@@ -1,0 +1,23 @@
+{
+  "id": "mt5-demo",
+  "label": "MT5 demo - replace account and server",
+  "connector": "mt5",
+  "account_ref": "12345678",
+  "environment": "demo",
+  "execution_enabled": false,
+  "symbols": ["EURUSDm"],
+  "terminal_path": "C:\\Program Files\\Your Broker MT5\\terminal64.exe",
+  "server": "REPLACE_WITH_EXACT_DEMO_SERVER",
+  "limits": {
+    "max_order_notional_usd": "1500",
+    "max_total_exposure_usd": "3000",
+    "max_stop_risk_usd": "10",
+    "max_equity_drawdown_usd": "50",
+    "max_quantity": "0.01",
+    "max_spread_points": "30",
+    "max_leverage": "2",
+    "max_deviation_points": 20,
+    "max_quote_age_seconds": 10,
+    "max_orders_per_day": 5
+  }
+}

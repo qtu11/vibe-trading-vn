@@ -1,0 +1,21 @@
+{
+  "id": "oanda-practice",
+  "label": "OANDA practice - replace account ID",
+  "connector": "oanda",
+  "account_ref": "101-001-REPLACE",
+  "environment": "demo",
+  "execution_enabled": false,
+  "symbols": ["EUR_USD"],
+  "limits": {
+    "max_order_notional_usd": "1000",
+    "max_total_exposure_usd": "3000",
+    "max_stop_risk_usd": "10",
+    "max_equity_drawdown_usd": "50",
+    "max_quantity": "100",
+    "max_spread_points": "30",
+    "max_leverage": "2",
+    "max_deviation_points": 20,
+    "max_quote_age_seconds": 10,
+    "max_orders_per_day": 5
+  }
+}

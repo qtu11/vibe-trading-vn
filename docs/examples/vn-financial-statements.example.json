@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "symbol": "VIC.VN",
+  "venue": "HOSE",
+  "records": [
+    {
+      "statement": "income",
+      "period": "quarter",
+      "period_start": "2025-01-01",
+      "period_end": "2025-03-31",
+      "period_basis": "standalone",
+      "consolidation": "consolidated",
+      "published_at": "2025-04-20T10:00:00+07:00",
+      "available_at": "2025-04-20T10:00:00+07:00",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Fictional fixture: page 3, income table",
+      "revision": "fictional-original",
+      "facts": {
+        "revenue": {"value": "100", "unit": "VND", "scale": 1000000},
+        "net_income": {"value": "-5.25", "unit": "VND", "scale": 1000000},
+        "eps": {"value": null, "unit": "VND/share", "scale": 1}
+      }
+    }
+  ]
+}
