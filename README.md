@@ -1,8 +1,63 @@
-# Vibe-Trading — Multi-Market AI Research & Trading Intelligence
+<p align="center">
+  <b>Tiếng Việt</b> | <a href="README_en.md">English</a> | <a href="README_zh.md">中文</a> | <a href="README_ja.md">日本語</a> | <a href="README_ko.md">한국어</a> | <a href="README_ar.md">العربية</a> | <a href="README_es.md">Español</a> | <a href="README_id.md">Bahasa Indonesia</a>
+</p>
+
+<p align="center">
+  <img src="assets/icon.png" width="130" alt="Vibe-Trading Logo"/>
+</p>
+
+<h1 align="center">Vibe-Trading: Your Personal Trading Agent</h1>
+
+<p align="center">
+  <b>One Command to Empower Your Agent with Comprehensive Trading Capabilities</b><br>
+  <i>Nền tảng nghiên cứu tài chính định lượng & điều phối nhóm AI chuyên sâu: Chứng khoán VN · Forex/XAUUSD · Crypto</i>
+</p>
+
+<p align="center">
+  <a href="https://www.star-history.com/HKUDS/Vibe-Trading"><img src="https://api.star-history.com/badge?repo=HKUDS/Vibe-Trading&amp;type=trending" height="55" alt="Star History: GitHub Trending"/></a>
+  <a href="https://trendshift.io/repositories/25527"><img src="https://trendshift.io/api/badge/trendshift/repositories/25527/daily" height="55" alt="Trendshift: daily ranking"/></a>
+  <a href="https://www.star-history.com/HKUDS/Vibe-Trading"><img src="https://api.star-history.com/badge?repo=HKUDS/Vibe-Trading" height="55" alt="Star History: global star ranking"/></a>
+</p>
+
+<p align="center">
+  <b>GitHub topic rankings by stars</b> · Nov 4, 2026<br>
+  <a href="https://github.com/search?q=topic%3Abacktesting&amp;type=repositories&amp;s=stars&amp;o=desc">#1 Backtesting</a> &nbsp;·&nbsp;
+  <a href="https://github.com/search?q=topic%3Aalgorithmic-trading&amp;type=repositories&amp;s=stars&amp;o=desc">#3 Algorithmic Trading</a> &nbsp;·&nbsp;
+  <a href="https://github.com/search?q=topic%3Aquantitative-finance&amp;type=repositories&amp;s=stars&amp;o=desc">#4 Quantitative Finance</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11%2B-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
+  <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=flat" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Frontend-React%2019-61DAFB?style=flat&logo=react&logoColor=white" alt="React">
+  <a href="https://pypi.org/project/vibe-trading-ai/"><img src="https://img.shields.io/pypi/v/vibe-trading-ai?style=flat&logo=pypi&logoColor=white" alt="PyPI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow?style=flat" alt="License"></a>
+  <br>
+  <a href="https://github.com/HKUDS/.github/blob/main/profile/README.md"><img src="https://img.shields.io/badge/Feishu-Group-E9DBFC?style=flat-square&logo=feishu&logoColor=white" alt="Feishu"></a>
+  <a href="https://github.com/HKUDS/.github/blob/main/profile/README.md"><img src="https://img.shields.io/badge/WeChat-Group-C5EAB4?style=flat-square&logo=wechat&logoColor=white" alt="WeChat"></a>
+  <a href="https://discord.gg/6TdQnT5xcF"><img src="https://img.shields.io/badge/Discord-Join-7289DA?style=flat-square&logo=discord&logoColor=white" alt="Discord"></a>
+</p>
+
+<p align="center">
+  <a href="docs/README.md">Tài liệu</a> &nbsp;&middot;&nbsp;
+  <a href="docs/MULTI_MARKET_ARCHITECTURE.md">Kiến trúc</a> &nbsp;&middot;&nbsp;
+  <a href="docs/VIETNAM_EQUITY_RESEARCH.md">Chứng khoán VN</a> &nbsp;&middot;&nbsp;
+  <a href="docs/FOREX_XAUUSD_LAB.md">Forex & Vàng</a> &nbsp;&middot;&nbsp;
+  <a href="docs/CRYPTO_INTELLIGENCE.md">Crypto</a> &nbsp;&middot;&nbsp;
+  <a href="#quick-start-từ-source">Cài đặt</a> &nbsp;&middot;&nbsp;
+  <a href="docs/IMPLEMENTATION_ROADMAP.md">Lộ trình</a> &nbsp;&middot;&nbsp;
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <a href="#quick-start-từ-source"><img src="assets/pip-install.svg" height="45" alt="pip install vibe-trading-ai"></a>
+</p>
+
+---
 
 Nền tảng nghiên cứu tài chính bằng ngôn ngữ tự nhiên, điều phối nhóm AI, phân tích định lượng và backtest. Bản source này có CLI, FastAPI, MCP và giao diện React; hướng phát triển tập trung vào ba môi trường: **chứng khoán Việt Nam**, **Forex/XAUUSD** và **Crypto**.
 
-**Phiên bản trong source:** `0.1.18`. **Tài liệu đối chiếu:** 04/11/2026. Đây là bản định hướng và hướng dẫn của workspace hiện tại; tính năng đề xuất được đánh dấu riêng, không coi việc viết tài liệu là triển khai phần mềm. Thư mục không có `.git`, nên chưa xác định được commit.
+**Phiên bản trong source:** `0.1.18`. **Tài liệu đối chiếu:** 05/11/2026. **Repository:** [qtu11/vibe-trading-vn](https://github.com/qtu11/vibe-trading-vn). Đây là bản định hướng và hướng dẫn của workspace hiện tại; tính năng đề xuất được đánh dấu riêng, không coi việc viết tài liệu là triển khai phần mềm.
 
 [Tài liệu chi tiết](docs/README.md) · [Baseline mã nguồn](docs/SOURCE_BASELINE.md) · [Kiến trúc](docs/MULTI_MARKET_ARCHITECTURE.md) · [Lộ trình](docs/IMPLEMENTATION_ROADMAP.md) · [Changelog](CHANGELOG.md)
 
