@@ -1,0 +1,258 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-06",
+  "deliveries": [
+    {
+      "key": "VN local reference and provenance",
+      "ids": ["VN-068", "VN-070", "PLATFORM-008", "PLATFORM-009"],
+      "status": "partial",
+      "delivered": "Local loader giữ reference/adjustment, cache/resample có regression; .VN profile có market label đúng và giữ provider identity/null.",
+      "remaining": "Chưa có historical issuer/venue master, official reference verification hoặc toàn bộ HOSE/HNX/UPCoM execution fidelity.",
+      "source": ["agent/backtest/loaders/local_loader.py", "agent/backtest/engines/vietnam_equity.py", "agent/src/tools/stock_profile_tool.py"],
+      "tests": ["agent/tests/test_local_vietnam_reference.py", "agent/tests/test_stock_profile_tool.py"]
+    },
+    {
+      "key": "VN curated financial research",
+      "ids": ["VN-078", "VN-079", "VN-080", "VN-081", "VN-082", "VN-083", "VN-084", "VN-128", "PLATFORM-010"],
+      "status": "partial",
+      "delivered": "Reader local có cutoff/revision/provenance; vietnam_research qua registry/MCP chuẩn hóa VND, suy quý từ lũy kế tương thích, kiểm A=L+E, cash conversion/FCF/accruals và DSO/DIO/DPO từ average balances. Missing/unit/revision không phù hợp giữ unknown và evidence.",
+      "remaining": "Chưa tự thu thập/xác minh BCTC gốc, immutable historical archive, OCR/taxonomy ngân hàng, audit độc lập hoặc báo cáo AI đầu cuối. Nguồn local vẫn user_supplied_unverified.",
+      "source": ["agent/src/tools/local_financial_statements.py", "agent/src/tools/vietnam_research_tool.py", "agent/mcp_server.py"],
+      "tests": ["agent/tests/test_local_financial_statements.py", "agent/tests/test_vietnam_research.py"]
+    },
+    {
+      "key": "DCF JSON bridge and research caller",
+      "ids": ["VN-112", "VN-127"],
+      "status": "partial",
+      "delivered": "quantlib_call nhận envelope Assumption cố định, chạy DCF hiện có qua JSON/FastMCP; preset fundamental research dùng tool VN và DCF/WACC có thật thay claim cũ không có engine.",
+      "remaining": "VN DCF/sensitivity và snapshot định lượng có delivery riêng; chưa forecast/model đầu vào thực của doanh nghiệp, report AI có review độc lập hoặc định giá được xác nhận từ nguồn thật.",
+      "source": ["agent/src/tools/quantlib_tool.py", "agent/src/swarm/presets/fundamental_research_team.yaml"],
+      "tests": ["agent/tests/test_dcf_tool_bridge.py", "agent/tests/test_preset_claim_backing.py"]
+    },
+    {
+      "key": "Forex raw provider boundary",
+      "ids": ["FX-166", "FX-191"],
+      "status": "partial",
+      "delivered": "Quote/account/instrument/exposure decoding trả lỗi có cấu trúc, reject dữ liệu không hữu hạn và valuation ticks stale; giữ submit/reconcile semantics hiện có.",
+      "remaining": "Chưa kiểm tài khoản/broker thật, persistent tick/feed recorder hoặc toàn bộ response schemas và execution lifecycle.",
+      "source": ["agent/src/trading/forex/adapters/oanda.py", "agent/src/trading/forex/adapters/exness.py", "agent/src/trading/forex/risk.py"],
+      "tests": ["agent/tests/test_forex_adapters.py", "agent/tests/test_forex_execution.py"]
+    },
+    {
+      "key": "Forex past-only walk-forward research",
+      "ids": ["FX-154", "FX-160", "FX-161"],
+      "status": "partial",
+      "delivered": "POST /api/forex/walk-forward và Forex MCP dùng shared typed request; refit SMA train-only ở từng fold, purge label boundary, giữ trial errors/config/data hashes và OOS-only aggregate. Thời điểm bar open và outcome availability được tách rõ.",
+      "remaining": "SMA và EMA riêng đều giữ một nến next-open/close với chi phí bps giả định; chưa broker-calibrated costs, tick/SL/TP/swap hoặc parity với production runner. Registry và UI lab có delivery riêng bên dưới.",
+      "source": ["agent/src/trading/forex/walk_forward.py", "agent/src/api/forex_routes.py", "agent/src/trading/forex/mcp_server.py"],
+      "tests": ["agent/tests/test_forex_walk_forward.py", "agent/tests/test_forex_surfaces.py"]
+    },
+    {
+      "key": "Crypto funding fidelity and accounting identity",
+      "ids": ["CRYPTO-200", "CRYPTO-232"],
+      "status": "partial",
+      "delivered": "Loader từ chối settlement không biểu diễn được trên grid; diagnostics/run card ghi đúng perpetual/funding/liquidation assumptions; strict crypto composite chưa hỗ trợ bị chặn.",
+      "remaining": "Chưa cash-spot/inverse accounting, arbitrary funding cadence completeness, strict composite lifecycle hoặc parity liquidation với sàn.",
+      "source": ["agent/backtest/loaders/ccxt_loader.py", "agent/backtest/engines/crypto.py", "agent/backtest/engines/composite.py"],
+      "tests": ["agent/tests/test_ccxt_perpetual_loader.py", "agent/tests/test_crypto_engine.py", "agent/tests/test_composite_currency_guard.py"]
+    },
+    {
+      "key": "Crypto public derivatives research",
+      "ids": ["CRYPTO-200", "CRYPTO-201", "CRYPTO-257"],
+      "status": "partial",
+      "delivered": "crypto_derivatives qua registry/MCP đọc Binance linear USDT perpetual; phân tích OI base/quote và quantity/implied-price decomposition, realized funding với historical mark, actual observed coverage/cadence/hash và missing giữ null.",
+      "remaining": "Archive cục bộ explicit capture có delivery riêng bên dưới; vẫn chưa exchange historical publication availability, time-aligned independent price join hoặc feed thật. Summary không phải causal signal, funding cash illustration không phải portfolio ledger.",
+      "source": ["agent/src/tools/crypto_derivatives_tool.py", "agent/mcp_server.py", "agent/src/swarm/presets/crypto_research_lab.yaml", "agent/src/swarm/presets/crypto_trading_desk.yaml"],
+      "tests": ["agent/tests/test_crypto_derivatives_tool.py", "agent/tests/test_preset_claim_backing.py"]
+    },
+    {
+      "key": "Forex persistent experiment registry",
+      "ids": ["FX-160", "PLATFORM-062"],
+      "status": "partial",
+      "delivered": "Store Forex schema4 giữ immutable experiment/run IDs, mọi attempt và request/config/cost/data snapshot, actual source/dependency hashes, trial/fold failures. API ghi có settings-write auth; MCP mutation cần --allow-research-writes riêng. Lần chạy chết giữa chừng giữ running, không suy diễn kết quả.",
+      "remaining": "Chưa generic multi-strategy registry, total tuning budget, promotion/OOS reuse gate hoặc tự recover interrupted attempts. Request bars được lưu trong execution.db; downgrade cần backup DB trước nâng schema.",
+      "source": ["agent/src/trading/forex/store.py", "agent/src/trading/forex/service.py", "agent/src/trading/forex/experiments.py", "agent/src/api/forex_routes.py", "agent/src/trading/forex/mcp_server.py"],
+      "tests": ["agent/tests/test_forex_experiments.py", "agent/tests/test_forex_core.py", "agent/tests/test_forex_surfaces.py"]
+    },
+    {
+      "key": "Crypto offline snapshot-delta replay",
+      "ids": ["CRYPTO-197"],
+      "status": "partial",
+      "delivered": "orderbook_depth và mirrored MCP nhận Binance USD-M replay có protocol tag; snapshot bridge, pu continuity, duplicate/stale/delete và dữ liệu hỏng được kiểm. Gap/cross/nonfinite làm invalid, feature chỉ có sau snapshot+bridge đồng bộ mới; input/output bounded và nguồn supplied-unverified.",
+      "remaining": "Chưa WebSocket lifecycle/recorder thật, historical archive, OKX sequencing/checksum, tick-to-trade parity hoặc chứng minh các sự kiện do caller cung cấp là thật. Coverage chỉ là level snapshot và delta được cung cấp.",
+      "source": ["agent/src/tools/binance_orderbook_replay.py", "agent/src/tools/orderbook_depth_tool.py"],
+      "tests": ["agent/tests/test_binance_orderbook_replay.py", "agent/tests/test_orderbook_depth_tool.py"]
+    },
+    {
+      "key": "Swarm logical call admission and usage uncertainty",
+      "ids": ["PLATFORM-039", "PLATFORM-040"],
+      "status": "partial",
+      "delivered": "Optional max_llm_calls dùng shared atomic admission trước mỗi stream_chat của Swarm, gồm worker/stream retries; reservation được persist trước dispatch. Failed/cancelled usage có provider số liệu được giữ, thiếu usage là unknown. API/tool/main MCP nối cap và retry/resume giữ cap cho run mới; legacy counters là null.",
+      "remaining": "Cap chỉ giới hạn logical stream_chat invocations của Swarm, chưa SDK HTTP retries/internal invoke fallback, token/dollar ceiling, provider pricing reconciliation, AgentLoop toàn nền tảng hoặc benchmark-based model routing. Retry tạo run mới và allowance mới.",
+      "source": ["agent/src/swarm/budget.py", "agent/src/swarm/models.py", "agent/src/swarm/runtime.py", "agent/src/swarm/worker.py", "agent/src/tools/swarm_tool.py", "agent/src/api/swarm_routes.py", "agent/mcp_server.py"],
+      "tests": ["agent/tests/test_swarm_call_budget.py", "agent/tests/test_swarm_cache_source.py", "agent/tests/test_cli_swarm_retry.py", "agent/tests/test_swarm_m5_trust_model.py"]
+    },
+    {
+      "key": "Research web entry and provenance display",
+      "ids": ["VN-128", "CRYPTO-257"],
+      "status": "partial",
+      "delivered": "Trang /research qua menu gọi hai API read-auth cố định, dùng đúng tool VN/Crypto hiện có. Hiển thị metrics, null/reason, evidence/revision/hash/cutoff, actual coverage và limitations; paging đóng băng cutoff, query đổi thì hủy/loại kết quả cũ, URL evidence được kiểm. Copy mới có en/vi/tr.",
+      "remaining": "Chưa research report AI có human review, PDF artifact/version workflow, dữ liệu nguồn thật được xác minh hoặc chụp/kiểm giao diện bằng browser runtime; chín locale khác dùng English fallback cho copy mới.",
+      "source": ["agent/src/api/research_routes.py", "agent/api_server.py", "frontend/src/pages/MarketResearch.tsx", "frontend/src/lib/research.ts", "frontend/src/lib/api.ts", "frontend/src/router.tsx"],
+      "tests": ["agent/tests/test_research_routes.py", "frontend/src/pages/__tests__/MarketResearch.test.tsx", "frontend/src/components/layout/__tests__/Navigation.test.tsx"]
+    },
+    {
+      "key": "VN annual PE and observed PB peer scenarios",
+      "ids": ["VN-110", "VN-111", "VN-128"],
+      "status": "partial",
+      "delivered": "vietnam_comparables qua registry/main MCP/API dùng PATMI/weighted shares và parent common equity/book-snapshot shares. Strict annual period, declared cutoff, price instant/share basis, explicit peer reasons/evidence; negative/missing inputs có exclusion, quantile của toàn peer set tạo scenario có điều kiện và paging không mất hash scope.",
+      "remaining": "Nguồn/issuer/peer comparability và corporate-action basis vẫn do caller khai báo, chưa được xác minh. Chưa justified P/B–ROE, quarterly TTM/calendarization, historical percentile, preferred/diluted reconciliation hoặc forecast/report AI có human review.",
+      "source": ["agent/src/tools/vietnam_comparables.py", "agent/src/tools/vietnam_comparables_tool.py", "agent/src/quantlib/valuation/comps.py", "agent/mcp_server.py", "agent/src/api/research_routes.py", "agent/src/swarm/presets/fundamental_research_team.yaml"],
+      "tests": ["agent/tests/test_vietnam_comparables.py", "agent/tests/test_research_routes.py", "agent/tests/quantlib/valuation/test_comps.py"]
+    },
+    {
+      "key": "Forex EMA research variant and web lab",
+      "ids": ["FX-154", "FX-160", "FX-161", "PLATFORM-062"],
+      "status": "partial",
+      "delivered": "WalkForwardRequest thêm ema_crossover có first-close seed/alpha2/(window+1)/slow+1 warmup, refit train-only và strategy/hash riêng; omitted SMA giữ output baseline. /research có lab nhập JSON/file bounded hoặc synthetic example, calculate riêng/save riêng, xem mọi fold/trial và lịch sử immutable attempts/paging, không tự retry ghi hoặc kích hoạt strategy.",
+      "remaining": "Vẫn one-bar mid-price/cost giả định, chưa SL/TP/tick/broker parity. UI chưa browser visual acceptance; registry chưa promotion/OOS reuse hoặc total tuning-budget gate. Save chạy evaluator lại và có thể chưa xác định kết quả khi transport timeout.",
+      "source": ["agent/src/trading/forex/research_signals.py", "agent/src/trading/forex/walk_forward.py", "agent/src/trading/forex/experiments.py", "frontend/src/components/forex/ForexResearchLab.tsx", "frontend/src/lib/forexResearch.ts", "frontend/src/pages/MarketResearch.tsx", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_forex_ema_research.py", "agent/tests/test_forex_experiments.py", "frontend/src/components/forex/__tests__/ForexResearchLab.test.tsx", "frontend/src/lib/__tests__/forexResearch.test.ts", "frontend/src/pages/__tests__/MarketResearch.test.tsx"]
+    },
+    {
+      "key": "Crypto append-only local observation archive",
+      "ids": ["CRYPTO-200", "CRYPTO-201", "PLATFORM-007", "PLATFORM-010"],
+      "status": "partial",
+      "delivered": "Crypto agent tool explicit capture ghi SQLite append-only theo Data Bridge config; main MCP chỉ live/archive read, API capture cần write-auth và UI có nút lưu riêng. Giữ parsed CCXT payload/normalization hash, local recorded/retrieved time, revisions; query read-only theo cutoff kiểm toàn scope manifests/index, conflict/corruption/clock regression trả lỗi và có bounded verification.",
+      "remaining": "Local recording time chưa chứng minh exchange historical publication time; đây chưa là collector tự động hay nguồn raw HTTP bytes/on-chain. Query giới hạn512 captures/20MB/20k observations; chưa signed/tamperproof external evidence, retention/partition policy hoặc lịch sử đủ. Không đổi archive path từ tool argument.",
+      "source": ["agent/src/tools/crypto_derivatives_archive.py", "agent/src/tools/crypto_derivatives_tool.py", "agent/mcp_server.py", "agent/src/api/research_routes.py", "frontend/src/pages/MarketResearch.tsx"],
+      "tests": ["agent/tests/test_crypto_derivatives_archive.py", "agent/tests/test_crypto_derivatives_tool.py", "agent/tests/test_research_routes.py", "frontend/src/pages/__tests__/MarketResearch.test.tsx"]
+    },
+    {
+      "key": "VN bounded DCF sensitivity and valuation workbench",
+      "ids": ["VN-112", "VN-117", "VN-128"],
+      "status": "partial",
+      "delivered": "Adapter VN dùng lại run_dcf/sensitivity_grid/equity bridge: explicit basis/evidence/availability, VND scale chỉ cho money, actual diluted shares, restricted cash tách riêng, non-financial consolidated FCFF và 9x9 WACC/g grid. Cell g>=WACC giữ null/reason; base exit-multiple khác grid perpetuity được ghi rõ. API read-auth và Web nối cả DCF/comparables với input/import/fixtures, provenance và lưu phiên bản riêng.",
+      "remaining": "Đầu vào doanh nghiệp, forecast, share/corporate-action basis và bằng chứng vẫn caller-declared/unverified. Reverse DCF có delivery riêng; chưa ngân hàng/bảo hiểm, actual-day/stub, dữ liệu thật, AI report/PDF hoặc browser visual acceptance; grid không phải xác suất.",
+      "source": ["agent/src/tools/vietnam_dcf.py", "agent/src/api/research_routes.py", "frontend/src/components/research/VietnamValuationLab.tsx", "frontend/src/components/research/ResearchJsonInput.tsx", "frontend/src/pages/MarketResearch.tsx", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_vietnam_dcf.py", "agent/tests/test_research_routes.py", "frontend/src/components/research/__tests__/VietnamValuationLab.test.tsx", "frontend/src/components/research/__tests__/ResearchJsonInput.test.tsx"]
+    },
+    {
+      "key": "Forex frozen OOS cost stress",
+      "ids": ["FX-160", "FX-161", "FX-163"],
+      "status": "partial",
+      "delivered": "CostStressRequest yêu cầu explicit spread/commission/slippage/gap sum khớp base cost; fit walk-forward một lần, khóa OOS parameters/signals/outcomes và tăng spread1x/2x/3x giữ phí khác. Trả shared tape hash, net expectancy/arithmetic break-even âm/null và compounded insolvency riêng; HTTP/dedicated Forex MCP/UI tính và lưu lại qua registry schema4, manifest giữ actual source hashes.",
+      "remaining": "Vẫn supplied-mid-bar one-bar study, chi phí caller-assumed, chưa broker-calibrated distribution, bid/ask ticks, dynamic spread/fee, swap/latency/SLTP hoặc price-gap replay. Gap chỉ fixed adverse charge; break-even số học không phải compounded root, chưa tuning/promotion/OOS reuse gate.",
+      "source": ["agent/src/trading/forex/cost_stress.py", "agent/src/trading/forex/walk_forward.py", "agent/src/trading/forex/experiments.py", "agent/src/trading/forex/service.py", "agent/src/api/forex_routes.py", "agent/src/trading/forex/mcp_server.py", "frontend/src/components/forex/ForexResearchLab.tsx", "frontend/src/lib/forexResearch.ts"],
+      "tests": ["agent/tests/test_forex_cost_stress.py", "agent/tests/test_forex_surfaces.py", "agent/tests/test_forex_experiments.py", "frontend/src/components/forex/__tests__/ForexResearchLab.test.tsx", "frontend/src/lib/__tests__/forexResearch.test.ts"]
+    },
+    {
+      "key": "Immutable VN research revisions and bounded delta review",
+      "ids": ["PLATFORM-033", "VN-128", "VN-130"],
+      "status": "partial",
+      "delivered": "Fixed server dispatch cho năm kind VN statements/comparables/DCF/reverse DCF/crypto basis, append request/result/source/facts/producer hashes vào SQLite riêng; writer schema2, reader schema1/2 và migration không sửa revision cũ. Parent scope, immutable revision/review events, read-only no-create và clock/integrity/foreign-store conflicts được kiểm. API/Web có lịch sử, JSON Pointer diffs giữ null/zero, affected VN ratio dependencies và self-reported acknowledgment/changes_requested. Attempt/idempotency có delivery riêng; lỗi refresh giữ revision cũ nguyên vẹn.",
+      "remaining": "Đây là snapshot định lượng một page/scenario, chưa AI narrative/PDF, selective claim regeneration, verified reviewer/role separation, tenant ACL hoặc signed tamperproof ledger. Module hashes chưa khóa đầy đủ dependency/runtime; review không xác minh tài liệu độc lập, chưa có review idempotency hoặc tự phục hồi attempt gián đoạn.",
+      "source": ["agent/src/research_artifacts/store.py", "agent/src/research_artifacts/service.py", "agent/src/api/research_artifact_routes.py", "agent/api_server.py", "frontend/src/components/research/ResearchRevisionPanel.tsx", "frontend/src/lib/researchArtifacts.ts", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_research_artifact_revisions.py", "agent/tests/test_research_artifact_routes.py", "frontend/src/components/research/__tests__/ResearchRevisionPanel.test.tsx", "frontend/src/pages/__tests__/MarketResearch.test.tsx", "frontend/src/lib/__tests__/api.test.ts"]
+    },
+    {
+      "key": "VN price-implied terminal growth solver",
+      "ids": ["VN-112", "VN-117", "VN-128"],
+      "status": "partial",
+      "delivered": "Reverse DCF giữ nguyên FCFF/WACC/equity bridge, dùng shared DCF input normalization và sensitivity_grid cho mỗi lần định giá. Explicit target VND/share, price availability/evidence/share basis và growth bracket; bounded bisection128, solved/outside_bracket/non_identifiable/iteration_limit không extrapolate. So sánh JSON-visible engine price với target decimal bằng precision80, residual decimal string để không báo hội tụ giả do float rounding. API/Web và revision kind riêng nối same engine; zero/null giữ đúng.",
+      "remaining": "Nghiệm chỉ giải thích supplied price trong fixed model, chưa forecast/growth verification hoặc chứng minh tính phù hợp của mô hình doanh nghiệp. Chưa actual-day/stub, bank/insurance, signed market-price evidence, independent review hoặc browser visual acceptance. Float engine có thể không đáp ứng tolerance; không tự nới sai số hay bracket.",
+      "source": ["agent/src/tools/vietnam_reverse_dcf.py", "agent/src/tools/vietnam_dcf.py", "agent/src/api/research_routes.py", "agent/src/research_artifacts/service.py", "frontend/src/components/research/VietnamReverseDCFLab.tsx", "frontend/src/lib/api.ts", "frontend/src/pages/MarketResearch.tsx"],
+      "tests": ["agent/tests/test_vietnam_reverse_dcf.py", "agent/tests/test_research_iteration7_routes.py", "frontend/src/components/research/__tests__/VietnamReverseDCFLab.test.tsx", "frontend/src/pages/__tests__/MarketResearch.test.tsx", "frontend/src/lib/__tests__/api.test.ts"]
+    },
+    {
+      "key": "Forex within-fold frozen OOS trade-path bootstrap",
+      "ids": ["FX-160", "FX-161", "FX-162", "PLATFORM-062"],
+      "status": "partial",
+      "delivered": "Seeded PCG64 moving-block bootstrap dùng từng fold OOS đã chọn tham số từ train, không fit lại hoặc cross-fold block. Giữ số trade mỗi fold, fixed base cost trừ một lần, shared tape/config/source hashes và NumPy version. Báo empirical terminal return/max drawdown quantiles, fan bounded20paths/100steps, zero/short-fold/numeric failure explicit; một path lỗi làm null toàn quantiles. HTTP/dedicated MCP/Web cùng registry schema4 tính/lưu riêng và load lại đúng method.",
+      "remaining": "Empirical resampling theo observed trade-index không phải xác suất lãi tương lai, Sharpe annualization, OOS reuse/tuning gate hoặc model margin/stop-out. Chưa block-length calibration/stationarity, calendar/dependence across folds, dynamic costs/ticks/broker/SLTP/swap hoặc permutation p-value. FX-162 acceptance vẫn mở.",
+      "source": ["agent/src/trading/forex/trade_paths.py", "agent/src/trading/forex/experiments.py", "agent/src/trading/forex/service.py", "agent/src/api/forex_routes.py", "agent/src/trading/forex/mcp_server.py", "frontend/src/components/forex/ForexResearchLab.tsx", "frontend/src/lib/forexResearch.ts", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_forex_trade_paths.py", "agent/tests/test_forex_surfaces.py", "agent/tests/test_forex_experiments.py", "frontend/src/components/forex/__tests__/ForexResearchLab.test.tsx", "frontend/src/lib/__tests__/forexResearch.test.ts"]
+    },
+    {
+      "key": "Crypto supplied dated-futures gross basis curve",
+      "ids": ["CRYPTO-202", "CRYPTO-257"],
+      "status": "partial",
+      "delivered": "crypto_basis_curve agent/main MCP và API/Web dùng strict64k/12contract typed supplied spot/future bid/ask, UTC cutoff/expiry/source references và explicit age/skew budgets. Tính signed mid basis, bid/ask gross bounds và simple ACT365F với exact intraday seconds, dùng quantlib day count; perpetual/expired/stale/skew/future availability/currency/settlement/nonlinear mismatch giữ rejected/null reason. Tool page3rows không đổi full summary/hash; API/artifact giữ full curve, source vẫn unverified.",
+      "remaining": "Chưa licensed/exchange collector, verified contract/expiry/quote source, raw feed history, net carry sau fees/funding/borrow/margin/liquidity/settlement hoặc executable arbitrage. Quote USDT không suy thành USD; perpetual không được gán expiry giả. Snapshot/review chưa tenant ACL/independent source verification; chưa browser visual acceptance.",
+      "source": ["agent/src/tools/crypto_basis.py", "agent/src/tools/crypto_basis_tool.py", "agent/mcp_server.py", "agent/src/api/research_routes.py", "agent/src/research_artifacts/service.py", "frontend/src/components/research/CryptoBasisLab.tsx", "frontend/src/pages/MarketResearch.tsx", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_crypto_basis.py", "agent/tests/test_research_iteration7_routes.py", "frontend/src/components/research/__tests__/CryptoBasisLab.test.tsx", "frontend/src/pages/__tests__/MarketResearch.test.tsx", "frontend/src/lib/__tests__/api.test.ts"]
+    },
+    {
+      "key": "Shared DAG input contract",
+      "ids": ["PLATFORM-029", "PLATFORM-030"],
+      "status": "partial",
+      "delivered": "Runtime và preset inspect dùng chung DAG gate cho ID/agent identity/dependency/input_from; transitive upstream được giữ, input sai bị từ chối trước persistence/reaper/thread.",
+      "remaining": "Chưa chứng minh toàn bộ durable DAG/checkpoint/effect semantics hoặc distributed scheduler/role delegation trong chương trình; quyền broker không sinh từ vai trò agent.",
+      "source": ["agent/src/swarm/task_store.py", "agent/src/swarm/presets.py", "agent/src/swarm/runtime.py"],
+      "tests": ["agent/tests/test_swarm_dag_validation.py", "agent/tests/test_swarm_preset_inspect.py"]
+    },
+    {
+      "key": "Markdown export from stored research revisions",
+      "ids": ["VN-128", "PLATFORM-064"],
+      "status": "partial",
+      "delivered": "Renderer Markdown deterministic từ đúng revision object do store trả về cho năm kind VN/comparables/DCF/reverse DCF/crypto basis; giữ as_of/cutoff/coverage/paging/gaps, null/zero/negative, rejected contract và evidence/locator đã ghi. Endpoint read-auth trả text/markdown với filename cố định, no-store/nosniff; preview và download dùng cùng response; 413/422/503 không tạo báo cáo rỗng hay số liệu thay thế.",
+      "remaining": "Chưa publish/gửi email/webhook, PDF, rights/redaction/entitlement/citation-resolution gate, chữ ký hoặc delivery receipt; chưa AI narrative, selective claim regeneration hoặc browser visual acceptance. Bản nháp vẫn user_supplied_unverified và không cấp quyền nguồn.",
+      "source": ["agent/src/research_artifacts/report.py", "agent/src/api/research_artifact_routes.py", "frontend/src/components/research/ResearchReportExport.tsx", "frontend/src/components/research/ResearchRevisionPanel.tsx", "frontend/src/lib/researchArtifacts.ts", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_research_report_export.py", "agent/tests/test_research_iteration8_routes.py", "frontend/src/components/research/__tests__/ResearchReportExport.test.tsx", "frontend/src/lib/__tests__/api.test.ts"]
+    },
+    {
+      "key": "Grounded source citations and reply provenance",
+      "ids": ["PLATFORM-031"],
+      "status": "partial",
+      "delivered": "SourcePolicy tier1-5 và SourceRecord/ledger cho web/news/doc giữ publisher, URL, thời điểm, quote và hash; citation v2 bắt [S#] resolve, giá trị khớp nguồn, caption bảng/footnote hợp lệ và tier được kiểm. Figure không backed bị loại thay vì nới gate; reply metadata trả sources để UI hiển thị tier/verification/timestamps.",
+      "remaining": "Chưa có reviewer độc lập/role separation, tự phát hiện EVIDENCE_CONFLICT hoặc entitlement retrieve/cache/redistribute. Nguồn trang vẫn verification=unverified; council sources là reported_by_council và không nhập ledger chính.",
+      "source": ["agent/src/agent/grounding/sources.py", "agent/src/agent/grounding/ledger.py", "agent/src/agent/grounding/policies.py", "agent/src/agent/grounding/release.py", "agent/src/agent/tool_lifecycle.py", "agent/src/agent/loop.py", "agent/src/session/service.py", "frontend/src/components/chat/SourceEvidence.tsx"],
+      "tests": ["agent/tests/test_grounding_sources.py", "agent/tests/test_grounding_release.py", "agent/tests/test_grounding_figures_contract.py", "agent/tests/test_grounding_figures_ref_parser.py", "agent/tests/test_session_reply_runtime_metadata.py"]
+    },
+    {
+      "key": "Vietnam equity research council and contract",
+      "ids": ["VN-127"],
+      "status": "partial",
+      "delivered": "Preset vietnam_equity_council sáu vai fundamental/technical/bull/bear/risk/PM; run_research_council nhận ticker trần, lấy bars quan sát, chạy swarm và trả fence council. Verdict chuẩn hóa stance/horizon/confidence/entry/stop/target, giữ WAIT và reject thiếu nguồn/sai geometry. Wrapper luôn execution_ready=false vì chưa lấy live quote/book/session/holdings; SELL là giảm vị thế đang có, thiếu holdings làm non-actionable và bỏ short-style risk/reward/sizing. UI tách dữ kiện/đánh giá/lời khuyên; skill phương pháp sâu có delivery riêng.",
+      "remaining": "Council sources chỉ reported_by_council, chưa có evidence ledger độc lập hoặc reviewer separation; actionability nghiên cứu không phải order authority. Chưa trusted settled holdings/position-aware reduction, live quote/session/auction/orderbook/ATO/MTL, dissent/majority vote hoặc đồng bộ input manifest đầy đủ. Chưa replay LLM thật cho FPT hoặc browser visual acceptance.",
+      "source": ["agent/src/swarm/presets/vietnam_equity_council.yaml", "agent/src/tools/research_council_tool.py", "agent/src/tools/council_contract.py", "agent/src/tools/price_chart_tool.py", "frontend/src/components/charts/CouncilReport.tsx", "frontend/src/components/charts/ChartBlock.tsx"],
+      "tests": ["agent/tests/test_research_council_tool.py", "agent/tests/test_council_contract.py", "agent/tests/test_price_chart_tool.py", "frontend/src/components/charts/__tests__/CouncilReport.test.tsx"]
+    },
+    {
+      "key": "Run-card warnings and run-state evidence",
+      "ids": ["PLATFORM-019"],
+      "status": "partial",
+      "delivered": "Run card ghi config/strategy/artifact hashes, model provenance, tool traces và warnings đã hợp nhất từ config cùng runtime engine (caliber, annualisation, benchmark, content filter) trước khi ghi run_card.json/md. RunStateStore ghi success/failed/cancelled vào state.json bằng flush+fsync để crash không để lại file rỗng; API đọc run card và trả warnings trong summary.",
+      "remaining": "Chưa có spec hash, registry/index tra cứu nhiều run hoặc reconcile run bị kill trước khi kịp ghi terminal state; chưa chứng minh status sau process crash và chưa có retention/query toàn bộ run.",
+      "source": ["agent/backtest/run_card.py", "agent/backtest/engines/base.py", "agent/src/core/state.py"],
+      "tests": ["agent/tests/test_run_card.py", "agent/tests/test_backtest_summary.py", "agent/tests/test_local_vietnam_reference.py"]
+    },
+    {
+      "key": "Research refresh attempt ledger and explicit save idempotency",
+      "ids": ["PLATFORM-033", "VN-130"],
+      "status": "partial",
+      "delivered": "Schema2 append-only attempt admission trước engine, unique terminal outcome và atomic success+revision; caller-body idempotency key tùy chọn replay success/failure không chạy lại, body/parent/kind conflict409, interrupted giữ in_flight_unknown. GETattempts read-auth/no-create có filters/paging, last-good và refresh state theo admission order. Web giữ frozen request/key cho deliberate retry, có manual attempt history; reader schema1 không migrate, new write nâng2 không rewrite revision/review/hash cũ.",
+      "remaining": "Chưa live-source freshness verification, lease/takeover/recovery interrupted attempts, review idempotency, browser key persistence, tenant ACL, signed evidence hoặc independent reviewer. Unknown không bị suy thành failed/success; key mới là ý định mới. Mã schema1-only không đọc kho2; backup trước nâng và giữ database khi rollback.",
+      "source": ["agent/src/research_artifacts/store.py", "agent/src/research_artifacts/service.py", "agent/src/api/research_artifact_routes.py", "frontend/src/components/research/ResearchRevisionPanel.tsx", "frontend/src/components/research/ResearchAttemptHistory.tsx", "frontend/src/lib/researchArtifacts.ts", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_research_refresh_attempts.py", "agent/tests/test_research_iteration8_routes.py", "agent/tests/test_research_artifact_revisions.py", "frontend/src/components/research/__tests__/ResearchRevisionPanel.test.tsx", "frontend/src/components/research/__tests__/ResearchAttemptHistory.test.tsx", "frontend/src/lib/__tests__/api.test.ts"]
+    },
+    {
+      "key": "Forex causal ATR-normalized SMA regime replay",
+      "ids": ["FX-147", "PLATFORM-016"],
+      "status": "partial",
+      "delivered": "Shared closed-bar dataset giữ validation 32..2000 nến mid liên tục UTC. Regime dùng trailing SMA slope/causal Wilder ATR, fit entry/exit quantiles trên initial train prefix rồi khóa trước evaluation; hysteresis/min dwell, warmup/ATR0/degenerate giữ unknown. API và dedicated Forex MCP read-only trả calibration/prefix/state/producer hashes, timeline paging và summary toàn evaluation; Web nhập fixture, replay riêng và xuất đúng request+một trang response, không save/activate. Future-mutation/paging/replay invariants có tests.",
+      "remaining": "Heuristic supplied-data chưa ADX/swing confirmation, multi-timeframe/news/fundamental integration, adaptive rolling fit, verified ingest lag/feed, broker calibration hoặc thống kê predictive validity. Không tín hiệu giao dịch/PnL/xác suất hoặc lệnh; neutral chưa chứng minh range market, chưa persistent regime checkpoint/strategy promotion hoặc browser visual acceptance.",
+      "source": ["agent/src/trading/forex/research_dataset.py", "agent/src/trading/forex/research_indicators.py", "agent/src/trading/forex/regime.py", "agent/src/trading/forex/walk_forward.py", "agent/src/api/forex_routes.py", "agent/src/trading/forex/mcp_server.py", "frontend/src/components/forex/ForexRegimeLab.tsx", "frontend/src/pages/MarketResearch.tsx", "frontend/src/lib/api.ts"],
+      "tests": ["agent/tests/test_forex_regime.py", "agent/tests/test_forex_surfaces.py", "agent/tests/test_forex_walk_forward.py", "frontend/src/components/forex/__tests__/ForexRegimeLab.test.tsx", "frontend/src/pages/__tests__/MarketResearch.test.tsx"]
+    },
+    {
+      "key": "Vietnam deep research method grounded in supplied report samples",
+      "ids": ["VN-127", "VN-128"],
+      "status": "partial",
+      "delivered": "Skill vietnam-deep-research nối chat routing và allowlist/hướng dẫn sáu vai council, học cấu trúc kết luận→dữ kiện→nguyên nhân→triển vọng→định giá→rủi ro từ bốn PDF mẫu FPT được đối chiếu trang. Tách business/timing view, reported/comparable và actual/forecast, tiền doanh nghiệp/market flow/proxy, phương án chưa sở hữu/đang giữ và pullback/breakout/breakdown có điều kiện; anomalies là nghi vấn kèm cách kiểm chứ không kết tội. Wrapper gắn execution context chưa có quote/session/book/holdings và chặn SELL thiếu vị thế.",
+      "remaining": "Đây là phương pháp/prompt và source-backed wrapper, chưa automatic validated PDF extraction/issuer verification, real model replay, structured narrative claim graph, live VN market flow/quotes/auction feed hoặc dự đoán khớp ATO/MTL. Source samples vẫn user-supplied, historical broker targets không thành khuyến nghị hiện tại; chưa cá nhân hóa danh mục hoặc tự gửi lệnh.",
+      "source": ["agent/src/skills/vietnam-deep-research/SKILL.md", "agent/src/agent/context.py", "agent/src/swarm/presets/vietnam_equity_council.yaml", "agent/src/tools/research_council_tool.py", "docs/REPORT_SAMPLE_FINDINGS.md", "docs/VIETNAM_DEEP_RESEARCH_METHOD.md"],
+      "tests": ["agent/tests/test_preset_claim_backing.py", "agent/tests/test_research_council_tool.py", "frontend/src/components/charts/__tests__/CouncilReport.test.tsx"]
+    }
+  ]
+}

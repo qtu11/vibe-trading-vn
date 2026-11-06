@@ -488,6 +488,10 @@ class SwarmTool(BaseTool):
                 ),
                 "additionalProperties": {"type": "string"},
             },
+            "max_llm_calls": {
+                "type": "integer", "minimum": 1,
+                "description": "Optional cap on Swarm stream_chat invocations, including retries. Not a token or cost cap; SDK retries and invoke fallback may occur inside an invocation.",
+            },
         },
         "required": ["prompt"],
     }
@@ -597,6 +601,7 @@ class SwarmTool(BaseTool):
                 variables,
                 live_callback=_live_callback if self._event_callback is not None else None,
                 include_shell_tools=self.include_shell_tools,
+                **({"max_llm_calls": kwargs["max_llm_calls"]} if kwargs.get("max_llm_calls") is not None else {}),
             )
         except FileNotFoundError as exc:
             return json.dumps(
@@ -707,6 +712,10 @@ def _format_result(
             "total_output_tokens": run.total_output_tokens,
             "token_source": run.token_source,
         },
+        "max_llm_calls": getattr(run, "max_llm_calls", None),
+        "llm_calls_started": getattr(run, "llm_calls_started", None),
+        "llm_calls_unknown_usage": getattr(run, "llm_calls_unknown_usage", None),
+        "budget_stop_reason": getattr(run, "budget_stop_reason", None),
     }
     return json.dumps(result, ensure_ascii=False, indent=2)
 

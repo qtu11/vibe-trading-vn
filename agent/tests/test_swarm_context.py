@@ -133,7 +133,12 @@ def test_context_file_symlink_cannot_redirect_writes(tmp_path):
     context.artifact_dir.mkdir()
     outside = tmp_path / 'outside'
     outside.mkdir()
-    (context.artifact_dir / 'context-results').symlink_to(outside, target_is_directory=True)
+    try:
+        (context.artifact_dir / 'context-results').symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, 'winerror', None) == 1314:
+            pytest.skip('Windows requires a symlink privilege unavailable to this test process')
+        raise
     before = copy.deepcopy(messages)
     assert context.compact(messages, []) == []
     assert messages == before
@@ -163,7 +168,7 @@ def test_worker_refuses_over_budget_request_without_discarding_fresh_results(tmp
     )
     assert len(calls) == 1
     assert result.status == 'token_limit'
-    messages = json.loads(next(tmp_path.rglob('messages.json')).read_text())
+    messages = json.loads(next(tmp_path.rglob('messages.json')).read_text(encoding='utf-8'))
     assert json.loads(messages[-1]['content'])['observed'] == 'probe'
 
 

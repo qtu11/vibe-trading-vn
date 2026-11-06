@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "market": "VN_EQUITY",
+  "symbol": "ABCXY",
+  "exchange": "SAN_GIA_LAP",
+  "company_name": "Công ty Cổ phần ABCXY (Giả lập)",
+  "title": "TĂNG TRƯỞNG CÓ CHỌN LỌC TRONG CHU KỲ MỚI",
+  "subtitle": "Vibe Research | Báo cáo doanh nghiệp | Dữ liệu minh họa, không phản ánh chứng khoán thực",
+  "data_as_of": "2026-10-30",
+  "recommendation": "MUA",
+  "investment_horizon": "6-12 tháng",
+  "overview": "ABCXY là doanh nghiệp GIẢ LẬP được sử dụng để minh họa thiết kế báo cáo Vibe-Trading. Hồ sơ này mô phỏng một doanh nghiệp công nghệ cung cấp dịch vụ xuất khẩu phần mềm, nền tảng dữ liệu và dịch vụ thuê bao. Không có số liệu nào ở đây được xác minh từ thị trường thật.",
+  "executive_summary": "Kịch bản thử nghiệm cho thấy tăng trưởng doanh thu và biên lợi nhuận có thể hỗ trợ định giá; các luận điểm dưới đây chỉ dùng để kiểm tra renderer, bố cục và cơ chế trích dẫn.",
+  "financial_metrics": [
+    {"key":"market_price", "label":"Giá thị trường", "value":101.1, "unit":"nghìn VND/cp", "as_of":"2026-10-30", "source_ids":["SIM01"]},
+    {"key":"revenue", "label":"Doanh thu 12 tháng", "value":24500.0, "unit":"tỷ VND", "as_of":"2026-10-30", "source_ids":["SIM02"], "decimals":0},
+    {"key":"profit", "label":"Lợi nhuận sau thuế", "value":3850.0, "unit":"tỷ VND", "as_of":"2026-10-30", "source_ids":["SIM02"], "decimals":0},
+    {"key":"roe", "label":"ROE", "value":19.5, "unit":"%", "as_of":"2026-10-30", "source_ids":["SIM02"], "decimals":1},
+    {"key":"market_cap", "label":"Vốn hóa", "value":46200.0, "unit":"tỷ VND", "as_of":"2026-10-30", "source_ids":["SIM01"], "decimals":0}
+  ],
+  "valuation_metrics": [
+    {"key":"target_price", "label":"Giá mục tiêu", "value":121.9, "unit":"nghìn VND/cp", "as_of":"2026-10-30", "source_ids":["SIM03"], "decimals":1},
+    {"key":"upside", "label":"Tăng giá kỳ vọng", "value":20.57, "unit":"%", "as_of":"2026-10-30", "source_ids":["SIM03"], "decimals":1},
+    {"key":"pe", "label":"P/E dự phóng", "value":19.4, "unit":"x", "as_of":"2026-10-30", "source_ids":["SIM03"], "decimals":1},
+    {"key":"pb", "label":"P/B", "value":3.1, "unit":"x", "as_of":"2026-10-30", "source_ids":["SIM03"], "decimals":1}
+  ],
+  "investment_theses": [
+    {"title":"Động lực doanh thu từ hợp đồng mới", "body":"Giả định quy mô hợp đồng mới tăng khiến doanh thu dịch vụ công nghệ có thể duy trì tốc độ tăng trưởng hai chữ số. Cần kiểm tra backlog, thời gian ghi nhận và tỷ lệ chuyển đổi sang doanh thu khi dùng dữ liệu thật.", "source_ids":["SIM02"], "confidence":"low"},
+    {"title":"Khả năng cải thiện biên lợi nhuận", "body":"Đòn bẩy vận hành từ các dự án giá trị gia tăng và doanh thu thuê bao có thể hỗ trợ biên lợi nhuận, nhưng chịu ảnh hưởng đáng kể từ chi phí nhân sự và biến động tỷ giá.", "source_ids":["SIM02"], "confidence":"low"},
+    {"title":"Định giá theo nhiều kịch bản", "body":"Giá mục tiêu giả lập lấy từ mô hình kết hợp P/E mục tiêu và dòng tiền chiết khấu, chỉ nhằm minh họa đầu ra khi một mô hình định giá thực sự đã được kiểm chứng.", "source_ids":["SIM03"], "confidence":"low"}
+  ],
+  "risk_factors": [
+    {"title":"Rủi ro định giá", "body":"Giả định tăng trưởng dài hạn, WACC và hệ số P/E có thể khiến giá mục tiêu thay đổi mạnh. Cần đánh giá độ nhạy và kịch bản xấu.", "source_ids":["SIM03"], "confidence":"medium"},
+    {"title":"Chất lượng nguồn dữ liệu", "body":"Bản minh họa không dùng công bố doanh nghiệp thật. Mọi kết luận và chỉ tiêu đều không hợp lệ cho hoạt động giao dịch hoặc tư vấn đầu tư.", "source_ids":["SIM01","SIM02"], "confidence":"high"}
+  ],
+  "price_history": [
+    {"date":"2026-01-30", "close":85.0},
+    {"date":"2026-02-28", "close":88.0},
+    {"date":"2026-03-31", "close":91.0},
+    {"date":"2026-04-30", "close":87.0},
+    {"date":"2026-05-31", "close":94.0},
+    {"date":"2026-06-30", "close":93.0},
+    {"date":"2026-07-31", "close":98.0},
+    {"date":"2026-08-31", "close":96.0},
+    {"date":"2026-09-30", "close":104.0},
+    {"date":"2026-10-30", "close":101.1}
+  ],
+  "sources": [
+    {"id":"SIM01", "title":"Bảng giá và lịch sử giao dịch giả lập", "provider":"Vibe Report Demo", "status":"simulated", "published_at":"2026-10-30", "snapshot_id":"demo-price-v1"},
+    {"id":"SIM02", "title":"Báo cáo kết quả kinh doanh giả lập", "provider":"Vibe Report Demo", "status":"simulated", "published_at":"2026-10-30", "snapshot_id":"demo-fin-v1"},
+    {"id":"SIM03", "title":"Mô hình định giá P/E + DCF giả lập", "provider":"Vibe Report Demo", "status":"simulated", "published_at":"2026-10-30", "snapshot_id":"demo-valuation-v1"}
+  ],
+  "methodology": "Mẫu thử dựng trên dữ liệu giả lập để kiểm tra luồng: Research Snapshot → Structured JSON → Evidence Validation → Vibe-Branded DOCX → PDF. Khi triển khai production cần liên kết snapshot nguồn dữ liệu thật, sử dụng mô hình định lượng có kiểm thử, đánh dấu giá theo đơn vị cổ phiếu và khóa as_of của cả bộ dữ liệu.",
+  "demo": true
+}

@@ -70,10 +70,15 @@ def _unsourced_symbol_figures(ledger: Any, content: str) -> list[dict[str, Any]]
         if not carried:
             continue
         # A figure declared ``cited`` is exempt, since a citation is an origin.
-        if all(
-            (match := block.match(figure.value, figure.percent, figure.digits)) is not None and match.role == "cited"
-            for figure in carried
-        ):
+        # A measured cell under a table caption naming a collected ``[S#]`` is
+        # likewise cited by the table, even without a per-cell declaration.
+        def _cited(figure) -> bool:
+            match = block.match(figure.value, figure.percent, figure.digits)
+            if match is not None and match.role == "cited":
+                return True
+            return bool(ledger._table_cited_sources(figure))
+
+        if all(_cited(figure) for figure in carried):
             continue
         for symbol in unknown:
             reported.add(symbol)

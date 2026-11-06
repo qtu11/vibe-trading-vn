@@ -1,0 +1,8 @@
+{
+  "extraPaths": [
+    "agent"
+  ],
+  "venvPath": ".",
+  "venv": ".venv"
+}
+

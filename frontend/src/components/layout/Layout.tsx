@@ -158,15 +158,20 @@ export function Layout() {
         )}
       >
         {/* Brand */}
-        <div className={cn("border-b border-border/60", collapsed ? "p-2 flex justify-center" : "p-4 max-md:p-2 max-md:flex max-md:justify-center")}>
+        <div className={cn("border-b border-border/60", collapsed ? "p-2 flex justify-center" : "px-3.5 py-3 max-md:p-2 max-md:flex max-md:justify-center")}>
           <Link
             to="/"
             aria-label="Vibe-Trading"
-            className={cn("flex items-center", collapsed ? "justify-center" : "gap-2 max-md:justify-center")}
+            className={cn("flex items-center group", collapsed ? "justify-center" : "gap-2.5 max-md:justify-center")}
           >
-            <BrandMark className="h-6 w-6 shrink-0" />
+            <div className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent p-1.5 ring-1 ring-border/80 group-hover:ring-primary/50 group-hover:scale-105 transition-all shadow-sm">
+              <BrandMark className="h-7 w-7 shrink-0" priority />
+            </div>
             {!collapsed && (
-              <span className="text-[15px] font-semibold tracking-tight max-md:hidden">Vibe-Trading</span>
+              <div className="flex flex-col min-w-0 max-md:hidden">
+                <span className="text-[15px] font-bold tracking-tight text-foreground leading-tight">Vibe-Trading</span>
+                <span className="text-[10px] font-semibold text-primary/80 tracking-wider uppercase">AI Trading Lab</span>
+              </div>
             )}
           </Link>
         </div>

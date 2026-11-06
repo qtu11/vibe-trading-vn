@@ -14,9 +14,13 @@ from src.live.mandate.commit import save_proposal
 from src.tools.propose_mandate_tool import ProposeMandateProfilesTool
 from src.trading.forex.errors import ForexError
 from src.trading.forex.council import ResearchPlanRequest
+from src.trading.forex.cost_stress import CostStressRequest, cost_stress
+from src.trading.forex.trade_paths import TradePathsRequest, trade_paths
+from src.trading.forex.regime import RegimeRequest, regime
 from src.trading.forex.models import AIStrategy, Connection, Order, Strategy, number
 from src.trading.forex.runner import Runners
 from src.trading.forex.service import ForexService
+from src.trading.forex.walk_forward import WalkForwardRequest, walk_forward
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +57,58 @@ def register_forex_routes(app: FastAPI, service=None):
                     "error": "Broker service unavailable; verify connection settings and OS-vault credentials",
                 },
             ) from exc
+
+    @app.post("/api/forex/walk-forward", dependencies=read)
+    def research_walk_forward(payload: WalkForwardRequest):
+        return walk_forward(payload)
+
+    @app.post("/api/forex/cost-stress", dependencies=read)
+    def research_cost_stress(payload: CostStressRequest):
+        return cost_stress(payload)
+
+    @app.post("/api/forex/cost-stress/experiments", dependencies=write)
+    def start_cost_stress_experiment(payload: CostStressRequest):
+        return invoke(service.run_cost_stress_experiment, payload)
+
+    @app.post("/api/forex/cost-stress/experiments/{experiment_id}/runs", dependencies=write)
+    def append_cost_stress_experiment(experiment_id: str, payload: CostStressRequest):
+        return invoke(service.run_cost_stress_experiment, payload, experiment_id)
+
+    @app.post("/api/forex/trade-paths", dependencies=read)
+    def research_trade_paths(payload: TradePathsRequest):
+        return trade_paths(payload)
+
+    @app.post("/api/forex/trade-paths/experiments", dependencies=write)
+    def start_trade_paths_experiment(payload: TradePathsRequest):
+        return invoke(service.run_trade_paths_experiment, payload)
+
+    @app.post("/api/forex/trade-paths/experiments/{experiment_id}/runs", dependencies=write)
+    def append_trade_paths_experiment(experiment_id: str, payload: TradePathsRequest):
+        return invoke(service.run_trade_paths_experiment, payload, experiment_id)
+
+    @app.post("/api/forex/regime", dependencies=read)
+    def research_regime(payload: RegimeRequest):
+        return regime(payload)
+
+    @app.post("/api/forex/experiments", dependencies=write)
+    def start_experiment(payload: WalkForwardRequest):
+        return invoke(service.run_experiment, payload)
+
+    @app.post("/api/forex/experiments/{experiment_id}/runs", dependencies=write)
+    def append_experiment(experiment_id: str, payload: WalkForwardRequest):
+        return invoke(service.run_experiment, payload, experiment_id)
+
+    @app.get("/api/forex/experiments", dependencies=read)
+    def list_experiments(limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+        return invoke(service.store.research_experiments, limit, offset)
+
+    @app.get("/api/forex/experiments/{experiment_id}", dependencies=read)
+    def get_experiment(experiment_id: str, limit: int = Query(20, ge=1, le=100), offset: int = Query(0, ge=0)):
+        return invoke(service.store.research_experiment, experiment_id, limit, offset)
+
+    @app.get("/api/forex/experiments/{experiment_id}/runs/{run_id}", dependencies=read)
+    def get_experiment_run(experiment_id: str, run_id: str):
+        return invoke(service.store.research_run, experiment_id, run_id)
 
     @app.get("/api/forex/connections", dependencies=read)
     def connections():

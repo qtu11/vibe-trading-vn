@@ -61,3 +61,50 @@ def test_completed_reply_persists_runtime_identity_and_elapsed_time(
     assert terminal.event_type == "attempt.completed"
     assert terminal.data["model"] == "deepseek-v4-flash-202607"
     assert terminal.data["elapsed_ms"] == reply.metadata["elapsed_ms"]
+
+
+def test_completed_reply_persists_and_streams_grounding_sources(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr("src.session.service.get_shared_index", lambda: _DummyIndex())
+    store = SessionStore(tmp_path / "sessions")
+    event_bus = EventBus()
+    service = SessionService(
+        store=store, event_bus=event_bus, runs_dir=tmp_path / "runs"
+    )
+    session = Session(title="source metadata")
+    store.create_session(session)
+    attempt = Attempt(session_id=session.session_id, prompt="hello")
+    sources = [
+        {
+            "source_id": "S1",
+            "title": "Báo cáo thường niên FPT 2025",
+            "url": "https://fpt.com.vn/bao-cao-thuong-nien",
+            "domain": "fpt.com.vn",
+            "publisher": "FPT",
+            "tier": 1,
+            "tier_label": "official/primary",
+            "market": ["VN"],
+            "published_at": "2026-03-30",
+            "data_effective_at": "2025-12-31",
+            "data_effective_basis": "explicit",
+            "retrieved_at": "2026-11-06T03:00:00Z",
+            "verification": "unverified",
+            "cite_allowed": True,
+        }
+    ]
+
+    async def _fake_run(*args, **kwargs):
+        del args, kwargs
+        return {"status": "success", "content": "done [S1]", "sources": sources}
+
+    monkeypatch.setattr(service, "_run_with_agent", _fake_run)
+
+    asyncio.run(service._run_attempt(session, attempt))
+
+    reply = store.get_messages(session.session_id)[-1]
+    assert reply.metadata["sources"] == sources
+    terminal = event_bus.replay(session.session_id, replay_all=True)[-1]
+    assert terminal.event_type == "attempt.completed"
+    assert terminal.data["sources"] == sources

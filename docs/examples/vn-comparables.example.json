@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "as_of": "2025-05-15T09:00:00Z",
+  "period_start": "2024-01-01",
+  "period_end": "2024-12-31",
+  "consolidation": "consolidated",
+  "target": {
+    "symbol": "CASE.VN", "venue": "HOSE", "sector": "synthetic_industrial",
+    "selection_basis": "Synthetic target for reproducible math only; no actual issuer mapping",
+    "price_observed_at": "2025-05-15T07:45:00Z",
+    "share_basis": "price_date_equivalent_common", "share_basis_note": "Synthetic common-share basis; no corporate actions",
+    "price_vnd": "20000", "patmi_vnd": "10000000000", "weighted_average_shares": "5000000",
+    "parent_equity_vnd": "100000000000", "current_common_shares": "10000000",
+    "financial_evidence": {
+      "source_url": "https://example.invalid/CASE/annual", "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic annual PATMI, parent equity, weighted-average and current common shares",
+      "published_at": "2025-03-31T00:00:00Z", "available_at": "2025-03-31T01:00:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+    },
+    "price_evidence": {
+      "source_url": "https://example.invalid/CASE/price", "document_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "locator": "Synthetic raw close, VND per common share",
+      "published_at": "2025-05-15T07:45:00Z", "available_at": "2025-05-15T07:46:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+    }
+  },
+  "peers": [
+    {
+      "symbol": "PEERA.VN", "venue": "HOSE", "sector": "synthetic_industrial",
+      "selection_basis": "Synthetic peer A; same declared annual period and sector",
+      "price_observed_at": "2025-05-15T07:45:00Z",
+      "share_basis": "price_date_equivalent_common", "share_basis_note": "Synthetic common-share basis; no corporate actions",
+      "price_vnd": "10000", "patmi_vnd": "10000000000", "weighted_average_shares": "5000000",
+      "parent_equity_vnd": "100000000000", "current_common_shares": "10000000",
+      "financial_evidence": {
+        "source_url": "https://example.invalid/PEERA/annual", "document_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "locator": "Synthetic annual common earnings and shares",
+        "published_at": "2025-03-31T00:00:00Z", "available_at": "2025-03-31T01:00:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+      },
+      "price_evidence": {
+        "source_url": "https://example.invalid/PEERA/price", "document_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "locator": "Synthetic raw close",
+        "published_at": "2025-05-15T07:45:00Z", "available_at": "2025-05-15T07:46:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+      }
+    },
+    {
+      "symbol": "PEERB.VN", "venue": "HNX", "sector": "synthetic_industrial",
+      "selection_basis": "Synthetic peer B; same declared annual period and sector",
+      "price_observed_at": "2025-05-15T07:45:00Z",
+      "share_basis": "price_date_equivalent_common", "share_basis_note": "Synthetic common-share basis; no corporate actions",
+      "price_vnd": "20000", "patmi_vnd": "10000000000", "weighted_average_shares": "5000000",
+      "parent_equity_vnd": "100000000000", "current_common_shares": "10000000",
+      "financial_evidence": {
+        "source_url": "https://example.invalid/PEERB/annual", "document_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "locator": "Synthetic annual common earnings and shares",
+        "published_at": "2025-03-31T00:00:00Z", "available_at": "2025-03-31T01:00:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+      },
+      "price_evidence": {
+        "source_url": "https://example.invalid/PEERB/price", "document_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "locator": "Synthetic raw close",
+        "published_at": "2025-05-15T07:45:00Z", "available_at": "2025-05-15T07:46:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+      }
+    },
+    {
+      "symbol": "PEERC.VN", "venue": "UPCOM", "sector": "synthetic_industrial",
+      "selection_basis": "Synthetic peer C; same declared annual period and sector",
+      "price_observed_at": "2025-05-15T07:45:00Z",
+      "share_basis": "price_date_equivalent_common", "share_basis_note": "Synthetic common-share basis; no corporate actions",
+      "price_vnd": "30000", "patmi_vnd": "10000000000", "weighted_average_shares": "5000000",
+      "parent_equity_vnd": "100000000000", "current_common_shares": "10000000",
+      "financial_evidence": {
+        "source_url": "https://example.invalid/PEERC/annual", "document_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+        "locator": "Synthetic annual common earnings and shares",
+        "published_at": "2025-03-31T00:00:00Z", "available_at": "2025-03-31T01:00:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+      },
+      "price_evidence": {
+        "source_url": "https://example.invalid/PEERC/price", "document_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "locator": "Synthetic raw close",
+        "published_at": "2025-05-15T07:45:00Z", "available_at": "2025-05-15T07:46:00Z", "retrieved_at": "2025-05-15T08:00:00Z"
+      }
+    }
+  ]
+}

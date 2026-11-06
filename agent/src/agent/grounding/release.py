@@ -84,6 +84,8 @@ _CORRECTION_REASONS = {
     "derivation_result_mismatch": "its own note evaluates to {result}",
     "outside_observed_range": "it is outside the observed range {range} and its note derives no value",
     "citation_without_source": "its note names no source",
+    "citation_unknown_source": "it cites a source id this session never collected; use an id from the tool result's _sources index",
+    "citation_value_not_in_source": "the value does not appear in the cited source's collected text; quote the source's own number or declare the arithmetic",
     "cited_as_observed": "it is presented as an observed value of this instrument",
     "unparseable_declaration": "the declaration line could not be read as `value | role | note | ref`",
     "symbol_never_handled": "no tool call in this session passed in or returned that symbol",

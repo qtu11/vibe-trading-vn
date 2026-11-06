@@ -5,6 +5,53 @@ This project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Sourced numbers survive the grounding gate with a resolvable citation.**
+  A tiered publisher registry now turns `web_search`, `read_url`, document
+  reads and `get_stock_news` results into bounded `S#` source records. A
+  `[S#]` citation is accepted only when the id resolves and the cited value
+  appears in that source; Markdown table captions cite every measured cell in
+  the table. The old visible-publisher-name check remains as an unverified
+  fallback. Cited sources are labelled by reputation tier, and presence in a
+  source is never presented as independent confirmation.
+- **Vietnamese stock news works for `.VN` tickers.** `get_stock_news` routes
+  Vietnam to Google News RSS (`hl=vi&gl=VN`) with CafeF RSS as a fallback,
+  reports `partial`/`provider_errors` when only one provider answers, and
+  tiers Google redirects by their real publisher URL. The VN tier-4 registry
+  covers major outlets including CafeF, Vietstock, VnEconomy, VietnamNet,
+  Dân trí, Người Quan Sát and Bnews; unknown publishers stay tier 5 and are
+  labelled unverified rather than silently trusted.
+- **Deterministic price charts in answers.** `build_price_chart` returns a
+  `chart` fenced block built from the same observed OHLCV rows as
+  `get_market_data`; the chat renders it as an ECharts candlestick with volume
+  and MA overlays, and falls back to text when the spec is invalid.
+- **Vietnam equity research council.** `run_research_council` runs a six-role
+  preset (fundamental, technical, bull, bear, risk, PM), evaluates the PM
+  verdict with deterministic unit/stop/target/R-R/sizing checks, and returns a
+  `council` fenced block. The UI separates facts, evaluation and advice, shows
+  the bull/bear cases and labels council-named sources as unverified. A
+  verdict without sources is not actionable. Only the observed chart bars
+  enter the grounding ledger; model-written entry/stop/target claims do not.
+- **Reply citations show their timestamps.** Completed replies now carry a
+  compact `sources` list in reply metadata, rendered under the answer with the
+  source id, publisher, tier, verification label, publication time,
+  data-effective time and retrieval time. When a provider gives no explicit
+  effective time, the UI marks the publication date as a fallback.
+- **Saved research revisions export as a bounded Markdown draft.** The export
+  renders the stored revision (VN statements, comparables, DCF, reverse DCF
+  and crypto basis) without re-running engines, fetching sources or upgrading
+  verification. The authenticated read endpoint returns `text/markdown`, and
+  preview/download share that same response; oversized or unsupported
+  revisions fail closed instead of producing a partial report.
+
+### Fixed
+
+- **`(omitted※)` no longer hides figures that have a real source.** The gate
+  was working as designed (fail-closed) but had no way to treat a sourced
+  text number as evidence. The citation contract above gives those figures a
+  verification path instead of weakening the gate.
+
 ## [0.1.18] — 2026-10-21
 
 ### Changed

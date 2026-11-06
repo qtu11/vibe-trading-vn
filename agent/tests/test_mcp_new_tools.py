@@ -55,6 +55,11 @@ KNOWN_MUTATING_MCP_TOOLS = frozenset(
     }
 )
 
+# A domain tool may have write modes while its hand-written MCP projection
+# exposes only reads. Do not grandfather writes: pin the exact wire whitelist
+# and reject capture before the domain registry in the regression below.
+READONLY_MCP_PROJECTIONS = frozenset({"crypto_derivatives"})
+
 
 def _import_mcp_server():
     """Import ``agent/mcp_server.py`` without executing ``main()``.
@@ -192,12 +197,14 @@ def test_order_placing_tools_are_never_exposed_via_mcp() -> None:
 
 
 def test_no_unexpected_mutating_tool_is_exposed_via_mcp() -> None:
-    """No tool with ``is_readonly=False`` may join the MCP surface.
+    """No unexpected write capability may join the MCP surface.
 
     The MCP server exposes read-only or sandbox-research tools only. A handful
     of pre-existing sandbox writers are grandfathered in
     (KNOWN_MUTATING_MCP_TOOLS); anything else showing up here means a mutating
-    tool was newly exposed, which is a red-line violation.
+    tool was newly exposed, which is a red-line violation. Hand-written read
+    projections are checked against their exact mode whitelist and direct/wire
+    write rejection below; their domain writes are not grandfathered here.
     """
     from src.tools import build_registry
 
@@ -209,10 +216,33 @@ def test_no_unexpected_mutating_tool_is_exposed_via_mcp() -> None:
         if (tool := registry.get(name)) is not None and tool.is_readonly is not True
     }
 
-    assert exposed_mutating <= KNOWN_MUTATING_MCP_TOOLS, (
+    for name in exposed_mutating & READONLY_MCP_PROJECTIONS:
+        assert _mcp_tools()[name].parameters["properties"]["mode"]["enum"] == ["live", "archive"]
+    unexpected = exposed_mutating - READONLY_MCP_PROJECTIONS
+    assert unexpected <= KNOWN_MUTATING_MCP_TOOLS, (
         "Mutating tools newly exposed via MCP: "
-        f"{sorted(exposed_mutating - KNOWN_MUTATING_MCP_TOOLS)}"
+        f"{sorted(unexpected - KNOWN_MUTATING_MCP_TOOLS)}"
     )
+
+
+def test_crypto_read_projection_rejects_capture_before_registry(monkeypatch) -> None:
+    import json
+    import mcp_server
+
+    monkeypatch.setattr(mcp_server, "_get_registry", lambda: pytest.fail("capture must not reach the domain tool"))
+    result = json.loads(mcp_server.crypto_derivatives("BTC-USDT-PERP", mode="capture"))
+    assert result["ok"] is False and result["error_code"] == "INVALID_ARGUMENT"
+
+
+@pytest.mark.asyncio
+async def test_crypto_wire_schema_rejects_capture_without_executing(monkeypatch) -> None:
+    from fastmcp import Client
+    import mcp_server
+
+    monkeypatch.setattr(mcp_server, "_get_registry", lambda: pytest.fail("wire capture must not reach registry"))
+    async with Client(mcp_server.mcp) as client:
+        result = await client.call_tool("crypto_derivatives", {"symbol": "BTC-USDT-PERP", "mode": "capture"}, raise_on_error=False)
+    assert result.is_error
 
 
 def test_every_mirrored_tool_is_readonly() -> None:

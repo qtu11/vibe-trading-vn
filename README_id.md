@@ -394,7 +394,7 @@
 
 - **2026-05-10** 🧱 **Regression guardrail + metadata run**: memory recall sekarang memperlakukan underscore sebagai token boundary, sehingga saved memory snake_case seperti `mcp_wiring_test` cocok dengan query natural-language seperti "mcp wiring" ([#87](https://github.com/HKUDS/Vibe-Trading/pull/87), terima kasih @hp083625). Server MCP memiliki subprocess smoke test yang mencakup initialize → `tools/list` → `tools/call` untuk menjaga first-call deadlock path ([#86](https://github.com/HKUDS/Vibe-Trading/pull/86)), sementara hardening low-risk masuk untuk test Windows yang path-sensitive, API best-effort exception handling, validation allowed-root `run_dir` backtest, dan metadata provider/model SwarmRun ([#88](https://github.com/HKUDS/Vibe-Trading/pull/88), [#90](https://github.com/HKUDS/Vibe-Trading/pull/90), [#91](https://github.com/HKUDS/Vibe-Trading/pull/91), [#92](https://github.com/HKUDS/Vibe-Trading/pull/92), terima kasih @Teerapat-Vatpitak).
 
-- **2026-05-09** 🛡️ **Hardening path API + stabilitas server MCP**: route run/session API sekarang memvalidasi path ID sebelum lookup, menolak parameter malformed yang mengandung newline dan mengunci behaviour tersebut dalam auth/security regression suite ([#80](https://github.com/HKUDS/Vibe-Trading/pull/80), terima kasih @SJoon99). Server MCP sekarang melakukan pre-warm tool registry di main thread sebelum melayani `tools/call`, menghindari first-call deadlock pada lazy tool discovery ([#85](https://github.com/HKUDS/Vibe-Trading/pull/85), terima kasih @Teerapat-Vatpitak). Vite dev proxy juga menghormati `VITE_API_URL` untuk target backend non-default ([#82](https://github.com/HKUDS/Vibe-Trading/pull/82), terima kasih @voidborne-d).
+- **2026-05-09** 🛡️ **Hardening path API + stabilitas server MCP**: route run/session API sekarang memvalidasi path ID sebelum lookup, menolak parameter malformed yang mengandung newline dan mengunci behaviour tersebut dalam auth/security regression suite ([#80](https://github.com/HKUDS/Vibe-Trading/pull/80), terima kasih @SJoon99). Server MCP sekarang melakukan pre-warm tool registry di main thread sebelum melayani `tools/call`, menghindari first-call deadlock pada lazy tool discovery ([#86](https://github.com/HKUDS/Vibe-Trading/pull/86), terima kasih @Teerapat-Vatpitak). Vite dev proxy juga menghormati `VITE_API_URL` untuk target backend non-default ([#82](https://github.com/HKUDS/Vibe-Trading/pull/82), terima kasih @voidborne-d).
 
 - **2026-05-08** 🧾 **Field statement Tushare dalam filter**: daily backtest A-share sekarang dapat meminta field financial statement yang PIT-safe melalui `fundamental_fields`, sehingga signal engine dapat melakukan screening pada `income_total_revenue`, `income_n_income`, `balancesheet_total_hldr_eqy_exc_min_int`, `fina_indicator_roe`, dan column berprefix table serupa setelah tanggal announcement/disclosure mereka ([#76](https://github.com/HKUDS/Vibe-Trading/pull/76), terima kasih @mrbob-git). Follow-up hardening membuat request statement-field eksplisit fail fast ketika enrichment Tushare tidak dapat berjalan, alih-alih diam-diam fallback ke raw price bar ([#77](https://github.com/HKUDS/Vibe-Trading/pull/77)).
 
@@ -735,9 +735,9 @@ Di luar OHLCV, **29 tool data read-only** menjangkau fundamental & flow — fund
 Inventaris detail dilipat di bawah agar README utama tetap mudah dipindai. Buka bagian yang Anda perlukan saat ingin memeriksa building block yang tersedia.
 
 <details>
-<summary><b>Library Skill Finansial</b> <sub>90 skill dalam 9 kategori</sub></summary>
+<summary><b>Library Skill Finansial</b> <sub>91 skill dalam 9 kategori</sub></summary>
 
-- 📊 90 skill finansial khusus yang diorganisasi dalam 9 kategori
+- 📊 91 skill finansial khusus yang diorganisasi dalam 9 kategori
 - 🌐 Cakupan lengkap dari market tradisional hingga crypto & DeFi
 - 🔬 Kapabilitas menyeluruh dari sourcing data hingga riset quant
 
@@ -745,7 +745,7 @@ Inventaris detail dilipat di bawah agar README utama tetap mudah dipindai. Buka 
 |----------|--------|----------|
 | Data Source | 10 | `data-routing`, `tushare`, `yfinance`, `okx-market`, `akshare`, `mootdx`, `ccxt`, `eastmoney`, `sec-edgar`, `qveris` |
 | Strategy | 19 | `strategy-generate`, `cross-market-strategy`, `technical-basic`, `candlestick`, `ichimoku`, `elliott-wave`, `smc`, `multi-factor`, `ml-strategy` |
-| Analysis | 23 | `factor-research`, `correlation-regime`, `macro-analysis`, `global-macro`, `valuation-model`, `investor-lenses`, `credit-analysis`, `dividend-analysis` |
+| Analysis | 24 | `factor-research`, `correlation-regime`, `macro-analysis`, `global-macro`, `valuation-model`, `investor-lenses`, `credit-analysis`, `dividend-analysis`, `vietnam-deep-research` |
 | Asset Class | 9 | `options-strategy`, `options-advanced`, `convertible-bond`, `etf-analysis`, `asset-allocation`, `sector-rotation` |
 | Crypto | 7 | `perp-funding-basis`, `liquidation-heatmap`, `stablecoin-flow`, `defi-yield`, `onchain-analysis` |
 | Flow | 8 | `hk-connect-flow`, `us-etf-flow`, `edgar-sec-filings`, `financial-statement`, `adr-hshare` |
@@ -827,9 +827,9 @@ Pemisahan paper-vs-live adalah **guard runtime struktural per broker** (format a
 </details>
 
 <details>
-<summary><b>Preset Tim Trading</b> <sub>30 preset swarm</sub></summary>
+<summary><b>Preset Tim Trading</b> <sub>31 preset swarm</sub></summary>
 
-- 🏢 30 tim agent siap pakai
+- 🏢 31 tim agent siap pakai
 - ⚡ Workflow finansial yang sudah dikonfigurasi
 - 🎯 Preset investasi, trading & manajemen risiko
 
@@ -896,7 +896,9 @@ Bar: 1m / 5m / 15m / 30m / 1H / 4H / 1D, plus mingguan / bulanan (1W / 1M, diban
 </details>
 
 <details>
-<summary><b>Quant Library</b> <sub>308 fungsi teruji dalam 24 modul, dapat dipanggil dari setiap transport</sub></summary>
+<summary><b>Quant Library</b> <sub>310 ekspor publik dalam 24 modul</sub></summary>
+
+quantlib_call menyediakan 234 entri yang dapat dipanggil; ekspor publik juga mencakup tipe dan konstanta.
 
 `src/quantlib` menyimpan satu implementasi teruji untuk setiap matematika finansial yang dibutuhkan agent.
 Skill **mengimpor** fungsi-fungsi ini alih-alih membawa formula di dalam
@@ -1618,7 +1620,7 @@ Mengirim `{}` akan menjadwalkan template memakai cadence yang disarankan beserta
 <a id="-mcp-plugin"></a>
 ## 🔌 Plugin MCP
 
-Vibe-Trading mengekspos 82 tool MCP untuk client yang kompatibel MCP. Berjalan sebagai subprocess stdio — tidak perlu setup server. Tool riset inti bekerja tanpa API key untuk HK/AS/crypto; tool connector trading menggunakan profil connector terpilih, dan `run_swarm` memerlukan LLM key.
+Vibe-Trading mengekspos 86 tool MCP untuk client yang kompatibel MCP. Berjalan sebagai subprocess stdio — tidak perlu setup server. Tool riset inti bekerja tanpa API key untuk HK/AS/crypto; tool connector trading menggunakan profil connector terpilih, dan `run_swarm` memerlukan LLM key.
 
 **Environment variable:** client menjalankan server sendiri, sehingga `export` dari shell tidak pernah sampai ke proses tersebut — atur di block `env` client. Kode backtest yang dihasilkan dibatasi ke root run yang diizinkan, jadi menulis hasil ke workspace Anda sendiri memerlukan `VIBE_TRADING_ALLOWED_RUN_ROOTS`:
 
@@ -1687,7 +1689,7 @@ dengan `--host` / `--port`.
 
 </details>
 
-**Tool MCP yang diekspos (82):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `adapt_strategy`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_southbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_fund_nav`, `get_cn_macro_series`, `get_cn_announcements`, `search_broker_reports`, `paper_trade_step`.
+**Tool MCP yang diekspos (86):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `adapt_strategy`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_southbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_fund_nav`, `get_cn_macro_series`, `get_cn_announcements`, `search_broker_reports`, `paper_trade_step`, `crypto_derivatives`, `vietnam_research`, `vietnam_comparables`, `crypto_basis_curve`.
 
 ### Tool MCP eksternal untuk SWARM
 
@@ -1711,7 +1713,7 @@ Jelajahi di ClawHub: [clawhub.ai/skills/vibe-trading](https://clawhub.ai/skills/
 <details>
 <summary><b>OpenSpace — skill yang berkembang sendiri</b></summary>
 
-Semua 90 skill finansial dipublikasikan di [open-space.cloud](https://open-space.cloud) dan berkembang secara otonom melalui engine self-evolution OpenSpace.
+Library skill publik Vibe-Trading tersedia di [open-space.cloud](https://open-space.cloud). Penambahan lokal belum tentu sudah dipublikasikan di sana.
 
 Untuk menggunakan OpenSpace, tambahkan kedua server MCP ke config agent Anda:
 
@@ -1733,7 +1735,7 @@ Untuk menggunakan OpenSpace, tambahkan kedua server MCP ke config agent Anda:
 }
 ```
 
-OpenSpace akan menemukan seluruh 90 skill secara otomatis, mengaktifkan auto-fix, auto-improve, dan sharing komunitas. Cari skill Vibe-Trading melalui `search_skills("finance backtest")` pada agent mana pun yang terhubung OpenSpace.
+OpenSpace akan menemukan seluruh 91 skill secara otomatis, mengaktifkan auto-fix, auto-improve, dan sharing komunitas. Cari skill Vibe-Trading melalui `search_skills("finance backtest")` pada agent mana pun yang terhubung OpenSpace.
 
 </details>
 
@@ -2061,13 +2063,13 @@ Vibe-Trading/
 ├── agent/                          # Backend (Python)
 │   ├── cli/                        # CLI package — interactive TUI + subcommands
 │   ├── api_server.py               # FastAPI server — runs, sessions, upload, swarm, SSE
-│   ├── mcp_server.py               # MCP server — 82 tools for OpenClaw / Claude Desktop
+│   ├── mcp_server.py               # MCP server — 86 tools for OpenClaw / Claude Desktop
 │   │
 │   ├── src/
 │   │   ├── agent/                  # ReAct agent core
 │   │   │   ├── loop.py             #   5-layer compression + read/write tool batching
 │   │   │   ├── context.py          #   system prompt + auto-recall from persistent memory
-│   │   │   ├── skills.py           #   skill loader (90 bundled + user-created via CRUD)
+│   │   │   ├── skills.py           #   skill loader (91 bundled + user-created via CRUD)
 │   │   │   ├── tools.py            #   tool base class + registry
 │   │   │   ├── memory.py           #   lightweight workspace state per run
 │   │   │   ├── frontmatter.py      #   shared YAML frontmatter parser
@@ -2076,7 +2078,7 @@ Vibe-Trading/
 │   │   ├── memory/                 # Cross-session persistent memory
 │   │   │   └── persistent.py       #   file-based memory (~/.vibe-trading/memory/)
 │   │   │
-│   │   ├── tools/                  # 114 auto-discovered agent tools
+│   │   ├── tools/                  # 120 auto-discovered agent tools
 │   │   │   ├── backtest_tool.py    #   run backtests
 │   │   │   ├── remember_tool.py    #   cross-session memory (save/recall/forget)
 │   │   │   ├── skill_writer_tool.py #  skill CRUD (save/patch/delete/file)
@@ -2094,9 +2096,9 @@ Vibe-Trading/
 │   │   ├── api/                    # FastAPI route modules
 │   │   │   └── alpha_routes.py     #   /alpha/list, /alpha/{id}, /alpha/bench, SSE stream
 │   │   │
-│   │   ├── skills/                 # 90 finance skills in 9 categories (SKILL.md each)
+│   │   ├── skills/                 # 91 finance skills in 9 categories (SKILL.md each)
 │   │   ├── swarm/                  # Swarm DAG execution engine
-│   │   │   └── presets/            #   30 swarm preset YAML definitions
+│   │   │   └── presets/            #   31 swarm preset YAML definitions
 │   │   ├── session/                # Multi-turn chat + FTS5 session search
 │   │   └── providers/              # LLM provider abstraction
 │   │

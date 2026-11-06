@@ -25,6 +25,80 @@ describe("generated report download", () => {
 });
 
 describe("api request helper", () => {
+  it("keeps an explicit calculation key in the authenticated body and reads filtered receipts", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => "research-key", setItem: vi.fn(), removeItem: vi.fn() });
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}", { headers: { "content-type": "application/json" } })));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await loadApiModule();
+    await api.saveResearchRevision("vietnam_dcf", { symbol: "CASE.VN" }, "rr_parent", "rk_explicit_intent");
+    await api.listResearchAttempts("vietnam_dcf", "rr_parent", "rk_explicit_intent", 10);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ kind: "vietnam_dcf", request: { symbol: "CASE.VN" }, parent_revision_id: "rr_parent", idempotency_key: "rk_explicit_intent" });
+    expect(fetch.mock.calls[1][0]).toBe("/api/research/artifacts/attempts?kind=vietnam_dcf&parent_revision_id=rr_parent&idempotency_key=rk_explicit_intent&limit=10&offset=10");
+    for (const [, init] of fetch.mock.calls) expect(init.headers).toMatchObject({ Authorization: "Bearer research-key" });
+  });
+  it("reads exact authenticated Markdown and rejects HTML or an oversized UTF-8 report", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => "report-key", setItem: vi.fn(), removeItem: vi.fn() });
+    const markdown = "# Nghiên cứu\n\nGiá trị: chưa xác minh.\n";
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(markdown, { headers: { "content-type": "text/markdown; charset=utf-8" } }))
+      .mockResolvedValueOnce(new Response("<html>login</html>", { headers: { "content-type": "text/html" } }))
+      .mockResolvedValueOnce(new Response("ệ".repeat(100_000), { headers: { "content-type": "text/markdown" } }));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await loadApiModule();
+    await expect(api.researchRevisionReport("rr_fixture")).resolves.toBe(markdown);
+    await expect(api.researchRevisionReport("rr_fixture")).rejects.toMatchObject({ name: "ApiError", status: 200 });
+    await expect(api.researchRevisionReport("rr_fixture")).rejects.toMatchObject({ name: "ApiError", status: 200 });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch.mock.calls[0]).toEqual(["/api/research/artifacts/rr_fixture/report", expect.objectContaining({ headers: { Authorization: "Bearer report-key" } })]);
+  });
+  it("sends bare reverse DCF and basis inputs to their fixed read routes with bearer auth", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => "research-test-key", setItem: vi.fn(), removeItem: vi.fn() });
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}", { headers: { "content-type": "application/json" } })));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await loadApiModule();
+    const controller = new AbortController();
+    await api.researchVietnamReverseDCF({ target_price_vnd: "100", dcf: { symbol: "CASE.VN" } }, controller.signal);
+    await api.researchCryptoBasis({ base: "CASE", quote: "USDT", futures: [] }, controller.signal);
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual(["/api/research/vietnam/reverse-dcf", "/api/research/crypto/basis"]);
+    for (const [, init] of fetch.mock.calls) {
+      expect(init.method).toBe("POST");
+      expect(init.headers).toMatchObject({ Authorization: "Bearer research-test-key" });
+    }
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ target_price_vnd: "100", dcf: { symbol: "CASE.VN" } });
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ base: "CASE", quote: "USDT", futures: [] });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("uses authenticated fixed research routes and never sends a client-certified result", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => "research-test-key", setItem: vi.fn(), removeItem: vi.fn() });
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}", { headers: { "content-type": "application/json" } })));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await loadApiModule();
+    const input = { symbol: "CASE.VN", as_of: "2025-08-01T00:00:00Z" };
+    await api.researchVietnamDCF(input);
+    await api.researchVietnamComparables(input, 3);
+    await api.saveResearchRevision("vietnam_dcf", input, "parent/id");
+    await api.listResearchRevisions("vietnam_dcf", 10);
+    await api.getResearchRevision("revision/id");
+    await api.diffResearchRevisions("before/id", "after/id");
+    await api.reviewResearchRevision("revision/id", "acknowledged", "Read scenario only", "Operator label");
+    expect(fetch.mock.calls.map(([url]) => url)).toEqual([
+      "/api/research/vietnam/dcf", "/api/research/vietnam/comparables", "/api/research/artifacts",
+      "/api/research/artifacts?kind=vietnam_dcf&offset=10&limit=10", "/api/research/artifacts/revision%2Fid",
+      "/api/research/artifacts/after%2Fid/diff?before=before%2Fid&limit=100", "/api/research/artifacts/revision%2Fid/reviews",
+    ]);
+    for (const [, init] of fetch.mock.calls) expect(init.headers).toMatchObject({ Authorization: "Bearer research-test-key" });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual(input);
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ payload: input, offset: 3 });
+    expect(JSON.parse(fetch.mock.calls[2][1].body)).toEqual({ kind: "vietnam_dcf", request: input, parent_revision_id: "parent/id" });
+    expect(JSON.parse(fetch.mock.calls[6][1].body)).toEqual({ decision: "acknowledged", note: "Read scenario only", reviewer: "Operator label" });
+  });
+  it("shows bounded field validation messages without exposing raw input values", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: [
+      { loc: ["body", "bars", 0, "complete"], msg: "Only complete bars are accepted", input: "private-input" },
+    ] }), { status: 422, headers: { "content-type": "application/json" } })));
+    const { api } = await loadApiModule();
+    await expect(api.forexWalkForward({} as never)).rejects.toMatchObject({ status: 422, message: "body.bars.0.complete: Only complete bars are accepted" });
+  });
   it("translates the server's message-size error into a recovery instruction", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
       detail: { code: "message_too_long", max_length: 100_000, message: "Shorten input" },

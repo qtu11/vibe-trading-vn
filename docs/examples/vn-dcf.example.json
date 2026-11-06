@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "symbol": "CASE.VN",
+  "venue": "HOSE",
+  "as_of": "2026-11-06T00:00:00Z",
+  "currency": "VND",
+  "amount_scale": 1000000,
+  "business_model": "non_financial",
+  "consolidation": "consolidated",
+  "discounting_convention": "year_end",
+  "terminal_value_method": "perpetuity_growth",
+  "wacc": {
+    "risk_free_rate": {"value": 0.04, "basis": "Synthetic VND scenario; not a current bond yield", "source_ids": []},
+    "beta": {"value": 1.1, "basis": "Synthetic levered beta; no historical regression", "source_ids": []},
+    "equity_risk_premium": {"value": 0.06, "basis": "Synthetic premium, not an observed market estimate", "source_ids": []},
+    "pretax_cost_of_debt": {"value": 0.08, "basis": "Synthetic debt-cost scenario", "source_ids": []},
+    "tax_rate": {"value": 0.2, "basis": "Synthetic constant marginal tax assumption, not tax-law verification", "source_ids": []},
+    "size_premium": {"value": 0, "basis": "Explicitly apply no size premium in this scenario", "source_ids": []},
+    "country_risk_premium": {"value": 0, "basis": "Explicitly apply no additional country premium in this scenario", "source_ids": []}
+  },
+  "capital_structure": {
+    "kind": "target", "target_equity_weight": 0.8, "target_debt_weight": 0.2,
+    "basis": "Synthetic target mix; not the issuer's observed market structure", "source_ids": []
+  },
+  "terminal_growth": {"value": 0.02, "basis": "Synthetic long-run scenario", "source_ids": []},
+  "exit_multiple": {"value": 8, "basis": "Synthetic EBITDA multiple; no observed peer sample", "source_ids": []},
+  "gdp_growth_reference": {"value": 0.05, "basis": "Synthetic diagnostic ceiling; not an official Vietnam GDP forecast", "source_ids": []},
+  "forecast": [
+    {"year": 1, "ebit": "120", "depreciation_amortization": "10", "capex": "15", "delta_nwc": "5", "basis": "Synthetic full relative year 1; money in million VND", "source_ids": []},
+    {"year": 2, "ebit": "130", "depreciation_amortization": "10", "capex": "15", "delta_nwc": "5", "basis": "Synthetic full relative year 2; not a calendar-year forecast", "source_ids": []}
+  ],
+  "equity_bridge": {
+    "snapshot_date": "2026-09-30", "total_debt": "100", "unrestricted_cash": "20", "restricted_cash": "7",
+    "minority_interest": "0", "preferred_equity": "0", "associate_investments": "0", "diluted_shares": "10000000",
+    "share_basis_note": "Synthetic actual diluted common shares; no rights, options or preferred dilution inferred",
+    "associate_earnings_excluded_from_forecast": true,
+    "basis": "Synthetic bridge with separately declared restricted cash", "source_ids": ["synthetic-bridge"]
+  },
+  "sensitivity": {
+    "wacc_values": [0.08, 0.0976, 0.12], "growth_values": [0.01, 0.02, 0.1],
+    "basis": "Synthetic deterministic WACC/growth range; no probabilities"
+  },
+  "evidence": [
+    {"id": "synthetic-bridge", "source_url": "https://example.invalid/synthetic-vn-dcf",
+     "document_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+     "locator": "Synthetic fixture only, not an issuer statement",
+     "published_at": "2026-10-20T00:00:00Z", "available_at": "2026-10-20T00:00:00Z", "retrieved_at": "2026-10-21T00:00:00Z"}
+  ]
+}

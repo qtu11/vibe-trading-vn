@@ -2451,6 +2451,7 @@ def cmd_swarm_retry_live(run_id: str, resume: bool = False) -> Optional[int]:
             live_callback=dashboard.handle_event,
             include_shell_tools=True,
             resume_from=reconciled if resume else None,
+            **({"max_llm_calls": reconciled.max_llm_calls} if getattr(reconciled, "max_llm_calls", None) is not None else {}),
         )
     except FileNotFoundError as exc:
         console.print(f"[red]{exc}[/red]")

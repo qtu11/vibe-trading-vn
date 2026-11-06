@@ -294,9 +294,14 @@ def test_replay_artifact_destination_symlink_escape_blocked(tmp_path, workers_su
     fresh = _make_dag_run("r-new", RunStatus.pending)
     store.create_run(fresh)
     # Plant a symlink where the re-home would create the agent artifact dir.
-    (store.run_dir("r-new") / "artifacts" / "analyst").symlink_to(
-        outside, target_is_directory=True
-    )
+    try:
+        (store.run_dir("r-new") / "artifacts" / "analyst").symlink_to(
+            outside, target_is_directory=True
+        )
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows requires a symlink privilege unavailable to this test process")
+        raise
 
     runtime._execute_run(fresh, threading.Event(), resume_from=original)
 
@@ -462,7 +467,12 @@ def test_replay_source_symlink_artifact_dropped(tmp_path, workers_succeed):
     run_dir = store.run_dir(original.id)
     analyst = run_dir / "artifacts" / "analyst"
     analyst.parent.mkdir(parents=True, exist_ok=True)
-    analyst.symlink_to(run_dir / "tasks", target_is_directory=True)
+    try:
+        analyst.symlink_to(run_dir / "tasks", target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows requires a symlink privilege unavailable to this test process")
+        raise
 
     fresh = _make_dag_run("r-new", RunStatus.pending)
     store.create_run(fresh)
@@ -588,7 +598,12 @@ def test_replay_destination_artifacts_dir_symlink_escape_blocked(tmp_path, worke
     # dir (as a tampering process with run-dir access could before the overlay).
     artifacts_rd = store.run_dir("r-new") / "artifacts"
     artifacts_rd.rmdir()
-    artifacts_rd.symlink_to(outside, target_is_directory=True)
+    try:
+        artifacts_rd.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows requires a symlink privilege unavailable to this test process")
+        raise
 
     runtime._execute_run(fresh, threading.Event(), resume_from=original)
 

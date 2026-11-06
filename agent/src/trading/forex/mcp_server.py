@@ -11,16 +11,21 @@ from fastmcp import FastMCP
 from pydantic import Field
 
 from .errors import ForexError
+from .cost_stress import CostStressRequest, cost_stress
+from .trade_paths import TradePathsRequest, trade_paths
+from .regime import RegimeRequest, regime
 from .models import Connection, Order, Symbol
 from .service import ForexService, SECRET_FIELDS
+from .walk_forward import WalkForwardRequest, walk_forward
 
 
-def build_server(service: ForexService, connection_id: str, *, allow_execution=False):
+def build_server(service: ForexService, connection_id: str, *, allow_execution=False, allow_research_writes=False):
     config = service.store.connection(connection_id)
     if allow_execution and not config.execution_enabled:
         raise ForexError("READONLY", "Operator must enable this connection's execution setting first")
     server = FastMCP("Vibe-Forex")
     read = {"readOnlyHint": True, "destructiveHint": False, "openWorldHint": True}
+    local_read = {**read, "openWorldHint": False}
 
     async def call(function, *args, **kwargs):
         try:
@@ -37,6 +42,102 @@ def build_server(service: ForexService, connection_id: str, *, allow_execution=F
                 "code": "BROKER_UNAVAILABLE",
                 "error": "Broker service unavailable; check configuration, credentials and outstanding executions",
             }
+
+    async def research_call(function, *args):
+        try:
+            return await asyncio.to_thread(function, *args)
+        except ForexError as exc:
+            return exc.payload()
+        except Exception:
+            return {"status": "error", "code": "RESEARCH_STORE_UNAVAILABLE", "error": "Local research storage is unavailable"}
+
+    @server.tool(annotations=local_read)
+    async def forex_list_experiments(
+        limit: Annotated[int, Field(ge=1, le=100)] = 20, offset: Annotated[int, Field(ge=0)] = 0,
+    ) -> dict:
+        """List local supplied-data experiments and all-attempt counts. No broker access."""
+        return await research_call(service.store.research_experiments, limit, offset)
+
+    @server.tool(annotations=local_read)
+    async def forex_get_experiment(
+        experiment_id: str, limit: Annotated[int, Field(ge=1, le=100)] = 20,
+        offset: Annotated[int, Field(ge=0)] = 0,
+    ) -> dict:
+        """List an experiment's attempts, including failed/incomplete attempts, newest first."""
+        return await research_call(service.store.research_experiment, experiment_id, limit, offset)
+
+    @server.tool(annotations=local_read)
+    async def forex_get_experiment_run(experiment_id: str, run_id: str) -> dict:
+        """Read immutable inputs, costs, engine versions and every trial/fold result for one attempt."""
+        return await research_call(service.store.research_run, experiment_id, run_id)
+
+    if allow_research_writes:
+
+        @server.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False})
+        async def forex_run_experiment(request: WalkForwardRequest, experiment_id: str | None = None) -> dict:
+            """Persist a supplied-data SMA/EMA attempt; omit experiment_id to create an experiment.
+
+            Keeps every failed trial and the full input/config/cost/version snapshot.
+            Appending never overwrites evidence, activates a strategy or sends orders.
+            """
+            return await research_call(service.run_experiment, request, experiment_id)
+
+        @server.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False})
+        async def forex_run_cost_stress_experiment(request: CostStressRequest, experiment_id: str | None = None) -> dict:
+            """Append a frozen-OOS spread sweep with explicit costs, source hashes and all failures.
+
+            Creates an experiment when experiment_id is omitted. Local evidence
+            write only; never activates a strategy, accesses a broker or sends orders.
+            """
+            return await research_call(service.run_cost_stress_experiment, request, experiment_id)
+
+        @server.tool(annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False})
+        async def forex_run_trade_paths_experiment(request: TradePathsRequest, experiment_id: str | None = None) -> dict:
+            """Append seeded within-fold OOS block-resampling evidence to the local journal.
+
+            Creates an experiment if experiment_id is omitted. Keeps base trials,
+            sampling assumptions and failures. Never accesses a broker or trades.
+            """
+            return await research_call(service.run_trade_paths_experiment, request, experiment_id)
+
+    @server.tool(annotations=local_read)
+    async def forex_walk_forward(request: WalkForwardRequest) -> dict:
+        """Fit bounded SMA/EMA candidates on past supplied OHLC and score chronological OOS folds.
+
+        Caller declares complete contiguous mid-price bars, revision and constant
+        round-trip costs. One-bar research variant; no account access or orders.
+        """
+        return await asyncio.to_thread(walk_forward, request)
+
+    @server.tool(annotations=local_read)
+    async def forex_cost_stress(request: CostStressRequest) -> dict:
+        """Fit once at base cost, freeze OOS trades, then stress spread at base/2x/3x.
+
+        Caller explicitly supplies round-trip spread, commission, slippage and
+        fixed adverse gap charges in bps on mid bars. Other costs stay fixed.
+        Arithmetic break-even may be negative. No broker, store write or orders.
+        """
+        return await asyncio.to_thread(cost_stress, request)
+
+    @server.tool(annotations=local_read)
+    async def forex_trade_paths(request: TradePathsRequest) -> dict:
+        """Resample noncircular contiguous OOS trade blocks independently within each fold.
+
+        Fit once on supplied historical mid bars at base costs, then freeze OOS
+        returns. Seeded empirical return/drawdown bands are not predictive
+        probabilities; no annualization, broker access or local evidence write.
+        """
+        return await asyncio.to_thread(trade_paths, request)
+
+    @server.tool(annotations=local_read)
+    async def forex_regime(request: RegimeRequest) -> dict:
+        """Replay train-calibrated ATR-normalized SMA-slope regimes on supplied closed mid bars.
+
+        Fits only an initial training prefix, then applies frozen quantile
+        thresholds, hysteresis and minimum dwell. Warmup/invalid calibration
+        stays unknown. No ADX, forecast, trade/PnL, broker or persistence.
+        """
+        return await asyncio.to_thread(regime, request)
 
     @server.tool(annotations=read)
     async def forex_connection_status() -> dict:
@@ -135,6 +236,7 @@ def build_server(service: ForexService, connection_id: str, *, allow_execution=F
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Vibe Forex MCP — local account-bound MT5, Exness and OANDA")
     parser.add_argument("--connection-id")
+    parser.add_argument("--allow-research-writes", action="store_true", help="Expose local supplied-data experiment persistence; never enables orders")
     parser.add_argument(
         "--allow-execution",
         action="store_true",
@@ -172,7 +274,7 @@ def main(argv=None):
             service.save_credentials(cfg.id, values)
             print("Credentials saved in the OS vault.")
             return 0
-        server = build_server(service, args.connection_id, allow_execution=args.allow_execution)
+        server = build_server(service, args.connection_id, allow_execution=args.allow_execution, allow_research_writes=args.allow_research_writes)
         server.run(transport="stdio")
         return 0
     except ForexError as exc:

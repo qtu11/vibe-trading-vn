@@ -117,6 +117,7 @@ __all__ = [
     "TargetCompany",
     "ExcludedMultiple",
     "PeerMultiples",
+    "EquityPeerMultiples",
     "MultipleDistribution",
     "ImpliedValuation",
     "CompsResult",
@@ -124,6 +125,7 @@ __all__ = [
     "equity_value_from_enterprise_value",
     "calendarise_metric",
     "peer_multiple_set",
+    "equity_multiple_set",
     "multiple_distribution",
     "implied_valuation",
     "run_comps",
@@ -733,8 +735,8 @@ class ExcludedMultiple:
 
     peer_name: str
     multiple_name: str
-    denominator_value: float
-    numerator_value: float = 0.0
+    denominator_value: float | None
+    numerator_value: float | None = 0.0
     reason: str = "non_positive_denominator"
 
 
@@ -835,6 +837,50 @@ class PeerMultiples:
     exclusions: tuple[ExcludedMultiple, ...]
 
 
+@dataclass(frozen=True)
+class EquityPeerMultiples:
+    """Equity-only multiples without inventing unused enterprise-value inputs."""
+
+    name: str
+    price_per_share: float | None
+    eps: float | None
+    book_value_per_share: float | None
+    pe: float | None
+    pb: float | None
+    exclusions: tuple[ExcludedMultiple, ...]
+
+
+def equity_multiple_set(
+    name: str,
+    *,
+    price_per_share: float | None,
+    eps: float | None,
+    book_value_per_share: float | None,
+) -> EquityPeerMultiples:
+    """Compute P/E and P/B from explicitly comparable per-share inputs.
+
+    Missing, non-finite or non-positive inputs never enter a distribution.
+    Share-count, period, currency and corporate-action alignment belong to the
+    caller's evidence contract; this pure math function does not verify them.
+    """
+    _require_name(name, "comps.equity_multiple_set")
+    values = {}
+    exclusions = []
+    for multiple, denominator in (("pe", eps), ("pb", book_value_per_share)):
+        if price_per_share is None or denominator is None:
+            value = None
+            excluded = ExcludedMultiple(name, multiple, denominator, price_per_share, "missing_input")
+        else:
+            value, excluded = _compute_multiple(
+                price_per_share, denominator, peer_name=name, multiple_name=multiple
+            )
+        values[multiple] = value
+        if excluded is not None:
+            exclusions.append(excluded)
+    return EquityPeerMultiples(name, price_per_share, eps, book_value_per_share,
+                              values["pe"], values["pb"], tuple(exclusions))
+
+
 def peer_multiple_set(peer: PeerCompany, policy: str) -> PeerMultiples:
     """Build one peer's EV bridge, calendarised metrics and full multiple set.
 
@@ -928,7 +974,7 @@ class MultipleDistribution:
     warning: str | None
 
 
-def multiple_distribution(name: str, peer_multiples: Sequence[PeerMultiples]) -> MultipleDistribution:
+def multiple_distribution(name: str, peer_multiples: Sequence[PeerMultiples | EquityPeerMultiples]) -> MultipleDistribution:
     """Build one multiple's cross-sectional distribution across a peer set.
 
     Args:
@@ -950,8 +996,8 @@ def multiple_distribution(name: str, peer_multiples: Sequence[PeerMultiples]) ->
     n = len(included)
     if n == 0:
         warning = (
-            f"{name}: all {len(peer_multiples)} peer(s) were excluded (non-positive "
-            "denominator) -- no min/p25/median/p75/max can be computed"
+            f"{name}: all {len(peer_multiples)} peer(s) were excluded (missing, non-finite "
+            "or non-positive input; see exclusions) -- no min/p25/median/p75/max can be computed"
         )
         return MultipleDistribution(
             name=name,

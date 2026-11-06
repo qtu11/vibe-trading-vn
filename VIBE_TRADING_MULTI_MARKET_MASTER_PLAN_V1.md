@@ -3,7 +3,7 @@ title: VIBE-TRADING — MULTI-MARKET AI RESEARCH & QUANT TRADING MASTER PLAN
 version: 1.1.0-proposal-source-reconciled
 status: DRAFT_FOR_APPROVAL
 prepared_at: 2026-11-04
-source_reconciled_at: 2026-11-05
+source_reconciled_at: 2026-11-06
 author: Architecture Planning Proposal
 scope: Vietnam Equities; Forex/XAUUSD; Crypto; Shared Infrastructure
 implementation_approved: false
@@ -13,7 +13,7 @@ repository: https://github.com/HKUDS/Vibe-Trading
 
 # VIBE-TRADING — MASTER PLAN NÂNG CẤP CHUYÊN SÂU
 
-> **Trạng thái:** TÀI LIỆU ĐỀ XUẤT ĐỂ DUYỆT. Không khẳng định đã triển khai bất kỳ thay đổi nào trên mã nguồn.
+> **Trạng thái:** TÀI LIỆU ĐỀ XUẤT ĐỂ DUYỆT Ở CẤP CHƯƠNG TRÌNH. Các phần code local đã giao được ghi riêng tại tracker và biên bản; chưa nghiệm thu toàn chương trình.
 >
 > **Định hướng:** Kiến trúc nhiều thị trường, nghiên cứu có bằng chứng, giao dịch thời gian thực có cổng an toàn, đo lường chất lượng và hiệu quả token.
 >
@@ -21,7 +21,11 @@ repository: https://github.com/HKUDS/Vibe-Trading
 >
 > **Tách lớp bắt buộc:** LLM nghiên cứu và lập kế hoạch; engine tính toán thực thi quyết định có tính tất định; broker adapter chỉ thi hành lệnh đã qua authorization + risk gate.
 
-## Cập nhật nghiên cứu và triển khai ngày 05/11/2026
+## Cập nhật nghiên cứu và triển khai ngày 06/11/2026
+
+Tiến độ code hiện tại nằm trong [tracker đủ265 ID](docs/IMPLEMENTATION_TRACKER.md), [biên bản đợt8](docs/IMPLEMENTATION_STATUS_2026-11-06_08.md) và [hướng dẫn chạy](docs/MULTI_MARKET_RESEARCH_USAGE.md). Đợt8 thêm refresh-attempt/idempotency schema2, Markdown từ revision đã lưu, regime Forex nhân quả và [phương pháp VN từ mẫu báo cáo](docs/VIETNAM_DEEP_RESEARCH_METHOD.md). Các delivery có kiểm thử vẫn là partial khi chưa đáp ứng toàn bộ acceptance; không đọc baseline source như trạng thái hoàn tất hiện tại.
+
+[Đọc bốn PDF FPT](docs/REPORT_SAMPLE_FINDINGS.md) giữ riêng reported/comparable, LNST tổng/mẹ, CFO/CFI, dự phóng/actual và ngày của giá. Hội đồng dùng hướng dẫn nghiên cứu sâu; thiếu quote/order book/phiên/holdings thì chưa chọn ATO/MTL hoặc giá khớp. Đây chưa là bộ dự đoán/thực thi lệnh Việt Nam hoặc tự xác minh mọi tài liệu.
 
 Giữ nguyên 265 ID/tên đặc tả, 54 Scenario, 10 giai đoạn P0–P9 và 16 DECISION của bản gốc. Mã chạy xuyên chương trình: PLATFORM-001–067, VN-068–131, FX-132–193, CRYPTO-194–265. Không đánh số lại theo từng nhóm.
 
@@ -36,7 +40,7 @@ Mỗi heading capability được bổ sung source seam, trạng thái baseline 
 
 Đọc [54 fixture/oracle](docs/specs/VALIDATION_54.md) và [10 giai đoạn/16 quyết định](docs/specs/DELIVERY_10_PHASES_16_DECISIONS.md). Ba template A/B/C cho mỗi capability là bộ khung thiết kế, không phải tests đã pass. Các tiêu chí đã bổ sung không thay thế kiểm tra quyền, license và tài khoản thật.
 
-Những điều chỉnh quan trọng: dùng lại SQLite/file stores và registry hiện có trước migration; deferred schema loading không phải semantic top-k routing; walk-forward hiện chia equity chứ chưa retrain; funding intrabar cần event fidelity; protocol orderbook/checksum phải theo venue/channel version; SSI MCP cần account/OAuth và chưa là integration đã xác minh.
+Những điều chỉnh quan trọng: dùng lại SQLite/file stores và registry hiện có trước migration; deferred schema loading không phải semantic top-k routing; walk-forward chia equity của quantlib không tự retrain, còn luồng Forex SMA mới refit train-only theo fold; funding intrabar cần event fidelity; protocol orderbook/checksum phải theo venue/channel version; SSI MCP cần account/OAuth và chưa là integration đã xác minh.
 
 Yêu cầu viết code trong chat cho phép các thay đổi local đã giao; không có nghĩa 16 quyết định chương trình, migration production hoặc live execution được duyệt. Các flag mặc định vẫn giữ nghiên cứu/demo và phạm vi quyền hiện hữu.
 

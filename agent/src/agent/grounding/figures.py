@@ -871,6 +871,50 @@ def table_rows(content: str) -> list[TableRow]:
     return rows
 
 
+def table_block(content: str, line_index: int) -> tuple[int, int] | None:
+    """Return the inclusive line range of the Markdown table holding a line.
+
+    A table is a maximal run of lines with at least two pipes, the same rule
+    :func:`table_rows` uses. Returns ``None`` when the line is not in a table.
+
+    Args:
+        content: The candidate answer.
+        line_index: A zero-based line number.
+
+    Returns:
+        ``(first_line, last_line)``, or ``None``.
+    """
+    lines = [line for line, _ in _lines_with_offsets(content)]
+    if not 0 <= line_index < len(lines):
+        return None
+    if lines[line_index].count("|") < 2:
+        return None
+    start = line_index
+    while start > 0 and lines[start - 1].count("|") >= 2:
+        start -= 1
+    end = line_index
+    while end + 1 < len(lines) and lines[end + 1].count("|") >= 2:
+        end += 1
+    return start, end
+
+
+def table_caption_text(content: str, line_index: int, radius: int = 2) -> str:
+    """Return the table block around a line plus nearby caption lines.
+
+    The plan's citation contract accepts a source caption that sits at most
+    two lines above or below a table. Returning the block and its neighbours
+    lets the citation check look for ``[S#]`` there without binding the check
+    to one publisher's caption wording.
+    """
+    span = table_block(content, line_index)
+    if span is None:
+        return ""
+    lines = content.splitlines()
+    start = max(0, span[0] - radius)
+    end = min(len(lines), span[1] + radius + 1)
+    return "\n".join(lines[start:end])
+
+
 def _code_before(head: str) -> str:
     """The uppercase ISO code ending ``head`` as a word of its own, or ""."""
     letters = head[len(head.rstrip(string.ascii_uppercase)) :]

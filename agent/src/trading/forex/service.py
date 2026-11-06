@@ -75,6 +75,44 @@ class ForexService:
                 self.owners[key] = config.id
             return config, self.adapters[key]
 
+    def run_experiment(self, request, experiment_id: str | None = None):
+        """Persist every supplied-data attempt; never activates a strategy or accesses an account."""
+        from .experiments import engine_manifest
+        from .walk_forward import walk_forward
+
+        return self._run_research(request, walk_forward, engine_manifest(), experiment_id)
+
+    def run_cost_stress_experiment(self, request, experiment_id: str | None = None):
+        """Append an offline frozen-signal cost sweep to the same immutable research journal."""
+        from .cost_stress import cost_stress
+        from .experiments import engine_manifest
+
+        return self._run_research(
+            request, cost_stress, engine_manifest(experiment_kind="frozen_oos_cost_stress"), experiment_id,
+        )
+
+    def _run_research(self, request, evaluator, manifest, experiment_id):
+        run = self.store.start_research_run(request.model_dump(mode="json"), manifest, experiment_id)
+        try:
+            result = evaluator(request)
+        except Exception as exc:
+            # Keep failed attempts without leaking local paths or provider data in exception text.
+            return self.store.finish_research_run(run["experiment_id"], run["id"], {
+                "status": "error", "code": "RESEARCH_EVALUATION_FAILED",
+                "error": "Research evaluation failed; inspect the retained input and engine version",
+                "exception_type": type(exc).__name__,
+            })
+        return self.store.finish_research_run(run["experiment_id"], run["id"], result)
+
+    def run_trade_paths_experiment(self, request, experiment_id: str | None = None):
+        """Append a seeded OOS block-resampling study; never activates execution."""
+        from .trade_paths import trade_paths
+        from .experiments import engine_manifest
+
+        return self._run_research(
+            request, trade_paths, engine_manifest(experiment_kind="frozen_oos_moving_block_bootstrap"), experiment_id,
+        )
+
     def save_connection(self, config: Connection):
         with daily_order_lock(config.connector):
             self.store.save_connection(config)

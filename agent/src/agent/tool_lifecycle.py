@@ -28,6 +28,36 @@ from src.tools.redaction import redact_payload, redact_tool_result
 
 logger = logging.getLogger("src.agent.loop")
 
+
+def _attach_source_index(result: str, sources: list[dict[str, Any]]) -> str:
+    """Add a ``_sources`` index to a JSON tool result, preserving validity.
+
+    The index tells the model which ``[S#]`` ids its prose may cite. It is a
+    normal JSON key because tests and providers parse tool results as JSON; a
+    free-text suffix would break that contract.
+    """
+    if not sources:
+        return result
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        return result
+    if not isinstance(payload, dict):
+        return result
+    existing = payload.get("_sources")
+    if isinstance(existing, list):
+        known = {
+            str(item.get("id"))
+            for item in existing
+            if isinstance(item, dict) and item.get("id")
+        }
+        sources = list(existing) + [item for item in sources if item.get("id") not in known]
+    payload["_sources"] = sources
+    try:
+        return json.dumps(payload, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return result
+
 # Compaction recovery is a bounded reliability aid, not an alternate research
 # loop: a run restores at most this many lost readonly payloads from its replay
 # cache. Past the cap a lost call runs again as it does without replay, so the
@@ -922,6 +952,12 @@ class ToolCallLifecycle:
 
         status = "ok" if success else "error"
         model_result = result
+        if self._grounding is not None:
+            try:
+                source_index = self._grounding.sources_index(tc.id)
+            except (AttributeError, TypeError):
+                source_index = []
+            model_result = _attach_source_index(model_result, source_index)
         if (tc.name == "get_forex_market_snapshot" and tc.arguments.get("trade_plan")
                 and getattr(self, "_forex_trade_plan", None) is not None):
             from src.trading.forex.council import model_summary

@@ -37,7 +37,7 @@ const localeLoaders = {
   id: () => import("./locales/id.json"),
   tr: () => import("./locales/tr.json"),
   vi: () => import("./locales/vi.json"),
-} satisfies Record<LazyLanguageCode, () => Promise<{ default: typeof en }>>;
+} satisfies Record<LazyLanguageCode, () => Promise<{ default: Record<string, any> }>>;
 
 const LANGUAGE_STORAGE_KEY = "i18nextLng";
 const LOCALE_LOAD_ATTEMPTS = 2;

@@ -63,3 +63,44 @@ variables:
     assert "Task 'task-a' depends on unknown task 'missing_task'" in report["errors"]
     assert "Prompt templates use undeclared variables: target" in report["warnings"]
     assert "Declared variables are not used by task prompt templates: market" in report["warnings"]
+
+
+def test_inspect_rejects_context_without_dependency(monkeypatch) -> None:
+    data = {
+        "name": "unordered_context",
+        "agents": [{"id": "analyst"}],
+        "tasks": [
+            {"id": "a", "agent_id": "analyst"},
+            {"id": "b", "agent_id": "analyst", "input_from": {"evidence": "a"}},
+        ],
+    }
+    monkeypatch.setattr(presets, "load_preset", lambda _: data)
+    report = presets.inspect_preset("unordered_context")
+
+    assert not report["valid"]
+    assert report["layers"] == []
+    assert report["errors"] == [
+        "Task 'b' input_from 'evidence' references 'a', which is not upstream in the DAG"
+    ]
+    assert report["warnings"] == []
+
+
+def test_inspect_accepts_transitive_context(monkeypatch) -> None:
+    data = {
+        "name": "ordered_context",
+        "agents": [{"id": "analyst"}],
+        "tasks": [
+            {"id": "a", "agent_id": "analyst"},
+            {"id": "b", "agent_id": "analyst", "depends_on": ["a"]},
+            {
+                "id": "c", "agent_id": "analyst", "depends_on": ["b"],
+                "input_from": {"evidence": "a"},
+            },
+        ],
+    }
+    monkeypatch.setattr(presets, "load_preset", lambda _: data)
+    report = presets.inspect_preset("ordered_context")
+
+    assert report["valid"]
+    assert report["errors"] == []
+    assert len(report["layers"]) == 3

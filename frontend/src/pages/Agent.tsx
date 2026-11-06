@@ -17,6 +17,7 @@ import {
 } from "@/lib/attachments";
 import { hasStoredMetrics, runCardFields } from "@/lib/runCards";
 import { parseForexTradePlan } from "@/lib/forexTradePlan";
+import { parseSourceCitations } from "@/lib/sourceEvidence";
 import { buildChatPrompt, MAX_GOAL_CHARS, MAX_MESSAGE_CHARS, promptExceedsLimit, SWARM_PROMPT_PREFIX } from "@/lib/chatPrompt";
 import type { AgentMessage, SwarmRunStatus, ToolCallEntry } from "@/types/agent";
 import { AgentAvatar } from "@/components/chat/AgentAvatar";
@@ -619,6 +620,7 @@ export function Agent() {
           ? toolTimeline[toolTimeline.length - 1].timestamp
           : ts - 1;
         const assistantTs = Math.max(ts, lastToolTimestamp + 1);
+        const sources = parseSourceCitations(meta?.sources);
         if (m.role === "user") {
           const displayPrompt = toDisplayPrompt(m.content);
           agentMsgs.push({
@@ -631,7 +633,7 @@ export function Agent() {
         } else if (runId) {
           // Show text answer first (if non-empty), then chart card
           if (m.content && m.content !== "Strategy execution completed.") {
-            agentMsgs.push({ id: m.message_id + "_ans", type: "answer", content: m.content, elapsed_ms: elapsedMs, timestamp: assistantTs, forexTradePlan: parseForexTradePlan(meta?.forex_trade_plan) });
+            agentMsgs.push({ id: m.message_id + "_ans", type: "answer", content: m.content, elapsed_ms: elapsedMs, timestamp: assistantTs, forexTradePlan: parseForexTradePlan(meta?.forex_trade_plan), sources });
           }
           if (hasStoredMetrics(metrics)) {
             agentMsgs.push({ id: m.message_id, type: "run_complete", content: "", runId, metrics, timestamp: assistantTs + 1 });
@@ -642,7 +644,7 @@ export function Agent() {
             }
           }
         } else {
-          agentMsgs.push({ id: m.message_id, type: "answer", content: m.content, elapsed_ms: elapsedMs, timestamp: assistantTs, forexTradePlan: parseForexTradePlan(meta?.forex_trade_plan) });
+          agentMsgs.push({ id: m.message_id, type: "answer", content: m.content, elapsed_ms: elapsedMs, timestamp: assistantTs, forexTradePlan: parseForexTradePlan(meta?.forex_trade_plan), sources });
         }
       }
       if (genRef.current !== gen) return;
@@ -1038,6 +1040,7 @@ export function Agent() {
             type: "answer",
             content: finalAnswer,
             forexTradePlan: parseForexTradePlan(d.forex_trade_plan),
+            sources: parseSourceCitations(d.sources),
             elapsed_ms: Number(d.elapsed_ms || 0) || undefined,
             timestamp: Date.now(),
           });

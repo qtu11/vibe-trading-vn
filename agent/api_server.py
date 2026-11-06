@@ -274,6 +274,12 @@ register_connection_routes(app)
 from src.api.forex_routes import register_forex_routes  # noqa: E402
 register_forex_routes(app)
 
+from src.api.research_routes import register_research_routes  # noqa: E402
+register_research_routes(app)
+
+from src.api.research_artifact_routes import register_research_artifact_routes  # noqa: E402
+register_research_artifact_routes(app)
+
 from src.api.live_routes import (  # noqa: F401, E402
     CommitMandateRequest,
     LiveHaltRequest,

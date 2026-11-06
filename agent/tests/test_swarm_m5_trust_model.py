@@ -69,7 +69,9 @@ _FORBIDDEN_RUN_SWARM_PARAMETERS = frozenset(
 # never by the caller, but it does appear in the JSON-Schema signature on
 # some FastMCP versions, so we allow it as a known-safe inclusion.
 _ALLOWED_RUN_SWARM_PARAMETERS = frozenset(
-    {"preset_name", "variables", "wait_seconds", "start_only", "ctx"}
+    # A strict positive logical call cap can only restrict this run. It cannot
+    # change provider/MCP configuration, credentials, paths or tool authority.
+    {"preset_name", "variables", "wait_seconds", "start_only", "ctx", "max_llm_calls"}
 )
 
 
@@ -184,10 +186,12 @@ def test_run_swarm_variables_are_template_data_only_never_config(
             preset_name: str,
             user_vars: dict[str, str],
             include_shell_tools: bool = False,
+            max_llm_calls: int | None = None,
         ) -> SwarmRun:
             captured["start_preset"] = preset_name
             captured["start_user_vars"] = dict(user_vars)
             captured["start_include_shell_tools"] = include_shell_tools
+            captured["start_max_llm_calls"] = max_llm_calls
             return SwarmRun(
                 id="swarm-test-trustcheck",
                 preset_name=preset_name,
@@ -224,6 +228,7 @@ def test_run_swarm_variables_are_template_data_only_never_config(
         "mcp_env": "EVIL_API_KEY=stolen",
         "agent_config": '{"mcpServers": {"evil": "..."}}',
         "extra_tools": "mcp_evil_anything",
+        "max_llm_calls": "999",
         # A legitimate template variable so the preset *could* render.
         "target": "AAPL.US",
     }
@@ -233,6 +238,7 @@ def test_run_swarm_variables_are_template_data_only_never_config(
             preset_name="any_preset_name",
             variables=attack_vars,
             start_only=True,
+            max_llm_calls=None,
         )
     )
 
@@ -262,6 +268,9 @@ def test_run_swarm_variables_are_template_data_only_never_config(
     # string. The caller picks the preset; that's expected and bounded
     # by the on-disk preset catalogue.
     assert captured["start_preset"] == "any_preset_name"
+    # Only the explicit tool parameter controls the cap; template data has no
+    # authority even when it names the same field as a runtime argument.
+    assert captured["start_max_llm_calls"] is None
 
 
 # --------------------------------------------------------------------------- #

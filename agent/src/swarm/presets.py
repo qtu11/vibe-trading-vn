@@ -17,7 +17,6 @@ lookup, so a name can never escape either presets directory.
 from __future__ import annotations
 
 import uuid
-from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from string import Formatter
@@ -180,58 +179,12 @@ def inspect_preset(name: str) -> dict:
     errors: list[str] = []
     warnings: list[str] = []
 
-    agent_ids = [agent.id for agent in run.agents]
-    task_ids = [task.id for task in run.tasks]
-    agent_id_set = set(agent_ids)
-    task_id_set = set(task_ids)
-
-    for duplicate in sorted(item for item, count in Counter(agent_ids).items() if count > 1):
-        errors.append(f"Duplicate agent id: {duplicate}")
-    for duplicate in sorted(item for item, count in Counter(task_ids).items() if count > 1):
-        errors.append(f"Duplicate task id: {duplicate}")
-
-    for task in run.tasks:
-        if task.agent_id not in agent_id_set:
-            errors.append(f"Task '{task.id}' references unknown agent '{task.agent_id}'")
-        for _, upstream_task_id in task.input_from.items():
-            if upstream_task_id not in task_id_set:
-                errors.append(
-                    f"Task '{task.id}' input_from references unknown task '{upstream_task_id}'"
-                )
-
     layers: list[list[str]] = []
     try:
-        validate_dag(run.tasks)
+        validate_dag(run.tasks, run.agents)
         layers = topological_layers(run.tasks)
     except ValueError as exc:
-        errors.append(str(exc))
-
-    dependents: dict[str, list[str]] = defaultdict(list)
-    for task in run.tasks:
-        for dep in task.depends_on:
-            dependents[dep].append(task.id)
-
-    def is_upstream(candidate: str, task_id: str) -> bool:
-        """Return whether candidate can reach task_id through dependency edges."""
-        seen: set[str] = set()
-        stack = [candidate]
-        while stack:
-            current = stack.pop()
-            if current == task_id:
-                return True
-            if current in seen:
-                continue
-            seen.add(current)
-            stack.extend(dependents.get(current, []))
-        return False
-
-    for task in run.tasks:
-        for key, upstream_task_id in task.input_from.items():
-            if upstream_task_id in task_id_set and not is_upstream(upstream_task_id, task.id):
-                warnings.append(
-                    f"Task '{task.id}' input_from '{key}' references '{upstream_task_id}', "
-                    "which is not upstream in the DAG"
-                )
+        errors.extend(str(exc).splitlines())
 
     declared_variables = _declared_variable_names(data.get("variables", []))
     used_variables: set[str] = set()

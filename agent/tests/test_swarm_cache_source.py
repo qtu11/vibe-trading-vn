@@ -356,8 +356,7 @@ def test_completed_exit_carries_real_cache_values_and_provider_label(tmp_path) -
 def test_cancelled_exit_carries_accumulated_cache_values(tmp_path) -> None:
     """Non-happy exit guard: iteration 0 measures a provider response with
     cache details and dispatches a tool; iteration 1's stream is cancelled
-    mid-flight. The cancelled WorkerResult must carry iteration 0's real
-    accumulated values, not defaults."""
+    mid-flight with reported usage. Both paid responses must be retained."""
     cancel_event = threading.Event()
     tool_turn = LLMResponse(
         content="",
@@ -373,9 +372,9 @@ def test_cancelled_exit_carries_accumulated_cache_values(tmp_path) -> None:
 
     assert result.status == "cancelled"
     assert llm.calls == 2
-    assert result.input_tokens == 100
-    assert result.cache_read_tokens == 70
-    assert result.cache_creation_tokens == 30
+    assert result.input_tokens == 200
+    assert result.cache_read_tokens == 140
+    assert result.cache_creation_tokens == 60
     assert result.token_source == "provider"
 
 

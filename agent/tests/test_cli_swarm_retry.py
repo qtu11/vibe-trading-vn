@@ -59,6 +59,7 @@ def test_swarm_retry_passes_prior_run_only_for_resume(
         status=status.failed,
         preset_name="demo",
         user_vars={"ticker": "AAPL"},
+        max_llm_calls=3,
     )
 
     class FakeStore:
@@ -103,6 +104,7 @@ def test_swarm_retry_passes_prior_run_only_for_resume(
 
     assert _legacy.cmd_swarm_retry_live("run-failed", resume=True) == 0
     assert captured["preset_name"] == "demo"
+    assert captured["max_llm_calls"] == 3
     assert captured["resume_from"] is not None
     assert captured["resume_from"].id == "run-failed"
 

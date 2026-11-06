@@ -85,7 +85,7 @@ async def test_actual_stdio_handshake_and_account_bound_schema(tmp_path, monkeyp
             await client.initialize()
             tools = (await client.list_tools()).tools
             names = {tool.name for tool in tools}
-            assert len(names) == (10 if execution else 7)
+            assert len(names) == (17 if execution else 14)
             assert ("forex_submit_intent" in names) == execution
             assert all(
                 "api_key" not in str(tool.inputSchema) and "password" not in str(tool.inputSchema) for tool in tools

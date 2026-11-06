@@ -247,12 +247,26 @@ export function WelcomeScreen({ onExample }: Props) {
     <div className="flex w-full flex-col items-center px-4 pb-14 text-center">
       <div className="w-full max-w-3xl">
         <div className="mx-auto max-w-2xl">
-          <div className="flex items-center justify-center gap-3">
-            <BrandMark className="h-9 w-9 shrink-0" />
-            <h1 className="text-[30px] sm:text-[38px] font-semibold tracking-tight leading-tight text-foreground">
-              {t(greetingKey as any)}
-            </h1>
+          {/* Hero Mascot & Brand Emblem */}
+          <div className="mb-6 flex flex-col items-center">
+            <div className="relative mb-3 flex items-center justify-center">
+              <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-primary/20 via-orange-500/15 to-primary/10 blur-xl opacity-75" />
+              <div className="relative flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-2xl border border-border/80 bg-card/90 p-2.5 shadow-xl shadow-primary/10 backdrop-blur-md ring-1 ring-white/10 transition-transform hover:scale-105">
+                <BrandMark className="h-full w-full" priority />
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary tracking-wide">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
+              VIBE-TRADING AI AGENT
+            </div>
           </div>
+
+          <h1 className="text-[30px] sm:text-[38px] font-semibold tracking-tight leading-tight text-foreground">
+            {t(greetingKey as any)}
+          </h1>
           <p className="mt-3 text-sm text-muted-foreground">
             {t("welcome.taskSubtitle" as any)}
             <span className="mt-2 block text-xs">{t("welcome.tasks.hint")}</span>

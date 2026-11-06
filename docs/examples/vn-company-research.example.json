@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "symbol": "CASE.VN",
+  "venue": "HOSE",
+  "records": [
+    {
+      "statement": "balance",
+      "period": "quarter",
+      "period_start": "2024-12-31",
+      "period_end": "2024-12-31",
+      "period_basis": "instant",
+      "consolidation": "consolidated",
+      "published_at": "2025-03-01T00:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 balance",
+      "revision": "original",
+      "facts": {
+        "total_assets": {
+          "value": "1000",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "total_liabilities": {
+          "value": "600",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "total_equity": {
+          "value": "400",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "current_assets": {
+          "value": "300",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "current_liabilities": {
+          "value": "200",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "accounts_receivable": {
+          "value": "20",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "inventories": {
+          "value": "30",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "accounts_payable": {
+          "value": "10",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    },
+    {
+      "statement": "income",
+      "period": "quarter",
+      "period_start": "2025-01-01",
+      "period_end": "2025-03-31",
+      "period_basis": "year_to_date",
+      "consolidation": "consolidated",
+      "published_at": "2025-04-20T03:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 income",
+      "revision": "original",
+      "facts": {
+        "revenue": {
+          "value": "200",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "gross_profit": {
+          "value": "80",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "net_income": {
+          "value": "100",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "cogs": {
+          "value": "120",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    },
+    {
+      "statement": "cashflow",
+      "period": "quarter",
+      "period_start": "2025-01-01",
+      "period_end": "2025-03-31",
+      "period_basis": "year_to_date",
+      "consolidation": "consolidated",
+      "published_at": "2025-04-20T03:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 cashflow",
+      "revision": "original",
+      "facts": {
+        "cfo": {
+          "value": "60",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "capex": {
+          "value": "10",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    },
+    {
+      "statement": "balance",
+      "period": "quarter",
+      "period_start": "2025-03-31",
+      "period_end": "2025-03-31",
+      "period_basis": "instant",
+      "consolidation": "consolidated",
+      "published_at": "2025-04-20T03:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 balance",
+      "revision": "original",
+      "facts": {
+        "total_assets": {
+          "value": "1000",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "total_liabilities": {
+          "value": "600",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "total_equity": {
+          "value": "400",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "current_assets": {
+          "value": "400",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "current_liabilities": {
+          "value": "200",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "accounts_receivable": {
+          "value": "40",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "inventories": {
+          "value": "50",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "accounts_payable": {
+          "value": "30",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    },
+    {
+      "statement": "income",
+      "period": "quarter",
+      "period_start": "2025-01-01",
+      "period_end": "2025-06-30",
+      "period_basis": "year_to_date",
+      "consolidation": "consolidated",
+      "published_at": "2025-07-20T00:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 income",
+      "revision": "original",
+      "facts": {
+        "revenue": {
+          "value": "470",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "gross_profit": {
+          "value": "180",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "net_income": {
+          "value": "210",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "cogs": {
+          "value": "290",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    },
+    {
+      "statement": "cashflow",
+      "period": "quarter",
+      "period_start": "2025-01-01",
+      "period_end": "2025-06-30",
+      "period_basis": "year_to_date",
+      "consolidation": "consolidated",
+      "published_at": "2025-07-20T00:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 cashflow",
+      "revision": "original",
+      "facts": {
+        "cfo": {
+          "value": "140",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "capex": {
+          "value": "25",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    },
+    {
+      "statement": "balance",
+      "period": "quarter",
+      "period_start": "2025-06-30",
+      "period_end": "2025-06-30",
+      "period_basis": "instant",
+      "consolidation": "consolidated",
+      "published_at": "2025-07-20T00:00:00Z",
+      "retrieved_at": "2026-11-05T00:00:00Z",
+      "source_url": "https://example.com/fictional-filing.pdf",
+      "document_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "locator": "Synthetic fixture, page 3 balance",
+      "revision": "original",
+      "facts": {
+        "total_assets": {
+          "value": "1100",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "total_liabilities": {
+          "value": "650",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "total_equity": {
+          "value": "450",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "current_assets": {
+          "value": "450",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "current_liabilities": {
+          "value": "250",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "accounts_receivable": {
+          "value": "50",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "inventories": {
+          "value": "65",
+          "unit": "VND",
+          "scale": 1000000
+        },
+        "accounts_payable": {
+          "value": "35",
+          "unit": "VND",
+          "scale": 1000000
+        }
+      }
+    }
+  ]
+}

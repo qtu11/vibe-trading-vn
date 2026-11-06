@@ -306,6 +306,11 @@ target-version = "py311"
 line-length = 120
 src = ["agent"]
 
+[tool.pyright]
+extraPaths = ["agent"]
+venvPath = "."
+venv = ".venv"
+
 [tool.coverage.run]
 source = ["agent"]
 omit = [

@@ -65,6 +65,18 @@ Nền tảng nghiên cứu tài chính bằng ngôn ngữ tự nhiên, điều p
 
 **Đợt code tiếp theo:** tool/MCP đã đọc [BCTC VN local có nguồn, đơn vị và revision theo `as_of`](docs/LOCAL_VN_FINANCIAL_STATEMENTS.md); `.VN` profile có nhãn market đúng, Forex kiểm raw provider data và Crypto ghi rõ giả định perpetual/funding trong run card. Xem [phạm vi và kiểm thử đợt 2](docs/IMPLEMENTATION_STATUS_2026-11-05_02.md). Dữ liệu BCTC local vẫn mang nhãn do người dùng cung cấp, chưa xác minh nội dung.
 
+**Đợt 3:** đã nối `vietnam_research` (đơn vị/quý/CF/working capital có evidence), DCF qua JSON/MCP, Forex train-only walk-forward, `crypto_derivatives` (Funding/OI) và validator DAG chung. [Hướng dẫn chạy và ví dụ tổng hợp](docs/MULTI_MARKET_RESEARCH_USAGE.md) · [Biên bản](docs/IMPLEMENTATION_STATUS_2026-11-05_03.md) · [Tracker đủ 265 ID và phần còn mở](docs/IMPLEMENTATION_TRACKER.md). Không coi các phần triển khai này là hoàn tất mọi đặc tả.
+
+**Đợt 4:** có trang **Nghiên cứu thị trường** (`/research`) cho BCTC VN và Crypto OI/Funding, registry lưu từng thí nghiệm Forex, offline Order Book replay và cap lượt gọi Swarm. [Cách dùng](docs/MULTI_MARKET_RESEARCH_USAGE.md) · [Kiểm thử, giới hạn và rollback DB schema4](docs/IMPLEMENTATION_STATUS_2026-11-05_04.md). Tracker hiện30 ID có bổ sung partial; acceptance toàn chương trình vẫn mở.
+
+**Đợt 5 — 06/11:** `/research` có [phòng lab Forex và EMA](docs/FOREX_RESEARCH_LAB.md), nhập JSON, tính/lưu riêng và xem lịch sử từng lần chạy. Thêm [định giá so sánh VN](docs/VN_COMPARABLES.md) qua `vietnam_comparables` và [Crypto capture/archive theo cutoff ghi nhận cục bộ](docs/CRYPTO_DERIVATIVES_ARCHIVE.md). Cuối đợt5 có33 ID bổ sung partial.
+
+**Đợt 6 — 06/11:** đã nối [DCF/sensitivity và giao diện định giá VN](docs/VN_DCF_SENSITIVITY.md), [stress spread1×/2×/3× trên tín hiệu OOS cố định](docs/FOREX_RESEARCH_LAB.md#kiểm-thử-chi-phí-trên-tín-hiệu-oos-đã-khóa), cùng [phiên bản nghiên cứu bất biến/diff/review](docs/RESEARCH_REVISIONS.md). Tính và lưu là hai thao tác riêng; review giữ nguồn chưa xác minh. Main inventory117 agent tools /85 MCP; dedicated Forex MCP12 read-only /15 execution, research writes thêm2. [Tracker](docs/IMPLEMENTATION_TRACKER.md) có37 ID bổ sung partial, mọi acceptance vẫn mở. [Phạm vi, kiểm thử và rollback](docs/IMPLEMENTATION_STATUS_2026-11-06_06.md).
+
+**Đợt 7 — 06/11:** `/research` có [reverse DCF tìm tăng trưởng hàm ý từ giá](docs/VN_REVERSE_DCF.md), [bootstrap đường vốn trên trade OOS Forex đã khóa](docs/FOREX_RESEARCH_LAB.md#bootstrap-đường-vốn-từ-các-trade-oos-đã-khóa) và [basis futures Crypto có kỳ hạn](docs/CRYPTO_BASIS_CURVE.md). API/Web nối revision riêng, giữ dữ liệu chưa xác minh; main inventory118 agent tools /86 MCP, dedicated Forex13 read-only /16 execution, research writes thêm3. [Tracker](docs/IMPLEMENTATION_TRACKER.md) ghi39 ID có phần triển khai; acceptance vẫn mở. Xem [phạm vi, kiểm thử và rollback đợt7](docs/IMPLEMENTATION_STATUS_2026-11-06_07.md).
+
+**Nghiên cứu cổ phiếu VN — 06/11:** đã bổ sung hướng dẫn cho agent và hội đồng từ [phân tích báo cáo mẫu](docs/REPORT_SAMPLE_FINDINGS.md) và [phương pháp nghiên cứu sâu](docs/VIETNAM_DEEP_RESEARCH_METHOD.md): tách dữ kiện/dự phóng, lợi nhuận/dòng tiền, định giá/thời điểm vào lệnh và lập kịch bản có điều kiện. Đây là hướng dẫn nghiên cứu; nguồn và khuyến nghị chưa tự được AI xác minh, không tạo báo giá realtime hay gửi lệnh. Inventory hiện tại: 120 agent tools / 86 main MCP; 91 skills trong 9 nhóm.
+
 Các README ngôn ngữ khác giữ phần hướng dẫn/danh mục từ baseline upstream: [中文](README_zh.md), [日本語](README_ja.md), [한국어](README_ko.md), [العربية](README_ar.md), [Español](README_es.md), [Bahasa Indonesia](README_id.md). Thiết kế multi-market mới được viết bằng tiếng Việt trong bộ tài liệu liên kết ở trên.
 
 ## Phạm vi hiện tại và hướng mở rộng
@@ -280,7 +292,7 @@ For a backtest, set `source` in `config.json`:
 
 In an Agent conversation, ask explicitly: **"Use Longbridge to fetch QQQ.US historical data."** The explicit source request is separate from `source: "auto"`; `auto` keeps the normal per-market fallback chain.
 
-Beyond OHLCV, **29 read-only data tools** reach into fundamentals & flow — fund flow, dragon-tiger, northbound, southbound, margin, block trades, shareholder count, lockup, sector, research reports, broker research search, news, SEC filings, Chinese-market announcements, financial statements, PIT fundamentals, options chains, crypto order-book depth, stock profile, market screening, symbol search, macro, China macro (EDB), iwencai, institutional holdings (13F), ETF look-through, off-exchange fund NAV, prediction markets, and research papers — all exposed over MCP. An explicit `local:` symbol never silently falls back to a network source.
+Beyond OHLCV, **31 read-only data and research tools** reach into fundamentals & flow — fund flow, dragon-tiger, northbound, southbound, margin, block trades, shareholder count, lockup, sector, research reports, broker research search, news, SEC filings, Chinese-market announcements, financial statements, PIT fundamentals, options chains, crypto order-book depth, stock profile, market screening, symbol search, macro, China macro (EDB), iwencai, institutional holdings (13F), ETF look-through, off-exchange fund NAV, prediction markets, research papers, local VN research and crypto derivatives — all exposed over MCP. An explicit `local:` symbol never silently falls back to a network source.
 
 <!-- QVERIS-START -->
 ### 💎 Optional premium data — QVeris
@@ -299,9 +311,9 @@ Beyond OHLCV, **29 read-only data tools** reach into fundamentals & flow — fun
 Detailed inventories are folded below to keep the main README scannable. Open them when you want to inspect the available building blocks.
 
 <details>
-<summary><b>Finance Skill Library</b> <sub>90 skills across 9 categories</sub></summary>
+<summary><b>Finance Skill Library</b> <sub>91 skills across 9 categories</sub></summary>
 
-- 📊 90 specialized finance skills organized into 9 categories
+- 📊 91 specialized finance skills organized into 9 categories
 - 🌐 Methods for traditional markets, crypto and DeFi; source coverage varies
 - 🔬 Comprehensive capabilities spanning data sourcing to quantitative research
 
@@ -309,7 +321,7 @@ Detailed inventories are folded below to keep the main README scannable. Open th
 |----------|--------|----------|
 | Data Source | 10 | `data-routing`, `tushare`, `yfinance`, `okx-market`, `akshare`, `mootdx`, `ccxt`, `eastmoney`, `sec-edgar`, `qveris` |
 | Strategy | 19 | `strategy-generate`, `cross-market-strategy`, `technical-basic`, `candlestick`, `ichimoku`, `elliott-wave`, `smc`, `multi-factor`, `ml-strategy` |
-| Analysis | 23 | `factor-research`, `correlation-regime`, `macro-analysis`, `global-macro`, `valuation-model`, `investor-lenses`, `credit-analysis`, `dividend-analysis` |
+| Analysis | 24 | `factor-research`, `correlation-regime`, `macro-analysis`, `global-macro`, `valuation-model`, `investor-lenses`, `credit-analysis`, `dividend-analysis`, `vietnam-deep-research` |
 | Asset Class | 9 | `options-strategy`, `options-advanced`, `convertible-bond`, `etf-analysis`, `asset-allocation`, `sector-rotation` |
 | Crypto | 7 | `perp-funding-basis`, `liquidation-heatmap`, `stablecoin-flow`, `defi-yield`, `onchain-analysis` |
 | Flow | 8 | `hk-connect-flow`, `us-etf-flow`, `edgar-sec-filings`, `financial-statement`, `adr-hshare` |
@@ -399,9 +411,9 @@ Paper-vs-live is a **structural per-broker runtime guard** (account-id format, h
 </details>
 
 <details>
-<summary><b>Preset Trading Teams</b> <sub>30 swarm presets</sub></summary>
+<summary><b>Preset Trading Teams</b> <sub>31 swarm presets</sub></summary>
 
-- 🏢 30 ready-to-use agent teams
+- 🏢 31 ready-to-use agent teams
 - ⚡ Pre-configured finance workflows
 - 🎯 Investment, trading & risk management presets
 
@@ -491,7 +503,9 @@ The shared backtest market classifier recognizes `BTC/USD`, `ETH/USD`,
 </details>
 
 <details>
-<summary><b>Quant Library</b> <sub>308 tested functions across 24 modules, callable from every transport</sub></summary>
+<summary><b>Quant Library</b> <sub>310 public exports across 24 modules</sub></summary>
+
+quantlib_call exposes 234 callable entries; public exports also include data types and constants.
 
 `src/quantlib` holds one tested implementation of each piece of finance math the
 agent needs. Skills **import** these rather than carrying formulas inside
@@ -839,7 +853,7 @@ Saves write the `channels.<name>` section of `~/.vibe-trading/agent.json` atomic
 
 ## 🔌 MCP Plugin
 
-Vibe-Trading exposes 82 MCP tools for compatible clients. It runs as a stdio subprocess; some research sources can be used without API keys, subject to provider availability and coverage. Trading reads use the selected connector profile, and `run_swarm` requires a configured LLM provider. The dedicated Forex MCP has a separate tool surface.
+Vibe-Trading exposes 86 MCP tools for compatible clients. It runs as a stdio subprocess; some research sources can be used without API keys, subject to provider availability and coverage. Trading reads use the selected connector profile, and `run_swarm` requires a configured LLM provider. The dedicated Forex MCP has a separate tool surface.
 
 **Environment variables:** the server inherits the spawning client's environment. An interactive shell export only reaches a client launched from that environment; configure the client's `env` block when needed. Generated backtest code is sandboxed to allowed run roots, so writing results into another workspace needs `VIBE_TRADING_ALLOWED_RUN_ROOTS`:
 
@@ -908,7 +922,7 @@ with `--host` / `--port`.
 
 </details>
 
-**MCP tools exposed (82):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `adapt_strategy`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_southbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_fund_nav`, `get_cn_macro_series`, `get_cn_announcements`, `search_broker_reports`, `paper_trade_step`.
+**MCP tools exposed (86):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `refresh_strategy_evidence`, `adapt_strategy`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_southbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_fund_nav`, `get_cn_macro_series`, `get_cn_announcements`, `search_broker_reports`, `paper_trade_step`, `crypto_derivatives`, `vietnam_research`, `vietnam_comparables`, `crypto_basis_curve`.
 
 `quantlib_call` attribution requires finite sector weights and returns, finite Carino return inputs, and a finite non-negative weight-sum tolerance. Invalid data is rejected explicitly rather than returned as an attribution result containing `NaN`. Missing returns for a zero-weight sector may still be inferred from the other side.
 
@@ -928,13 +942,13 @@ Vibe-Trading/
 ├── agent/                          # Backend (Python)
 │   ├── cli/                        # CLI package — interactive TUI + subcommands
 │   ├── api_server.py               # FastAPI server — runs, sessions, upload, swarm, SSE
-│   ├── mcp_server.py               # MCP server — 82 tools for OpenClaw / Claude Desktop
+│   ├── mcp_server.py               # MCP server — 86 tools for OpenClaw / Claude Desktop
 │   │
 │   ├── src/
 │   │   ├── agent/                  # ReAct agent core
 │   │   │   ├── loop.py             #   5-layer compression + read/write tool batching
 │   │   │   ├── context.py          #   system prompt + auto-recall from persistent memory
-│   │   │   ├── skills.py           #   skill loader (90 bundled + user-created via CRUD)
+│   │   │   ├── skills.py           #   skill loader (91 bundled + user-created via CRUD)
 │   │   │   ├── tools.py            #   tool base class + registry
 │   │   │   ├── memory.py           #   lightweight workspace state per run
 │   │   │   ├── frontmatter.py      #   shared YAML frontmatter parser
@@ -943,7 +957,7 @@ Vibe-Trading/
 │   │   ├── memory/                 # Cross-session persistent memory
 │   │   │   └── persistent.py       #   file-based memory (~/.vibe-trading/memory/)
 │   │   │
-│   │   ├── tools/                  # 114 auto-discovered agent tools
+│   │   ├── tools/                  # 120 auto-discovered agent tools
 │   │   │   ├── backtest_tool.py    #   run backtests
 │   │   │   ├── remember_tool.py    #   cross-session memory (save/recall/forget)
 │   │   │   ├── skill_writer_tool.py #  skill CRUD (save/patch/delete/file)
@@ -961,9 +975,9 @@ Vibe-Trading/
 │   │   ├── api/                    # FastAPI route modules
 │   │   │   └── alpha_routes.py     #   /alpha/list, /alpha/{id}, /alpha/bench, SSE stream
 │   │   │
-│   │   ├── skills/                 # 90 finance skills in 9 categories (SKILL.md each)
+│   │   ├── skills/                 # 91 finance skills in 9 categories (SKILL.md each)
 │   │   ├── swarm/                  # Swarm DAG execution engine
-│   │   │   └── presets/            #   30 swarm preset YAML definitions
+│   │   │   └── presets/            #   31 swarm preset YAML definitions
 │   │   ├── session/                # Multi-turn chat + FTS5 session search
 │   │   └── providers/              # LLM provider abstraction
 │   │

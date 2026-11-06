@@ -1,4 +1,5 @@
 import type { ForexTradePlan } from "@/lib/forexTradePlan";
+import type { SourceCitation } from "@/lib/sourceEvidence";
 
 /** Chat message types */
 export type AgentMessageType =
@@ -73,6 +74,8 @@ export interface AgentMessage {
   /** Shadow Account id if render_shadow_report fired in this turn (RunCompleteCard renders a "View Shadow Report" button). */
   shadowId?: string;
   forexTradePlan?: ForexTradePlan;
+  /** Grounding-ledger sources that resolve `[S#]` markers in the answer. */
+  sources?: SourceCitation[];
 }
 
 /** Tool call tracking entry */

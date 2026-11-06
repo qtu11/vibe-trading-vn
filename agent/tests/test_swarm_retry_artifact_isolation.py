@@ -106,7 +106,12 @@ def test_agent_artifact_dir_rejects_canonical_symlink_escape(tmp_path: Path) -> 
     (artifact_root / "analyst").mkdir(parents=True)
     outside = tmp_path / "outside"
     outside.mkdir()
-    (artifact_root / "analyst" / "task-1").symlink_to(outside, target_is_directory=True)
+    try:
+        (artifact_root / "analyst" / "task-1").symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows requires a symlink privilege unavailable to this test process")
+        raise
 
     with pytest.raises(ValueError, match="agent/task id"):
         agent_artifact_dir(run_dir, "analyst", "task-1")

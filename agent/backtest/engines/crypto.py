@@ -10,6 +10,7 @@ Market rules:
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +78,7 @@ class CryptoEngine(BaseEngine):
         self._liquidation_price_source: str | None = None
         self._strict_funding_applied: set[tuple[str, pd.Timestamp]] = set()
         self._isolated_margins: dict[str, float] = {}
+        self._isolated_top_ups: dict[str, float] = {}
         self._schedule_cache: dict[tuple[str, str], MaintenanceSchedule] = {}
         self._risk_frames: dict[str, MarketRiskFrame] = {}
         self._blocked_symbols: set[str] = set()
@@ -307,6 +309,49 @@ class CryptoEngine(BaseEngine):
                 funding_pnl=-payment,
             )
 
+    def top_up_isolated_margin(
+        self,
+        symbol: str,
+        amount: float,
+        timestamp: pd.Timestamp,
+    ) -> None:
+        """Move free capital into an isolated position after recording it.
+
+        The event is appended before the margin mutation so a top-up can
+        never improve the liquidation buffer without an audit record. Only
+        strict isolated runs with an active, non-liquidated position and
+        sufficient free capital are accepted; everything else fails closed.
+        """
+        if not self.perpetual_strict:
+            raise ValueError("isolated margin top-up requires perpetual_strict=True")
+        if self.margin_mode != "isolated":
+            raise ValueError("isolated margin top-up requires margin_mode='isolated'")
+        if symbol not in self.positions:
+            raise ValueError("isolated margin top-up requires an open position")
+        if self.terminal_status != "active" or symbol in self._blocked_symbols:
+            raise ValueError("isolated margin top-up is not allowed after liquidation")
+        if not math.isfinite(amount) or amount <= 0:
+            raise ValueError("isolated margin top-up amount must be positive and finite")
+        margin_before = self._isolated_margins.get(symbol)
+        if margin_before is None:
+            raise ValueError("isolated margin top-up requires tracked position margin")
+        if amount > self.capital + 1e-9:
+            raise ValueError("isolated margin top-up exceeds available free capital")
+        event_time = pd.Timestamp(timestamp)
+        if pd.isna(event_time):
+            raise ValueError("isolated margin top-up timestamp must be valid")
+        self._record_event(
+            event_time,
+            "isolated_margin_top_up",
+            symbol=symbol,
+            amount=amount,
+            margin_before=margin_before,
+            margin_after=margin_before + amount,
+        )
+        self.capital -= amount
+        self._isolated_margins[symbol] = margin_before + amount
+        self._isolated_top_ups[symbol] = self._isolated_top_ups.get(symbol, 0.0) + amount
+
     def _account_state(self) -> AccountState:
         positions = tuple(
             PositionState(
@@ -323,6 +368,7 @@ class CryptoEngine(BaseEngine):
             self._calc_margin(
                 position.symbol, position.size, position.entry_price, position.leverage
             )
+            + self._isolated_top_ups.get(position.symbol, 0.0)
             for position in self.positions.values()
         )
         return AccountState(
@@ -461,7 +507,13 @@ class CryptoEngine(BaseEngine):
                     after.leverage,
                 )
             else:
-                self._isolated_margins[after.symbol] *= after.size / before.size
+                size_ratio = after.size / before.size
+                top_up = self._isolated_top_ups.get(after.symbol, 0.0)
+                released_top_up = top_up * (1.0 - size_ratio)
+                if released_top_up:
+                    self.capital += released_top_up
+                    self._isolated_top_ups[after.symbol] = top_up - released_top_up
+                self._isolated_margins[after.symbol] *= size_ratio
 
         signed_delta = after.direction * size_delta
         self._record_event(
@@ -539,6 +591,7 @@ class CryptoEngine(BaseEngine):
             )
         if self.perpetual_strict and self.margin_mode == "isolated":
             self._isolated_margins[order.symbol] = order.margin
+            self._isolated_top_ups[order.symbol] = 0.0
         self._risk_after_atomic_mutation(timestamp)
 
     def _execute_position_increase(self, order, timestamp: pd.Timestamp) -> None:
@@ -589,6 +642,10 @@ class CryptoEngine(BaseEngine):
                 reason=reason,
             )
         self._isolated_margins.pop(symbol, None)
+        if position is not None:
+            self.capital += self._isolated_top_ups.pop(symbol, 0.0)
+        else:
+            self._isolated_top_ups.pop(symbol, None)
         if position is not None and reason == "signal":
             self._risk_after_atomic_mutation(exit_time)
 

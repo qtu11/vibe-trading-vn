@@ -3,6 +3,7 @@ import { FlaskConical, Building2, Activity, BarChart3, Bot, CalendarClock, Candl
 export const NAVIGATION_GROUPS = [
   { id: "research", items: [
     { id: "agent", to: "/", icon: Bot },
+    { id: "marketResearch", to: "/research", icon: BarChart3 },
     { id: "reports", to: "/reports", icon: FileText },
     { id: "paperTrading", to: "/paper-trading", icon: FlaskConical },
     { id: "portfolio", to: "/portfolio", icon: WalletCards },

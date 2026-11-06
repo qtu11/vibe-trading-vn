@@ -26,6 +26,7 @@ from src.config.accessor import get_env_config
 from src.config.schema import AgentConfig
 from src.providers.llm import _ensure_dotenv, uses_responses_api
 from src.swarm import grounding
+from src.swarm.budget import SwarmCallBudget
 from src.swarm.models import (
     RunStatus,
     SwarmAgentSpec,
@@ -307,6 +308,7 @@ class SwarmRuntime:
         live_callback: Callable | None = None,
         include_shell_tools: bool = False,
         resume_from: SwarmRun | None = None,
+        max_llm_calls: int | None = None,
     ) -> SwarmRun:
         """Start a swarm run. Returns immediately, execution happens in background.
 
@@ -327,6 +329,16 @@ class SwarmRuntime:
             FileNotFoundError: If preset does not exist.
             ValueError: If DAG validation fails.
         """
+        run = build_run_from_preset(preset_name, user_vars)
+        validate_dag(run.tasks, run.agents)
+        if max_llm_calls is None and resume_from is not None:
+            max_llm_calls = resume_from.max_llm_calls
+        if max_llm_calls is not None and (type(max_llm_calls) is not int or max_llm_calls < 1):
+            raise ValueError("max_llm_calls must be a positive integer or null")
+        run.max_llm_calls = max_llm_calls
+        run.llm_calls_started = 0
+        run.llm_calls_unknown_usage = 0
+
         _ensure_dotenv()
         # Reap any previously running runs whose host process died without
         # finalizing them. Threshold is computed per-run from agent timeouts +
@@ -338,9 +350,6 @@ class SwarmRuntime:
                 logger.info("Reaped %d stale swarm run(s): %s", len(reaped), reaped)
         except Exception:
             logger.warning("Stale-run reaper failed", exc_info=True)
-
-        run = build_run_from_preset(preset_name, user_vars)
-        validate_dag(run.tasks)
 
         # Capture which provider/model the run was launched against so the
         # serialized run.json carries enough context for cost audits and
@@ -489,6 +498,12 @@ class SwarmRuntime:
         # this run. The block is empty when no symbols were detected, in
         # which case workers see no extra section.
         grounding_block = grounding.format_grounding_block(run.grounding_data or {})
+        call_budget = SwarmCallBudget(
+            run, self._store,
+            lambda kind, agent, task, data: self._emit_event(
+                run.id, self._make_event(kind, agent, task, data),
+            ),
+        )
 
         # Compute execution layers
         layers = topological_layers(run.tasks)
@@ -534,6 +549,7 @@ class SwarmRuntime:
                     cancel_event=cancel_event,
                     include_shell_tools=include_shell_tools,
                     grounding_block=grounding_block,
+                    call_budget=call_budget,
                 )
 
                 # Process results
@@ -903,6 +919,7 @@ class SwarmRuntime:
         cancel_event: threading.Event,
         include_shell_tools: bool = False,
         grounding_block: str = "",
+        call_budget: SwarmCallBudget | None = None,
     ) -> dict[str, WorkerResult]:
         """Execute all tasks in a single layer in parallel, with retry on failure.
 
@@ -1024,6 +1041,7 @@ class SwarmRuntime:
                     include_shell_tools=include_shell_tools,
                     grounding_block=grounding_block,
                     cancel_event=cancel_event,
+                    call_budget=call_budget,
                 )
                 futures[future] = tid
                 per_task_budget = (
@@ -1086,6 +1104,7 @@ class SwarmRuntime:
         include_shell_tools: bool = False,
         grounding_block: str = "",
         cancel_event: threading.Event | None = None,
+        call_budget: SwarmCallBudget | None = None,
     ) -> WorkerResult:
         """Run a worker with automatic retry on failure.
 
@@ -1183,6 +1202,7 @@ class SwarmRuntime:
                 grounding_block=grounding_block,
                 agent_config=self._agent_config,
                 cancel_event=cancel_event,
+                **({"call_budget": call_budget} if call_budget is not None else {}),
             )
 
             cumulative_input_tokens += result.input_tokens

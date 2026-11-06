@@ -99,6 +99,19 @@ class MaintenanceSchedule:
         if any(current <= previous for previous, current in zip(caps, caps[1:])):
             raise ValueError("notional caps must be strictly increasing")
 
+    def resolve_tier(self, notional: float) -> MaintenanceBracket:
+        """Return the bracket whose cap contains ``notional``.
+
+        Caps are inclusive: a notional exactly equal to a cap stays in that
+        tier. The first tier above the notional wins; a notional above the
+        final cap fails closed instead of extrapolating a rate.
+        """
+        _require_finite("notional", notional, positive=True)
+        for bracket in self.brackets:
+            if notional <= bracket.notional_cap:
+                return bracket
+        raise ValueError("notional exceeds the final maintenance bracket cap")
+
     @classmethod
     def from_loader_columns(
         cls, symbol: str, maintenance_brackets: str, maintenance_bracket_version: str,
@@ -168,6 +181,13 @@ class PositionRisk:
 
 @dataclass(frozen=True)
 class RiskSnapshot:
+    """Point-in-time risk state; never an exchange liquidation sequence.
+
+    ``liquidation_targets`` names positions whose adverse mark breached
+    maintenance. Any price derived from that mark is an estimate or a
+    scenario bound, not a guaranteed liquidation floor.
+    """
+
     margin_balance: float
     initial_margin: float
     maintenance_margin: float
@@ -185,20 +205,26 @@ def maintenance_margin(
         raise ValueError("position and schedule symbols must match")
     _require_finite("mark_price", mark_price, positive=True)
     notional = abs(position.quantity) * mark_price
-    for bracket in schedule.brackets:
-        if notional <= bracket.notional_cap:
-            return notional * bracket.maintenance_rate - bracket.cumulative_maintenance_amount
-    raise ValueError("notional exceeds the final maintenance bracket cap")
+    bracket = schedule.resolve_tier(notional)
+    return notional * bracket.maintenance_rate - bracket.cumulative_maintenance_amount
 
 
 @dataclass(frozen=True)
 class AccountState:
-    """Single-asset USDT account state without open-order margin."""
+    """Single-asset USDT account state without open-order margin.
+
+    Cross-margin accounting deliberately supports one collateral asset with
+    no haircut. Passing another asset or a non-unit haircut fails closed:
+    silently valuing mixed collateral at par would overstate the shared
+    wallet and the credit available to every position.
+    """
 
     wallet_balance: float
     positions: tuple[PositionState, ...]
     margin_mode: MarginMode
     terminal_status: TerminalStatus = "active"
+    collateral_asset: str = "USDT"
+    collateral_haircut: float = 1.0
 
     def __post_init__(self) -> None:
         _require_finite("wallet_balance", self.wallet_balance)
@@ -206,6 +232,16 @@ class AccountState:
             raise ValueError("margin_mode must be 'isolated' or 'cross'")
         if self.terminal_status not in {"active", "completed", "account_liquidation"}:
             raise ValueError("unsupported terminal_status")
+        if self.collateral_asset != "USDT":
+            raise ValueError(
+                "mixed or non-USDT collateral is not supported; "
+                "collateral_asset must be 'USDT'"
+            )
+        _require_finite("collateral_haircut", self.collateral_haircut, positive=True)
+        if self.collateral_haircut != 1.0:
+            raise ValueError(
+                "collateral haircut is not supported; collateral_haircut must be 1.0"
+            )
         symbols = [position.symbol for position in self.positions]
         if len(symbols) != len(set(symbols)):
             raise ValueError("duplicate position symbol")
@@ -327,8 +363,14 @@ def _position_risks(
 
     if len(timestamps) > 1:
         raise ValueError("position frame timestamps must match")
-    if len(account.positions) > 1 and price_field == "adverse":
-        fidelity_flags.append("conservative_intrabar_assumption")
+    if price_field == "adverse":
+        if len(account.positions) > 1:
+            fidelity_flags.append("conservative_intrabar_assumption")
+        else:
+            # A single position still uses one OHLC extremum as the adverse
+            # mark. That is a scenario bound, not a replay of the intrabar
+            # high/low/funding/liquidation order.
+            fidelity_flags.append("intrabar_mark_path_unknown")
     return tuple(risks), tuple(dict.fromkeys(fidelity_flags))
 
 

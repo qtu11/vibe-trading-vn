@@ -1,0 +1,31 @@
+{
+  "action": "call",
+  "module": "valuation.dcf",
+  "function": "run_dcf",
+  "kwargs": {
+    "inputs": {
+      "risk_free_rate": 0.04,
+      "beta": 1.1,
+      "equity_risk_premium": 0.06,
+      "pretax_cost_of_debt": 0.08,
+      "tax_rate": 0.2,
+      "target_equity_weight": 0.8,
+      "target_debt_weight": 0.2,
+      "ebit": [120000000, 130000000],
+      "depreciation_amortization": [10000000, 10000000],
+      "capex": [15000000, 15000000],
+      "delta_nwc": [5000000, 5000000],
+      "terminal_growth": {"__assumption__": {"name": "terminal_growth", "value": 0.02, "basis": "Synthetic long-run scenario"}},
+      "exit_multiple": {"__assumption__": {"name": "exit_multiple", "value": 8, "basis": "Synthetic exit scenario"}},
+      "total_debt": 100000000,
+      "cash_and_equivalents": 20000000,
+      "minority_interest": 0,
+      "preferred_equity": 0,
+      "associate_investments": 0,
+      "diluted_shares": 10000000
+    },
+    "capital_structure_basis": "target",
+    "discounting_convention": "year_end",
+    "terminal_value_method": "perpetuity_growth"
+  }
+}

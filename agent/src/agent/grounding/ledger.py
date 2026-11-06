@@ -22,6 +22,7 @@ from src.agent.grounding.evidence import EvidenceRecord, _EvidenceMixin, _json_o
 from src.agent.grounding.figures import Figure, FiguresBlock, parse_figures_block, scan_figures, strip_figures_block
 from src.agent.grounding.policies import ValidationResult, _PolicyMixin
 from src.agent.grounding.registry import GROUNDING_CHECKS
+from src.agent.grounding.sources import _SourceMixin
 from src.agent.grounding.release import (
     MAX_GROUNDING_RECOVERY_ROUNDS,
     MAX_PRICE_EVIDENCE_ATTEMPTS,
@@ -89,6 +90,7 @@ class GroundingLedger(
     _IdentityMixin,
     _EvidenceMixin,
     _PolicyMixin,
+    _SourceMixin,
     _ReleaseMixin,
 ):
     """Run-scoped identity state machine and evidence ledger."""
@@ -122,6 +124,7 @@ class GroundingLedger(
         )
         self._identities: dict[str, IdentityRecord] = {}
         self._evidence: list[EvidenceRecord] = []
+        self._init_sources()
         self._tool_failures: list[dict[str, Any]] = []
         self._analysis_completed: list[dict[str, Any]] = []
         self._analysis_metrics: list[dict[str, Any]] = []
@@ -136,6 +139,7 @@ class GroundingLedger(
         # living on the ledger.
         self._active_block: FiguresBlock | None = None
         self._active_figures: Sequence[Figure] = ()
+        self._active_content = ""
         self._symbol_resolution_attempts = 0
         self._price_evidence_attempts = 0
         self._ingested_csvs: set[str] = set()
@@ -320,6 +324,7 @@ class GroundingLedger(
                 ]}
         self._track_session_symbols(arguments, result)
         self._note_model_write(tool_name, arguments, payload)
+        self._ingest_sources(tool_name, arguments, payload, call_id)
         if tool_name in _ANALYSIS_TOOLS:
             self._ingest_analysis_result(tool_name, arguments, payload, call_id)
         if tool_name == _RESOLVER_TOOL:
@@ -328,6 +333,8 @@ class GroundingLedger(
             self._ingest_market_data(arguments, payload, call_id, tool_name=tool_name)
             if tool_name == "get_forex_market_snapshot":
                 self._ingest_forex_context(payload, call_id)
+        elif tool_name == "run_research_council":
+            self._ingest_council_snapshot(arguments, payload, call_id)
         elif (tool_name == "get_br_market_data" and payload is not None
               and isinstance(payload.get("data"), dict)
               and payload["data"].get("action") == "quotes"):
@@ -401,6 +408,7 @@ class GroundingLedger(
         block = parse_figures_block(content)
         figures = scan_figures(content, block)
         self._active_check_findings: list[dict[str, Any]] = []
+        self._active_content = content
         self._active_block = block
         self._active_figures = figures
         issues: list[dict[str, Any]] = []
@@ -447,6 +455,7 @@ class GroundingLedger(
                 "session_symbols": sorted(self._session_symbols),
                 "session_symbol_roots": sorted(self._session_symbol_roots),
                 "evidence": [asdict(record) for record in self._evidence],
+                "sources": self.source_records(),
                 "tool_failures": list(self._tool_failures),
                 "analysis_completed": list(self._analysis_completed),
                 "analysis_evidence": list(self._analysis_metrics),

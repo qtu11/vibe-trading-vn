@@ -27,13 +27,35 @@ from random import Random
 from typing import Any
 
 from src.agent.tools import BaseTool
+from src.tools.council_contract import parse_number
 
 # ---------------------------------------------------------------------------
-# Markdown data-point extraction (handles Chinese financial reports)
+# Markdown data-point extraction (Chinese and Vietnamese financial reports)
 # ---------------------------------------------------------------------------
 
-_KV_LABEL_RE = re.compile(r"(?P<label>[一-龥A-Za-z][^|\n：:*]{1,30})[：:]\s*")
-_UNIT_PATTERN = r"亿[元美港]?元?|万亿|倍|%|[BMTxX](?![A-Za-z])"
+_KV_LABEL_RE = re.compile(r"(?P<label>[^\W\d_][^|\n：:*]{1,30})[：:]\s*")
+#: Vietnamese magnitude words, longest first. ``đồng``/``vnđ``/``VND`` are
+#: currency words (factor 1); they matter because a bare number followed by a
+#: currency word is a material amount, not a unitless ratio.
+_VN_UNIT_SCALE: dict[str, float] = {
+    "nghìn tỷ": 1e12,
+    "ngàn tỷ": 1e12,
+    "triệu tỷ": 1e15,
+    "tỷ": 1e9,
+    "tỉ": 1e9,
+    "triệu": 1e6,
+    "nghìn": 1e3,
+    "ngàn": 1e3,
+    "đồng": 1.0,
+    "vnđ": 1.0,
+    "vnd": 1.0,
+}
+_VN_UNIT_PATTERN = "|".join(
+    re.escape(unit)
+    for unit in ("nghìn tỷ", "ngàn tỷ", "triệu tỷ", "tỷ", "tỉ", "triệu",
+                 "nghìn", "ngàn", "đồng", "vnđ", "VND")
+)
+_UNIT_PATTERN = rf"{_VN_UNIT_PATTERN}|亿[元美港]?元?|万亿|倍|%|[BMTxX](?![A-Za-z])"
 _NUMUNIT_RE = re.compile(
     r"[~约]?\$?\s*(?:"
     r"(?P<open>[（(])\s*\$?\s*(?P<account_num>[+\-−]?[\d,，.]+)\s*"
@@ -43,6 +65,8 @@ _NUMUNIT_RE = re.compile(
     rf"(?P<unit>{_UNIT_PATTERN})?)"
 )
 _TABLE_SEP_RE = re.compile(r"^\|[\-\s|:]+\|$")
+_SOURCE_REF_RE = re.compile(r"\[(S\d+)\]", re.IGNORECASE)
+_VN_NEGATIVE_PREFIX_RE = re.compile(r"^\s*(?:âm|am)\s+", re.IGNORECASE)
 
 _SKIP_LABELS = {
     "来源", "sources", "source", "说明", "注意", "备注", "数据来源",
@@ -64,21 +88,37 @@ def _clean_num(s: str) -> float | None:
 def _report_value(text: str, *, prose: bool = False) -> tuple[float, str, int] | None:
     """Read a financial value without rescuing malformed accounting notation.
 
+    Vietnamese magnitude suffixes (``tỷ``/``triệu``/``nghìn``/``đồng``) are
+    converted to whole VND so a reported value and a fetched value can be
+    compared without the caller guessing the scale. The number is parsed with
+    Vietnamese grouping rules (``1.234,5`` is one thousand two hundred ...),
+    not with the Chinese/US comma convention.
+
     Args:
         text: Table cell or text immediately following a prose label.
         prose: Require a unit or currency for a parenthesized prose value.
 
     Returns:
-        Finite signed value, its unit and consumed end offset, or None.
+        Finite signed value, its normalised unit and consumed end offset, or
+        None.
     """
-    match = _NUMUNIT_RE.match(text) if prose else _NUMUNIT_RE.search(text)
+    offset = 0
+    working = text
+    vn_negative = False
+    negative_prefix = _VN_NEGATIVE_PREFIX_RE.match(working)
+    if negative_prefix is not None:
+        vn_negative = True
+        offset = negative_prefix.end()
+        working = working[offset:]
+    match = _NUMUNIT_RE.match(working) if prose else _NUMUNIT_RE.search(working)
     if match is None:
         return None
+    consumed = match.end() + offset
     # A failed accounting match must not restart at the unsigned inner digits.
-    prefix = text[: match.start()]
+    prefix = working[: match.start()]
     if prefix.count("(") > prefix.count(")") or prefix.count("（") > prefix.count("）"):
         return None
-    suffix = text[match.end() :].lstrip()
+    suffix = working[match.end() :].lstrip()
     if suffix.startswith((")", "）")):
         return None
     if match.group("open"):
@@ -98,6 +138,7 @@ def _report_value(text: str, *, prose: bool = False) -> tuple[float, str, int] |
             # Parens mean negative regardless of an inner sign: "(-25)" is
             # the same debt as "(25)", never a credit.
             value = -abs(value)
+        number_text = match.group("account_num")
     else:
         value = _clean_num(match.group("num"))
         sign = match.group("currency_sign")
@@ -107,9 +148,26 @@ def _report_value(text: str, *, prose: bool = False) -> tuple[float, str, int] |
             if value is not None and sign in {"-", "−"}:
                 value = -value
         unit = match.group("unit") or ""
+        number_text = match.group("num")
     if value is None or not math.isfinite(value):
         return None
-    return value, unit, match.end()
+
+    vn_scale = _VN_UNIT_SCALE.get(unit)
+    if vn_scale is not None:
+        # Re-read the numeric core with VN grouping rules: "1.234,5 tỷ" is
+        # 1234.5 billion, while _clean_num (ASCII comma only) would read the
+        # dot as a decimal point and lose a factor of 1000.
+        parsed = parse_number(number_text or "", vn_locale=True)
+        if parsed is None:
+            return None
+        negative = vn_negative or value < 0 or parsed < 0
+        value = abs(parsed) * vn_scale
+        if negative:
+            value = -value
+        return value, "VND", consumed
+    if vn_negative:
+        value = -abs(value)
+    return value, unit, consumed
 
 
 def _is_valid_label(label: str) -> bool:
@@ -186,6 +244,15 @@ def _parse_md_tables(lines: list[str]) -> list[tuple[str, str, float, str, int, 
     return results
 
 
+def _source_ref(*texts: str) -> str | None:
+    """Return the first ``[S1]``-style citation marker in *texts*, if any."""
+    for text in texts:
+        match = _SOURCE_REF_RE.search(text or "")
+        if match is not None:
+            return match.group(1).upper()
+    return None
+
+
 def extract_data_points(md_text: str) -> list[dict[str, Any]]:
     """Extract recognizable financial data points from a markdown report.
 
@@ -197,12 +264,17 @@ def extract_data_points(md_text: str) -> list[dict[str, Any]]:
 
     Returns:
         List of point dicts: ``{id, label, reported_value, unit, raw_text,
-        line_number}``.
+        line_number, source_ref, trace}``. ``trace`` records the four audit
+        links the verdict depends on: source reference, unit, derivation and
+        claim label. Values carrying a Vietnamese magnitude suffix are
+        normalised to whole VND.
     """
     points: list[dict[str, Any]] = []
     seen: set[str] = set()
 
-    def _add(label: str, val: float | None, unit: str, lineno: int, raw: str) -> None:
+    def _add(
+        label: str, val: float | None, unit: str, lineno: int, raw: str,
+    ) -> None:
         label = re.sub(r"[*_`]+", "", label).strip()
         if not _is_valid_label(label):
             return
@@ -214,6 +286,7 @@ def extract_data_points(md_text: str) -> list[dict[str, Any]]:
         if key in seen:
             return
         seen.add(key)
+        ref = _source_ref(raw)
         points.append(
             {
                 "id": len(points) + 1,
@@ -222,6 +295,13 @@ def extract_data_points(md_text: str) -> list[dict[str, Any]]:
                 "unit": unit,
                 "raw_text": raw[:120],
                 "line_number": lineno,
+                "source_ref": ref,
+                "trace": {
+                    "source_ref": ref,
+                    "unit": unit or None,
+                    "formula": "direct",
+                    "claim": label,
+                },
             }
         )
 
@@ -325,6 +405,30 @@ def _finite_number(value: Any) -> float | None:
     return number if math.isfinite(number) else None
 
 
+def _origin_key(item: dict[str, Any], suffix: str = "") -> str:
+    """Return a comparison key for a fetch's declared origin.
+
+    Two mirrors of one wire service are one confirmation, not two. The key is
+    deliberately coarse: an explicit ``fetched_origin`` wins, otherwise the
+    source label acts as the declared origin. URLs are reduced to their host so
+    ``https://cafef.vn/a`` and ``https://cafef.vn/b`` collapse to one origin.
+    """
+    raw = item.get(f"fetched_origin{suffix}") or item.get(f"fetched_source{suffix}")
+    text = str(raw or "").strip().casefold()
+    if not text:
+        return ""
+    text = re.sub(r"^[a-z][a-z0-9+.-]*://", "", text)
+    host = re.split(r"[/?#]", text, maxsplit=1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+    return host
+
+
+def _explicit_origin(item: dict[str, Any], suffix: str = "") -> str:
+    """Return only an explicitly declared ``fetched_origin`` (never a label)."""
+    return str(item.get(f"fetched_origin{suffix}") or "").strip().casefold()
+
+
 def render_verdict(results: list[dict[str, Any]], report_name: str = "") -> dict[str, Any]:
     """Render a PASS/FAIL verdict from per-point verification results.
 
@@ -335,14 +439,22 @@ def render_verdict(results: list[dict[str, Any]], report_name: str = "") -> dict
 
     A point whose ``reported_value`` is missing, ``None``, or non-finite is
     unverifiable, so it fails with an explicit ``reason`` instead of being
-    treated as a reported zero. A genuine reported ``0`` stays valid. A
+    treated as a reported zero. A genuine recorded ``0`` stays valid. A
     supplied but non-finite ``fetched_value`` fails the point the same way
     (unverifiable evidence), while an absent one is skipped as "not verified".
+
+    Independence is checked before the second value is used. When both fetches
+    name the same origin (for example two mirrors of one exchange feed), the
+    second is not counted as an independent confirmation: the point is judged
+    on the first fetch only and an ``independence_warnings`` entry records why.
+    Only two distinct explicit ``fetched_origin`` values increment
+    ``independent_confirmations``; differing source labels alone do not prove
+    independence.
 
     Args:
         results: List of verification objects — ``{id, label, reported_value,
             unit, fetched_value, fetched_source, (optional) fetched_value2,
-            fetched_source2, ...}``.
+            fetched_source2, fetched_origin, fetched_origin2, ...}``.
         report_name: Optional report name for display.
 
     Returns:
@@ -353,8 +465,11 @@ def render_verdict(results: list[dict[str, Any]], report_name: str = "") -> dict
     """
     fail_items: list[dict[str, Any]] = []
     warn_items: list[dict[str, Any]] = []
+    independence_warnings: list[dict[str, Any]] = []
     pass_count = 0
     total = 0
+    independent_confirmations = 0
+    two_source_points = 0
 
     for item in results:
         raw_fetched = item.get("fetched_value")
@@ -418,6 +533,30 @@ def render_verdict(results: list[dict[str, Any]], report_name: str = "") -> dict
         # instead of crashing the verdict; a garbage source verifies nothing.
         fetched2 = _finite_number(item.get("fetched_value2"))
         source2 = item.get("fetched_source2", "")
+        origin1 = _origin_key(item)
+        origin2 = _origin_key(item, "2")
+        same_origin = bool(fetched2 is not None and origin1 and origin1 == origin2)
+        if same_origin:
+            # Two mirrors of one origin are one confirmation, not two. Judge
+            # the point on the first fetch and say why the second was dropped.
+            independence_warnings.append({
+                "id": item.get("id"), "label": label,
+                "origin": origin1,
+                "reason": (
+                    "second fetch shares the first fetch's origin; it is a "
+                    "mirror, not an independent confirmation"
+                ),
+            })
+            fetched2 = None
+        elif (
+            fetched2 is not None
+            and _explicit_origin(item)
+            and _explicit_origin(item, "2")
+            and _explicit_origin(item) != _explicit_origin(item, "2")
+        ):
+            two_source_points += 1
+            independent_confirmations += 1
+
         pass1 = diff1 <= _TOLERANCE
 
         if fetched2 is None:
@@ -484,6 +623,9 @@ def render_verdict(results: list[dict[str, Any]], report_name: str = "") -> dict
         "fail_count": fail_count,
         "fail_items": fail_items,
         "warn_items": warn_items,
+        "independence_warnings": independence_warnings,
+        "two_source_points": two_source_points,
+        "independent_confirmations": independent_confirmations,
     }
 
 

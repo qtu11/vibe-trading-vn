@@ -45,6 +45,10 @@ anywhere in ``kwargs``::
 
 A plain list stays a plain list, because most functions accept a sequence and
 coercing every list into a Series would break the ones that do not.
+
+Valuation assumptions use ``{"__assumption__": {"name": ..., "value": ...,
+"basis": ..., "source": ...}}``. Only the fixed Assumption type is constructed;
+the envelope cannot name a class or import a module.
 """
 
 from __future__ import annotations
@@ -152,6 +156,21 @@ def _decode(value: Any) -> Any:
     import pandas as pd
 
     if isinstance(value, dict):
+        if "__assumption__" in value:
+            from src.quantlib.valuation.contracts import Assumption
+
+            spec = value["__assumption__"]
+            required = {"name", "value", "basis"}
+            if (set(value) != {"__assumption__"} or not isinstance(spec, dict)
+                    or not required <= spec.keys() or spec.keys() - required - {"source"}):
+                raise ValueError("__assumption__ needs exactly name, value, basis and optional source")
+            if any(not isinstance(spec[key], str) or not spec[key].strip() for key in ("name", "basis")):
+                raise ValueError("__assumption__ name and basis must be non-empty strings")
+            if type(spec["value"]) not in (int, float) or not -1e100 <= spec["value"] <= 1e100:
+                raise ValueError("__assumption__ value must be a finite numeric scalar within supported bounds")
+            if "source" in spec and spec["source"] is not None and not isinstance(spec["source"], str):
+                raise ValueError("__assumption__ source must be a string or null")
+            return Assumption(**spec)
         if "__series__" in value:
             spec = value["__series__"]
             if not isinstance(spec, dict) or "values" not in spec:

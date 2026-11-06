@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   app,
@@ -47,6 +47,9 @@ if (!app.requestSingleInstanceLock()) {
 }
 
 async function ready(): Promise<void> {
+  if (process.platform === "win32") {
+    app.setAppUserModelId("io.github.vibetrading.community.desktop");
+  }
   desktopLocale = resolveDesktopLocale(
     process.env.VIBE_TRADING_DESKTOP_LOCALE ?? app.getLocale(),
   );
@@ -62,8 +65,24 @@ async function ready(): Promise<void> {
   void boot();
 }
 
+function resolveWindowIcon(): string | undefined {
+  const candidates = [
+    path.join(__dirname, "icon.ico"),
+    path.join(__dirname, "icon.png"),
+    path.join(__dirname, "../../assets/icon.png"),
+    path.join(app.getAppPath(), "dist/icon.ico"),
+    path.join(app.getAppPath(), "dist/icon.png"),
+    path.join(process.resourcesPath, "icon.ico"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 function createWindow(): void {
   const parentDeathSmoke = Boolean(process.env.VIBE_TRADING_DESKTOP_PARENT_DEATH_SMOKE_FILE);
+  const icon = resolveWindowIcon();
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -73,6 +92,7 @@ function createWindow(): void {
     backgroundColor: "#0b0f14",
     title: productName,
     autoHideMenuBar: true,
+    ...(icon ? { icon } : {}),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -156,6 +176,20 @@ async function showLoadingPage(): Promise<void> {
   });
 }
 
+function resolveHostBackend(): string | undefined {
+  if (process.env.VIBE_TRADING_EXECUTABLE && existsSync(process.env.VIBE_TRADING_EXECUTABLE)) {
+    return process.env.VIBE_TRADING_EXECUTABLE;
+  }
+  const candidates = [
+    "D:\\Vibe-Trading\\.venv\\Scripts\\vibe-trading.exe",
+    path.join(process.env.USERPROFILE ?? "", "Vibe-Trading", ".venv", "Scripts", "vibe-trading.exe"),
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 function boot(): Promise<void> {
   if (bootPromise) return bootPromise;
   bootPromise = bootInternal().finally(() => { bootPromise = undefined; });
@@ -166,6 +200,11 @@ async function bootInternal(): Promise<void> {
   if (!mainWindow) return;
   await backend?.stop();
   if (!mainWindow.webContents.getURL().startsWith("file:")) await showLoadingPage();
+
+  const hostBackend = resolveHostBackend();
+  if (hostBackend && !process.env.VIBE_TRADING_EXECUTABLE) {
+    process.env.VIBE_TRADING_EXECUTABLE = hostBackend;
+  }
 
   backend = new BackendManager({
     appPath: app.getAppPath(),

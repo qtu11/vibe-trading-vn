@@ -1,5 +1,5 @@
 import i18n from '@/i18n';
-import { Component, lazy, memo, Suspense, useState, useCallback, type ReactNode } from "react";
+import { Component, isValidElement, lazy, memo, Suspense, useState, useCallback, type ReactNode } from "react";
 import { XCircle, RefreshCw, Copy, Check, Paperclip, Users, Target, Clock3 } from "lucide-react";
 import ReactMarkdown, { type Options as ReactMarkdownOptions } from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -12,6 +12,7 @@ import type { StoredAgentMessage } from "@/stores/agent";
 import { AgentAvatar } from "./AgentAvatar";
 import { RunCompleteCard } from "./RunCompleteCard";
 import { ForexTradeCards } from "./ForexTradeCards";
+import { SourceEvidence } from "./SourceEvidence";
 
 // singleDollarTextMath off: dollar amounts ("$150 to $120") must never parse as
 // formulas; LLM \(...\)/\[...\] delimiters are normalized to $$ before render.
@@ -21,7 +22,56 @@ const remarkPlugins: ReactMarkdownOptions["remarkPlugins"] = [
 ];
 // Math fonts and syntax highlighters are only needed for completed answers.
 const EnhancedMarkdown = lazy(() => import("./EnhancedMarkdown"));
+// ECharts is heavy; only a message that actually carries a `chart` or
+// `council` fence pays for it. The fences are presentation artifacts: the
+// chart holds observed bars, and the council block's prose stays self-labelled.
+const ChartBlock = lazy(() => import("@/components/charts/ChartBlock"));
+const CouncilReport = lazy(() => import("@/components/charts/CouncilReport"));
+
+interface FenceSource {
+  language: string;
+  text: string;
+}
+
+/** Return the language and payload of a fenced code block, else ``null``. */
+function fenceSource(children: ReactNode): FenceSource | null {
+  const child: unknown = Array.isArray(children) ? children[0] : children;
+  if (!isValidElement(child)) return null;
+  const props = child.props as { className?: unknown; children?: unknown };
+  if (typeof props.className !== "string") return null;
+  const language = props.className
+    .split(/\s+/)
+    .find((part) => part.startsWith("language-"))
+    ?.slice("language-".length);
+  if (!language) return null;
+  const text = props.children;
+  if (typeof text === "string") return { language, text };
+  if (Array.isArray(text) && text.every((part) => typeof part === "string")) {
+    return { language, text: text.join("") };
+  }
+  return null;
+}
+
 const markdownComponents: ReactMarkdownOptions["components"] = {
+  pre: ({ node, children, ...props }) => {
+    void node;
+    const fence = fenceSource(children);
+    if (fence?.language === "chart") {
+      return (
+        <Suspense fallback={<pre {...props}>{children}</pre>}>
+          <ChartBlock code={fence.text} />
+        </Suspense>
+      );
+    }
+    if (fence?.language === "council") {
+      return (
+        <Suspense fallback={<pre {...props}>{children}</pre>}>
+          <CouncilReport code={fence.text} />
+        </Suspense>
+      );
+    }
+    return <pre {...props}>{children}</pre>;
+  },
   table: ({ node, ...props }) => {
     void node;
     return (
@@ -251,6 +301,9 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
           <CopyButton text={msg.content} />
           {msg.forexTradePlan && <ForexTradeCards plan={msg.forexTradePlan} />}
           <MarkdownContent content={msg.content} />
+          {msg.sources && msg.sources.length > 0 && (
+            <SourceEvidence sources={msg.sources} />
+          )}
           {msg.elapsed_ms != null && (
             <div className="mt-1 flex items-center gap-2 text-[10px] text-muted-foreground/55">
               <span className="inline-flex items-center gap-1 tabular-nums" title={i18n.t("messageBubble.elapsedTime")}>

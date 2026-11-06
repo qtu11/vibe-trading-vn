@@ -1,0 +1,3739 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-11-06",
+  "counts": {
+    "baseline_only": 221,
+    "partial_delivered": 44
+  },
+  "baseline_counts": {
+    "PARTIAL": 56,
+    "PROPOSED": 8,
+    "EXISTING": 3,
+    "source-partial": 81,
+    "proposed": 114,
+    "source-existing": 3
+  },
+  "priority_counts": {
+    "P0": {
+      "total": 110,
+      "implementation": {
+        "baseline_only": 87,
+        "partial_delivered": 23
+      }
+    },
+    "P1": {
+      "total": 99,
+      "implementation": {
+        "partial_delivered": 19,
+        "baseline_only": 80
+      }
+    },
+    "P2": {
+      "total": 56,
+      "implementation": {
+        "baseline_only": 54,
+        "partial_delivered": 2
+      }
+    }
+  },
+  "seam_link_base": "docs/specs",
+  "interpretation": "baseline_only means not re-accepted here, not proof that no source implementation exists",
+  "deliveries": [
+    {
+      "key": "VN local reference and provenance",
+      "ids": [
+        "VN-068",
+        "VN-070",
+        "PLATFORM-008",
+        "PLATFORM-009"
+      ],
+      "status": "partial",
+      "delivered": "Local loader giữ reference/adjustment, cache/resample có regression; .VN profile có market label đúng và giữ provider identity/null.",
+      "remaining": "Chưa có historical issuer/venue master, official reference verification hoặc toàn bộ HOSE/HNX/UPCoM execution fidelity.",
+      "source": [
+        "agent/backtest/loaders/local_loader.py",
+        "agent/backtest/engines/vietnam_equity.py",
+        "agent/src/tools/stock_profile_tool.py"
+      ],
+      "tests": [
+        "agent/tests/test_local_vietnam_reference.py",
+        "agent/tests/test_stock_profile_tool.py"
+      ]
+    },
+    {
+      "key": "VN curated financial research",
+      "ids": [
+        "VN-078",
+        "VN-079",
+        "VN-080",
+        "VN-081",
+        "VN-082",
+        "VN-083",
+        "VN-084",
+        "VN-128",
+        "PLATFORM-010"
+      ],
+      "status": "partial",
+      "delivered": "Reader local có cutoff/revision/provenance; vietnam_research qua registry/MCP chuẩn hóa VND, suy quý từ lũy kế tương thích, kiểm A=L+E, cash conversion/FCF/accruals và DSO/DIO/DPO từ average balances. Missing/unit/revision không phù hợp giữ unknown và evidence.",
+      "remaining": "Chưa tự thu thập/xác minh BCTC gốc, immutable historical archive, OCR/taxonomy ngân hàng, audit độc lập hoặc báo cáo AI đầu cuối. Nguồn local vẫn user_supplied_unverified.",
+      "source": [
+        "agent/src/tools/local_financial_statements.py",
+        "agent/src/tools/vietnam_research_tool.py",
+        "agent/mcp_server.py"
+      ],
+      "tests": [
+        "agent/tests/test_local_financial_statements.py",
+        "agent/tests/test_vietnam_research.py"
+      ]
+    },
+    {
+      "key": "DCF JSON bridge and research caller",
+      "ids": [
+        "VN-112",
+        "VN-127"
+      ],
+      "status": "partial",
+      "delivered": "quantlib_call nhận envelope Assumption cố định, chạy DCF hiện có qua JSON/FastMCP; preset fundamental research dùng tool VN và DCF/WACC có thật thay claim cũ không có engine.",
+      "remaining": "VN DCF/sensitivity và snapshot định lượng có delivery riêng; chưa forecast/model đầu vào thực của doanh nghiệp, report AI có review độc lập hoặc định giá được xác nhận từ nguồn thật.",
+      "source": [
+        "agent/src/tools/quantlib_tool.py",
+        "agent/src/swarm/presets/fundamental_research_team.yaml"
+      ],
+      "tests": [
+        "agent/tests/test_dcf_tool_bridge.py",
+        "agent/tests/test_preset_claim_backing.py"
+      ]
+    },
+    {
+      "key": "Forex raw provider boundary",
+      "ids": [
+        "FX-166",
+        "FX-191"
+      ],
+      "status": "partial",
+      "delivered": "Quote/account/instrument/exposure decoding trả lỗi có cấu trúc, reject dữ liệu không hữu hạn và valuation ticks stale; giữ submit/reconcile semantics hiện có.",
+      "remaining": "Chưa kiểm tài khoản/broker thật, persistent tick/feed recorder hoặc toàn bộ response schemas và execution lifecycle.",
+      "source": [
+        "agent/src/trading/forex/adapters/oanda.py",
+        "agent/src/trading/forex/adapters/exness.py",
+        "agent/src/trading/forex/risk.py"
+      ],
+      "tests": [
+        "agent/tests/test_forex_adapters.py",
+        "agent/tests/test_forex_execution.py"
+      ]
+    },
+    {
+      "key": "Forex past-only walk-forward research",
+      "ids": [
+        "FX-154",
+        "FX-160",
+        "FX-161"
+      ],
+      "status": "partial",
+      "delivered": "POST /api/forex/walk-forward và Forex MCP dùng shared typed request; refit SMA train-only ở từng fold, purge label boundary, giữ trial errors/config/data hashes và OOS-only aggregate. Thời điểm bar open và outcome availability được tách rõ.",
+      "remaining": "SMA và EMA riêng đều giữ một nến next-open/close với chi phí bps giả định; chưa broker-calibrated costs, tick/SL/TP/swap hoặc parity với production runner. Registry và UI lab có delivery riêng bên dưới.",
+      "source": [
+        "agent/src/trading/forex/walk_forward.py",
+        "agent/src/api/forex_routes.py",
+        "agent/src/trading/forex/mcp_server.py"
+      ],
+      "tests": [
+        "agent/tests/test_forex_walk_forward.py",
+        "agent/tests/test_forex_surfaces.py"
+      ]
+    },
+    {
+      "key": "Crypto funding fidelity and accounting identity",
+      "ids": [
+        "CRYPTO-200",
+        "CRYPTO-232"
+      ],
+      "status": "partial",
+      "delivered": "Loader từ chối settlement không biểu diễn được trên grid; diagnostics/run card ghi đúng perpetual/funding/liquidation assumptions; strict crypto composite chưa hỗ trợ bị chặn.",
+      "remaining": "Chưa cash-spot/inverse accounting, arbitrary funding cadence completeness, strict composite lifecycle hoặc parity liquidation với sàn.",
+      "source": [
+        "agent/backtest/loaders/ccxt_loader.py",
+        "agent/backtest/engines/crypto.py",
+        "agent/backtest/engines/composite.py"
+      ],
+      "tests": [
+        "agent/tests/test_ccxt_perpetual_loader.py",
+        "agent/tests/test_crypto_engine.py",
+        "agent/tests/test_composite_currency_guard.py"
+      ]
+    },
+    {
+      "key": "Crypto public derivatives research",
+      "ids": [
+        "CRYPTO-200",
+        "CRYPTO-201",
+        "CRYPTO-257"
+      ],
+      "status": "partial",
+      "delivered": "crypto_derivatives qua registry/MCP đọc Binance linear USDT perpetual; phân tích OI base/quote và quantity/implied-price decomposition, realized funding với historical mark, actual observed coverage/cadence/hash và missing giữ null.",
+      "remaining": "Archive cục bộ explicit capture có delivery riêng bên dưới; vẫn chưa exchange historical publication availability, time-aligned independent price join hoặc feed thật. Summary không phải causal signal, funding cash illustration không phải portfolio ledger.",
+      "source": [
+        "agent/src/tools/crypto_derivatives_tool.py",
+        "agent/mcp_server.py",
+        "agent/src/swarm/presets/crypto_research_lab.yaml",
+        "agent/src/swarm/presets/crypto_trading_desk.yaml"
+      ],
+      "tests": [
+        "agent/tests/test_crypto_derivatives_tool.py",
+        "agent/tests/test_preset_claim_backing.py"
+      ]
+    },
+    {
+      "key": "Forex persistent experiment registry",
+      "ids": [
+        "FX-160",
+        "PLATFORM-062"
+      ],
+      "status": "partial",
+      "delivered": "Store Forex schema4 giữ immutable experiment/run IDs, mọi attempt và request/config/cost/data snapshot, actual source/dependency hashes, trial/fold failures. API ghi có settings-write auth; MCP mutation cần --allow-research-writes riêng. Lần chạy chết giữa chừng giữ running, không suy diễn kết quả.",
+      "remaining": "Chưa generic multi-strategy registry, total tuning budget, promotion/OOS reuse gate hoặc tự recover interrupted attempts. Request bars được lưu trong execution.db; downgrade cần backup DB trước nâng schema.",
+      "source": [
+        "agent/src/trading/forex/store.py",
+        "agent/src/trading/forex/service.py",
+        "agent/src/trading/forex/experiments.py",
+        "agent/src/api/forex_routes.py",
+        "agent/src/trading/forex/mcp_server.py"
+      ],
+      "tests": [
+        "agent/tests/test_forex_experiments.py",
+        "agent/tests/test_forex_core.py",
+        "agent/tests/test_forex_surfaces.py"
+      ]
+    },
+    {
+      "key": "Crypto offline snapshot-delta replay",
+      "ids": [
+        "CRYPTO-197"
+      ],
+      "status": "partial",
+      "delivered": "orderbook_depth và mirrored MCP nhận Binance USD-M replay có protocol tag; snapshot bridge, pu continuity, duplicate/stale/delete và dữ liệu hỏng được kiểm. Gap/cross/nonfinite làm invalid, feature chỉ có sau snapshot+bridge đồng bộ mới; input/output bounded và nguồn supplied-unverified.",
+      "remaining": "Chưa WebSocket lifecycle/recorder thật, historical archive, OKX sequencing/checksum, tick-to-trade parity hoặc chứng minh các sự kiện do caller cung cấp là thật. Coverage chỉ là level snapshot và delta được cung cấp.",
+      "source": [
+        "agent/src/tools/binance_orderbook_replay.py",
+        "agent/src/tools/orderbook_depth_tool.py"
+      ],
+      "tests": [
+        "agent/tests/test_binance_orderbook_replay.py",
+        "agent/tests/test_orderbook_depth_tool.py"
+      ]
+    },
+    {
+      "key": "Swarm logical call admission and usage uncertainty",
+      "ids": [
+        "PLATFORM-039",
+        "PLATFORM-040"
+      ],
+      "status": "partial",
+      "delivered": "Optional max_llm_calls dùng shared atomic admission trước mỗi stream_chat của Swarm, gồm worker/stream retries; reservation được persist trước dispatch. Failed/cancelled usage có provider số liệu được giữ, thiếu usage là unknown. API/tool/main MCP nối cap và retry/resume giữ cap cho run mới; legacy counters là null.",
+      "remaining": "Cap chỉ giới hạn logical stream_chat invocations của Swarm, chưa SDK HTTP retries/internal invoke fallback, token/dollar ceiling, provider pricing reconciliation, AgentLoop toàn nền tảng hoặc benchmark-based model routing. Retry tạo run mới và allowance mới.",
+      "source": [
+        "agent/src/swarm/budget.py",
+        "agent/src/swarm/models.py",
+        "agent/src/swarm/runtime.py",
+        "agent/src/swarm/worker.py",
+        "agent/src/tools/swarm_tool.py",
+        "agent/src/api/swarm_routes.py",
+        "agent/mcp_server.py"
+      ],
+      "tests": [
+        "agent/tests/test_swarm_call_budget.py",
+        "agent/tests/test_swarm_cache_source.py",
+        "agent/tests/test_cli_swarm_retry.py",
+        "agent/tests/test_swarm_m5_trust_model.py"
+      ]
+    },
+    {
+      "key": "Research web entry and provenance display",
+      "ids": [
+        "VN-128",
+        "CRYPTO-257"
+      ],
+      "status": "partial",
+      "delivered": "Trang /research qua menu gọi hai API read-auth cố định, dùng đúng tool VN/Crypto hiện có. Hiển thị metrics, null/reason, evidence/revision/hash/cutoff, actual coverage và limitations; paging đóng băng cutoff, query đổi thì hủy/loại kết quả cũ, URL evidence được kiểm. Copy mới có en/vi/tr.",
+      "remaining": "Chưa research report AI có human review, PDF artifact/version workflow, dữ liệu nguồn thật được xác minh hoặc chụp/kiểm giao diện bằng browser runtime; chín locale khác dùng English fallback cho copy mới.",
+      "source": [
+        "agent/src/api/research_routes.py",
+        "agent/api_server.py",
+        "frontend/src/pages/MarketResearch.tsx",
+        "frontend/src/lib/research.ts",
+        "frontend/src/lib/api.ts",
+        "frontend/src/router.tsx"
+      ],
+      "tests": [
+        "agent/tests/test_research_routes.py",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx",
+        "frontend/src/components/layout/__tests__/Navigation.test.tsx"
+      ]
+    },
+    {
+      "key": "VN annual PE and observed PB peer scenarios",
+      "ids": [
+        "VN-110",
+        "VN-111",
+        "VN-128"
+      ],
+      "status": "partial",
+      "delivered": "vietnam_comparables qua registry/main MCP/API dùng PATMI/weighted shares và parent common equity/book-snapshot shares. Strict annual period, declared cutoff, price instant/share basis, explicit peer reasons/evidence; negative/missing inputs có exclusion, quantile của toàn peer set tạo scenario có điều kiện và paging không mất hash scope.",
+      "remaining": "Nguồn/issuer/peer comparability và corporate-action basis vẫn do caller khai báo, chưa được xác minh. Chưa justified P/B–ROE, quarterly TTM/calendarization, historical percentile, preferred/diluted reconciliation hoặc forecast/report AI có human review.",
+      "source": [
+        "agent/src/tools/vietnam_comparables.py",
+        "agent/src/tools/vietnam_comparables_tool.py",
+        "agent/src/quantlib/valuation/comps.py",
+        "agent/mcp_server.py",
+        "agent/src/api/research_routes.py",
+        "agent/src/swarm/presets/fundamental_research_team.yaml"
+      ],
+      "tests": [
+        "agent/tests/test_vietnam_comparables.py",
+        "agent/tests/test_research_routes.py",
+        "agent/tests/quantlib/valuation/test_comps.py"
+      ]
+    },
+    {
+      "key": "Forex EMA research variant and web lab",
+      "ids": [
+        "FX-154",
+        "FX-160",
+        "FX-161",
+        "PLATFORM-062"
+      ],
+      "status": "partial",
+      "delivered": "WalkForwardRequest thêm ema_crossover có first-close seed/alpha2/(window+1)/slow+1 warmup, refit train-only và strategy/hash riêng; omitted SMA giữ output baseline. /research có lab nhập JSON/file bounded hoặc synthetic example, calculate riêng/save riêng, xem mọi fold/trial và lịch sử immutable attempts/paging, không tự retry ghi hoặc kích hoạt strategy.",
+      "remaining": "Vẫn one-bar mid-price/cost giả định, chưa SL/TP/tick/broker parity. UI chưa browser visual acceptance; registry chưa promotion/OOS reuse hoặc total tuning-budget gate. Save chạy evaluator lại và có thể chưa xác định kết quả khi transport timeout.",
+      "source": [
+        "agent/src/trading/forex/research_signals.py",
+        "agent/src/trading/forex/walk_forward.py",
+        "agent/src/trading/forex/experiments.py",
+        "frontend/src/components/forex/ForexResearchLab.tsx",
+        "frontend/src/lib/forexResearch.ts",
+        "frontend/src/pages/MarketResearch.tsx",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_forex_ema_research.py",
+        "agent/tests/test_forex_experiments.py",
+        "frontend/src/components/forex/__tests__/ForexResearchLab.test.tsx",
+        "frontend/src/lib/__tests__/forexResearch.test.ts",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx"
+      ]
+    },
+    {
+      "key": "Crypto append-only local observation archive",
+      "ids": [
+        "CRYPTO-200",
+        "CRYPTO-201",
+        "PLATFORM-007",
+        "PLATFORM-010"
+      ],
+      "status": "partial",
+      "delivered": "Crypto agent tool explicit capture ghi SQLite append-only theo Data Bridge config; main MCP chỉ live/archive read, API capture cần write-auth và UI có nút lưu riêng. Giữ parsed CCXT payload/normalization hash, local recorded/retrieved time, revisions; query read-only theo cutoff kiểm toàn scope manifests/index, conflict/corruption/clock regression trả lỗi và có bounded verification.",
+      "remaining": "Local recording time chưa chứng minh exchange historical publication time; đây chưa là collector tự động hay nguồn raw HTTP bytes/on-chain. Query giới hạn512 captures/20MB/20k observations; chưa signed/tamperproof external evidence, retention/partition policy hoặc lịch sử đủ. Không đổi archive path từ tool argument.",
+      "source": [
+        "agent/src/tools/crypto_derivatives_archive.py",
+        "agent/src/tools/crypto_derivatives_tool.py",
+        "agent/mcp_server.py",
+        "agent/src/api/research_routes.py",
+        "frontend/src/pages/MarketResearch.tsx"
+      ],
+      "tests": [
+        "agent/tests/test_crypto_derivatives_archive.py",
+        "agent/tests/test_crypto_derivatives_tool.py",
+        "agent/tests/test_research_routes.py",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx"
+      ]
+    },
+    {
+      "key": "VN bounded DCF sensitivity and valuation workbench",
+      "ids": [
+        "VN-112",
+        "VN-117",
+        "VN-128"
+      ],
+      "status": "partial",
+      "delivered": "Adapter VN dùng lại run_dcf/sensitivity_grid/equity bridge: explicit basis/evidence/availability, VND scale chỉ cho money, actual diluted shares, restricted cash tách riêng, non-financial consolidated FCFF và 9x9 WACC/g grid. Cell g>=WACC giữ null/reason; base exit-multiple khác grid perpetuity được ghi rõ. API read-auth và Web nối cả DCF/comparables với input/import/fixtures, provenance và lưu phiên bản riêng.",
+      "remaining": "Đầu vào doanh nghiệp, forecast, share/corporate-action basis và bằng chứng vẫn caller-declared/unverified. Reverse DCF có delivery riêng; chưa ngân hàng/bảo hiểm, actual-day/stub, dữ liệu thật, AI report/PDF hoặc browser visual acceptance; grid không phải xác suất.",
+      "source": [
+        "agent/src/tools/vietnam_dcf.py",
+        "agent/src/api/research_routes.py",
+        "frontend/src/components/research/VietnamValuationLab.tsx",
+        "frontend/src/components/research/ResearchJsonInput.tsx",
+        "frontend/src/pages/MarketResearch.tsx",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_vietnam_dcf.py",
+        "agent/tests/test_research_routes.py",
+        "frontend/src/components/research/__tests__/VietnamValuationLab.test.tsx",
+        "frontend/src/components/research/__tests__/ResearchJsonInput.test.tsx"
+      ]
+    },
+    {
+      "key": "Forex frozen OOS cost stress",
+      "ids": [
+        "FX-160",
+        "FX-161",
+        "FX-163"
+      ],
+      "status": "partial",
+      "delivered": "CostStressRequest yêu cầu explicit spread/commission/slippage/gap sum khớp base cost; fit walk-forward một lần, khóa OOS parameters/signals/outcomes và tăng spread1x/2x/3x giữ phí khác. Trả shared tape hash, net expectancy/arithmetic break-even âm/null và compounded insolvency riêng; HTTP/dedicated Forex MCP/UI tính và lưu lại qua registry schema4, manifest giữ actual source hashes.",
+      "remaining": "Vẫn supplied-mid-bar one-bar study, chi phí caller-assumed, chưa broker-calibrated distribution, bid/ask ticks, dynamic spread/fee, swap/latency/SLTP hoặc price-gap replay. Gap chỉ fixed adverse charge; break-even số học không phải compounded root, chưa tuning/promotion/OOS reuse gate.",
+      "source": [
+        "agent/src/trading/forex/cost_stress.py",
+        "agent/src/trading/forex/walk_forward.py",
+        "agent/src/trading/forex/experiments.py",
+        "agent/src/trading/forex/service.py",
+        "agent/src/api/forex_routes.py",
+        "agent/src/trading/forex/mcp_server.py",
+        "frontend/src/components/forex/ForexResearchLab.tsx",
+        "frontend/src/lib/forexResearch.ts"
+      ],
+      "tests": [
+        "agent/tests/test_forex_cost_stress.py",
+        "agent/tests/test_forex_surfaces.py",
+        "agent/tests/test_forex_experiments.py",
+        "frontend/src/components/forex/__tests__/ForexResearchLab.test.tsx",
+        "frontend/src/lib/__tests__/forexResearch.test.ts"
+      ]
+    },
+    {
+      "key": "Immutable VN research revisions and bounded delta review",
+      "ids": [
+        "PLATFORM-033",
+        "VN-128",
+        "VN-130"
+      ],
+      "status": "partial",
+      "delivered": "Fixed server dispatch cho năm kind VN statements/comparables/DCF/reverse DCF/crypto basis, append request/result/source/facts/producer hashes vào SQLite riêng; writer schema2, reader schema1/2 và migration không sửa revision cũ. Parent scope, immutable revision/review events, read-only no-create và clock/integrity/foreign-store conflicts được kiểm. API/Web có lịch sử, JSON Pointer diffs giữ null/zero, affected VN ratio dependencies và self-reported acknowledgment/changes_requested. Attempt/idempotency có delivery riêng; lỗi refresh giữ revision cũ nguyên vẹn.",
+      "remaining": "Đây là snapshot định lượng một page/scenario, chưa AI narrative/PDF, selective claim regeneration, verified reviewer/role separation, tenant ACL hoặc signed tamperproof ledger. Module hashes chưa khóa đầy đủ dependency/runtime; review không xác minh tài liệu độc lập, chưa có review idempotency hoặc tự phục hồi attempt gián đoạn.",
+      "source": [
+        "agent/src/research_artifacts/store.py",
+        "agent/src/research_artifacts/service.py",
+        "agent/src/api/research_artifact_routes.py",
+        "agent/api_server.py",
+        "frontend/src/components/research/ResearchRevisionPanel.tsx",
+        "frontend/src/lib/researchArtifacts.ts",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_research_artifact_revisions.py",
+        "agent/tests/test_research_artifact_routes.py",
+        "frontend/src/components/research/__tests__/ResearchRevisionPanel.test.tsx",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx",
+        "frontend/src/lib/__tests__/api.test.ts"
+      ]
+    },
+    {
+      "key": "VN price-implied terminal growth solver",
+      "ids": [
+        "VN-112",
+        "VN-117",
+        "VN-128"
+      ],
+      "status": "partial",
+      "delivered": "Reverse DCF giữ nguyên FCFF/WACC/equity bridge, dùng shared DCF input normalization và sensitivity_grid cho mỗi lần định giá. Explicit target VND/share, price availability/evidence/share basis và growth bracket; bounded bisection128, solved/outside_bracket/non_identifiable/iteration_limit không extrapolate. So sánh JSON-visible engine price với target decimal bằng precision80, residual decimal string để không báo hội tụ giả do float rounding. API/Web và revision kind riêng nối same engine; zero/null giữ đúng.",
+      "remaining": "Nghiệm chỉ giải thích supplied price trong fixed model, chưa forecast/growth verification hoặc chứng minh tính phù hợp của mô hình doanh nghiệp. Chưa actual-day/stub, bank/insurance, signed market-price evidence, independent review hoặc browser visual acceptance. Float engine có thể không đáp ứng tolerance; không tự nới sai số hay bracket.",
+      "source": [
+        "agent/src/tools/vietnam_reverse_dcf.py",
+        "agent/src/tools/vietnam_dcf.py",
+        "agent/src/api/research_routes.py",
+        "agent/src/research_artifacts/service.py",
+        "frontend/src/components/research/VietnamReverseDCFLab.tsx",
+        "frontend/src/lib/api.ts",
+        "frontend/src/pages/MarketResearch.tsx"
+      ],
+      "tests": [
+        "agent/tests/test_vietnam_reverse_dcf.py",
+        "agent/tests/test_research_iteration7_routes.py",
+        "frontend/src/components/research/__tests__/VietnamReverseDCFLab.test.tsx",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx",
+        "frontend/src/lib/__tests__/api.test.ts"
+      ]
+    },
+    {
+      "key": "Forex within-fold frozen OOS trade-path bootstrap",
+      "ids": [
+        "FX-160",
+        "FX-161",
+        "FX-162",
+        "PLATFORM-062"
+      ],
+      "status": "partial",
+      "delivered": "Seeded PCG64 moving-block bootstrap dùng từng fold OOS đã chọn tham số từ train, không fit lại hoặc cross-fold block. Giữ số trade mỗi fold, fixed base cost trừ một lần, shared tape/config/source hashes và NumPy version. Báo empirical terminal return/max drawdown quantiles, fan bounded20paths/100steps, zero/short-fold/numeric failure explicit; một path lỗi làm null toàn quantiles. HTTP/dedicated MCP/Web cùng registry schema4 tính/lưu riêng và load lại đúng method.",
+      "remaining": "Empirical resampling theo observed trade-index không phải xác suất lãi tương lai, Sharpe annualization, OOS reuse/tuning gate hoặc model margin/stop-out. Chưa block-length calibration/stationarity, calendar/dependence across folds, dynamic costs/ticks/broker/SLTP/swap hoặc permutation p-value. FX-162 acceptance vẫn mở.",
+      "source": [
+        "agent/src/trading/forex/trade_paths.py",
+        "agent/src/trading/forex/experiments.py",
+        "agent/src/trading/forex/service.py",
+        "agent/src/api/forex_routes.py",
+        "agent/src/trading/forex/mcp_server.py",
+        "frontend/src/components/forex/ForexResearchLab.tsx",
+        "frontend/src/lib/forexResearch.ts",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_forex_trade_paths.py",
+        "agent/tests/test_forex_surfaces.py",
+        "agent/tests/test_forex_experiments.py",
+        "frontend/src/components/forex/__tests__/ForexResearchLab.test.tsx",
+        "frontend/src/lib/__tests__/forexResearch.test.ts"
+      ]
+    },
+    {
+      "key": "Crypto supplied dated-futures gross basis curve",
+      "ids": [
+        "CRYPTO-202",
+        "CRYPTO-257"
+      ],
+      "status": "partial",
+      "delivered": "crypto_basis_curve agent/main MCP và API/Web dùng strict64k/12contract typed supplied spot/future bid/ask, UTC cutoff/expiry/source references và explicit age/skew budgets. Tính signed mid basis, bid/ask gross bounds và simple ACT365F với exact intraday seconds, dùng quantlib day count; perpetual/expired/stale/skew/future availability/currency/settlement/nonlinear mismatch giữ rejected/null reason. Tool page3rows không đổi full summary/hash; API/artifact giữ full curve, source vẫn unverified.",
+      "remaining": "Chưa licensed/exchange collector, verified contract/expiry/quote source, raw feed history, net carry sau fees/funding/borrow/margin/liquidity/settlement hoặc executable arbitrage. Quote USDT không suy thành USD; perpetual không được gán expiry giả. Snapshot/review chưa tenant ACL/independent source verification; chưa browser visual acceptance.",
+      "source": [
+        "agent/src/tools/crypto_basis.py",
+        "agent/src/tools/crypto_basis_tool.py",
+        "agent/mcp_server.py",
+        "agent/src/api/research_routes.py",
+        "agent/src/research_artifacts/service.py",
+        "frontend/src/components/research/CryptoBasisLab.tsx",
+        "frontend/src/pages/MarketResearch.tsx",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_crypto_basis.py",
+        "agent/tests/test_research_iteration7_routes.py",
+        "frontend/src/components/research/__tests__/CryptoBasisLab.test.tsx",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx",
+        "frontend/src/lib/__tests__/api.test.ts"
+      ]
+    },
+    {
+      "key": "Shared DAG input contract",
+      "ids": [
+        "PLATFORM-029",
+        "PLATFORM-030"
+      ],
+      "status": "partial",
+      "delivered": "Runtime và preset inspect dùng chung DAG gate cho ID/agent identity/dependency/input_from; transitive upstream được giữ, input sai bị từ chối trước persistence/reaper/thread.",
+      "remaining": "Chưa chứng minh toàn bộ durable DAG/checkpoint/effect semantics hoặc distributed scheduler/role delegation trong chương trình; quyền broker không sinh từ vai trò agent.",
+      "source": [
+        "agent/src/swarm/task_store.py",
+        "agent/src/swarm/presets.py",
+        "agent/src/swarm/runtime.py"
+      ],
+      "tests": [
+        "agent/tests/test_swarm_dag_validation.py",
+        "agent/tests/test_swarm_preset_inspect.py"
+      ]
+    },
+    {
+      "key": "Markdown export from stored research revisions",
+      "ids": [
+        "VN-128",
+        "PLATFORM-064"
+      ],
+      "status": "partial",
+      "delivered": "Renderer Markdown deterministic từ đúng revision object do store trả về cho năm kind VN/comparables/DCF/reverse DCF/crypto basis; giữ as_of/cutoff/coverage/paging/gaps, null/zero/negative, rejected contract và evidence/locator đã ghi. Endpoint read-auth trả text/markdown với filename cố định, no-store/nosniff; preview và download dùng cùng response; 413/422/503 không tạo báo cáo rỗng hay số liệu thay thế.",
+      "remaining": "Chưa publish/gửi email/webhook, PDF, rights/redaction/entitlement/citation-resolution gate, chữ ký hoặc delivery receipt; chưa AI narrative, selective claim regeneration hoặc browser visual acceptance. Bản nháp vẫn user_supplied_unverified và không cấp quyền nguồn.",
+      "source": [
+        "agent/src/research_artifacts/report.py",
+        "agent/src/api/research_artifact_routes.py",
+        "frontend/src/components/research/ResearchReportExport.tsx",
+        "frontend/src/components/research/ResearchRevisionPanel.tsx",
+        "frontend/src/lib/researchArtifacts.ts",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_research_report_export.py",
+        "agent/tests/test_research_iteration8_routes.py",
+        "frontend/src/components/research/__tests__/ResearchReportExport.test.tsx",
+        "frontend/src/lib/__tests__/api.test.ts"
+      ]
+    },
+    {
+      "key": "Grounded source citations and reply provenance",
+      "ids": [
+        "PLATFORM-031"
+      ],
+      "status": "partial",
+      "delivered": "SourcePolicy tier1-5 và SourceRecord/ledger cho web/news/doc giữ publisher, URL, thời điểm, quote và hash; citation v2 bắt [S#] resolve, giá trị khớp nguồn, caption bảng/footnote hợp lệ và tier được kiểm. Figure không backed bị loại thay vì nới gate; reply metadata trả sources để UI hiển thị tier/verification/timestamps.",
+      "remaining": "Chưa có reviewer độc lập/role separation, tự phát hiện EVIDENCE_CONFLICT hoặc entitlement retrieve/cache/redistribute. Nguồn trang vẫn verification=unverified; council sources là reported_by_council và không nhập ledger chính.",
+      "source": [
+        "agent/src/agent/grounding/sources.py",
+        "agent/src/agent/grounding/ledger.py",
+        "agent/src/agent/grounding/policies.py",
+        "agent/src/agent/grounding/release.py",
+        "agent/src/agent/tool_lifecycle.py",
+        "agent/src/agent/loop.py",
+        "agent/src/session/service.py",
+        "frontend/src/components/chat/SourceEvidence.tsx"
+      ],
+      "tests": [
+        "agent/tests/test_grounding_sources.py",
+        "agent/tests/test_grounding_release.py",
+        "agent/tests/test_grounding_figures_contract.py",
+        "agent/tests/test_grounding_figures_ref_parser.py",
+        "agent/tests/test_session_reply_runtime_metadata.py"
+      ]
+    },
+    {
+      "key": "Vietnam equity research council and contract",
+      "ids": [
+        "VN-127"
+      ],
+      "status": "partial",
+      "delivered": "Preset vietnam_equity_council sáu vai fundamental/technical/bull/bear/risk/PM; run_research_council nhận ticker trần, lấy bars quan sát, chạy swarm và trả fence council. Verdict chuẩn hóa stance/horizon/confidence/entry/stop/target, giữ WAIT và reject thiếu nguồn/sai geometry. Wrapper luôn execution_ready=false vì chưa lấy live quote/book/session/holdings; SELL là giảm vị thế đang có, thiếu holdings làm non-actionable và bỏ short-style risk/reward/sizing. UI tách dữ kiện/đánh giá/lời khuyên; skill phương pháp sâu có delivery riêng.",
+      "remaining": "Council sources chỉ reported_by_council, chưa có evidence ledger độc lập hoặc reviewer separation; actionability nghiên cứu không phải order authority. Chưa trusted settled holdings/position-aware reduction, live quote/session/auction/orderbook/ATO/MTL, dissent/majority vote hoặc đồng bộ input manifest đầy đủ. Chưa replay LLM thật cho FPT hoặc browser visual acceptance.",
+      "source": [
+        "agent/src/swarm/presets/vietnam_equity_council.yaml",
+        "agent/src/tools/research_council_tool.py",
+        "agent/src/tools/council_contract.py",
+        "agent/src/tools/price_chart_tool.py",
+        "frontend/src/components/charts/CouncilReport.tsx",
+        "frontend/src/components/charts/ChartBlock.tsx"
+      ],
+      "tests": [
+        "agent/tests/test_research_council_tool.py",
+        "agent/tests/test_council_contract.py",
+        "agent/tests/test_price_chart_tool.py",
+        "frontend/src/components/charts/__tests__/CouncilReport.test.tsx"
+      ]
+    },
+    {
+      "key": "Run-card warnings and run-state evidence",
+      "ids": [
+        "PLATFORM-019"
+      ],
+      "status": "partial",
+      "delivered": "Run card ghi config/strategy/artifact hashes, model provenance, tool traces và warnings đã hợp nhất từ config cùng runtime engine (caliber, annualisation, benchmark, content filter) trước khi ghi run_card.json/md. RunStateStore ghi success/failed/cancelled vào state.json bằng flush+fsync để crash không để lại file rỗng; API đọc run card và trả warnings trong summary.",
+      "remaining": "Chưa có spec hash, registry/index tra cứu nhiều run hoặc reconcile run bị kill trước khi kịp ghi terminal state; chưa chứng minh status sau process crash và chưa có retention/query toàn bộ run.",
+      "source": [
+        "agent/backtest/run_card.py",
+        "agent/backtest/engines/base.py",
+        "agent/src/core/state.py"
+      ],
+      "tests": [
+        "agent/tests/test_run_card.py",
+        "agent/tests/test_backtest_summary.py",
+        "agent/tests/test_local_vietnam_reference.py"
+      ]
+    },
+    {
+      "key": "Research refresh attempt ledger and explicit save idempotency",
+      "ids": [
+        "PLATFORM-033",
+        "VN-130"
+      ],
+      "status": "partial",
+      "delivered": "Schema2 append-only attempt admission trước engine, unique terminal outcome và atomic success+revision; caller-body idempotency key tùy chọn replay success/failure không chạy lại, body/parent/kind conflict409, interrupted giữ in_flight_unknown. GETattempts read-auth/no-create có filters/paging, last-good và refresh state theo admission order. Web giữ frozen request/key cho deliberate retry, có manual attempt history; reader schema1 không migrate, new write nâng2 không rewrite revision/review/hash cũ.",
+      "remaining": "Chưa live-source freshness verification, lease/takeover/recovery interrupted attempts, review idempotency, browser key persistence, tenant ACL, signed evidence hoặc independent reviewer. Unknown không bị suy thành failed/success; key mới là ý định mới. Mã schema1-only không đọc kho2; backup trước nâng và giữ database khi rollback.",
+      "source": [
+        "agent/src/research_artifacts/store.py",
+        "agent/src/research_artifacts/service.py",
+        "agent/src/api/research_artifact_routes.py",
+        "frontend/src/components/research/ResearchRevisionPanel.tsx",
+        "frontend/src/components/research/ResearchAttemptHistory.tsx",
+        "frontend/src/lib/researchArtifacts.ts",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_research_refresh_attempts.py",
+        "agent/tests/test_research_iteration8_routes.py",
+        "agent/tests/test_research_artifact_revisions.py",
+        "frontend/src/components/research/__tests__/ResearchRevisionPanel.test.tsx",
+        "frontend/src/components/research/__tests__/ResearchAttemptHistory.test.tsx",
+        "frontend/src/lib/__tests__/api.test.ts"
+      ]
+    },
+    {
+      "key": "Forex causal ATR-normalized SMA regime replay",
+      "ids": [
+        "FX-147",
+        "PLATFORM-016"
+      ],
+      "status": "partial",
+      "delivered": "Shared closed-bar dataset giữ validation 32..2000 nến mid liên tục UTC. Regime dùng trailing SMA slope/causal Wilder ATR, fit entry/exit quantiles trên initial train prefix rồi khóa trước evaluation; hysteresis/min dwell, warmup/ATR0/degenerate giữ unknown. API và dedicated Forex MCP read-only trả calibration/prefix/state/producer hashes, timeline paging và summary toàn evaluation; Web nhập fixture, replay riêng và xuất đúng request+một trang response, không save/activate. Future-mutation/paging/replay invariants có tests.",
+      "remaining": "Heuristic supplied-data chưa ADX/swing confirmation, multi-timeframe/news/fundamental integration, adaptive rolling fit, verified ingest lag/feed, broker calibration hoặc thống kê predictive validity. Không tín hiệu giao dịch/PnL/xác suất hoặc lệnh; neutral chưa chứng minh range market, chưa persistent regime checkpoint/strategy promotion hoặc browser visual acceptance.",
+      "source": [
+        "agent/src/trading/forex/research_dataset.py",
+        "agent/src/trading/forex/research_indicators.py",
+        "agent/src/trading/forex/regime.py",
+        "agent/src/trading/forex/walk_forward.py",
+        "agent/src/api/forex_routes.py",
+        "agent/src/trading/forex/mcp_server.py",
+        "frontend/src/components/forex/ForexRegimeLab.tsx",
+        "frontend/src/pages/MarketResearch.tsx",
+        "frontend/src/lib/api.ts"
+      ],
+      "tests": [
+        "agent/tests/test_forex_regime.py",
+        "agent/tests/test_forex_surfaces.py",
+        "agent/tests/test_forex_walk_forward.py",
+        "frontend/src/components/forex/__tests__/ForexRegimeLab.test.tsx",
+        "frontend/src/pages/__tests__/MarketResearch.test.tsx"
+      ]
+    },
+    {
+      "key": "Vietnam deep research method grounded in supplied report samples",
+      "ids": [
+        "VN-127",
+        "VN-128"
+      ],
+      "status": "partial",
+      "delivered": "Skill vietnam-deep-research nối chat routing và allowlist/hướng dẫn sáu vai council, học cấu trúc kết luận→dữ kiện→nguyên nhân→triển vọng→định giá→rủi ro từ bốn PDF mẫu FPT được đối chiếu trang. Tách business/timing view, reported/comparable và actual/forecast, tiền doanh nghiệp/market flow/proxy, phương án chưa sở hữu/đang giữ và pullback/breakout/breakdown có điều kiện; anomalies là nghi vấn kèm cách kiểm chứ không kết tội. Wrapper gắn execution context chưa có quote/session/book/holdings và chặn SELL thiếu vị thế.",
+      "remaining": "Đây là phương pháp/prompt và source-backed wrapper, chưa automatic validated PDF extraction/issuer verification, real model replay, structured narrative claim graph, live VN market flow/quotes/auction feed hoặc dự đoán khớp ATO/MTL. Source samples vẫn user-supplied, historical broker targets không thành khuyến nghị hiện tại; chưa cá nhân hóa danh mục hoặc tự gửi lệnh.",
+      "source": [
+        "agent/src/skills/vietnam-deep-research/SKILL.md",
+        "agent/src/agent/context.py",
+        "agent/src/swarm/presets/vietnam_equity_council.yaml",
+        "agent/src/tools/research_council_tool.py",
+        "docs/REPORT_SAMPLE_FINDINGS.md",
+        "docs/VIETNAM_DEEP_RESEARCH_METHOD.md"
+      ],
+      "tests": [
+        "agent/tests/test_preset_claim_backing.py",
+        "agent/tests/test_research_council_tool.py",
+        "frontend/src/components/charts/__tests__/CouncilReport.test.tsx"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "id": "PLATFORM-001",
+      "title": "Goal and Intent Resolver",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[goal/store.py](../../agent/src/goal/store.py), [swarm/presets.py](../../agent/src/swarm/presets.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Ticker mơ hồ giữa hai venue trả yêu cầu làm rõ; câu hỏi nghiên cứu không sinh execution scope"
+    },
+    {
+      "id": "PLATFORM-002",
+      "title": "Canonical Instrument Registry",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[_market_hooks.py](../../agent/backtest/engines/_market_hooks.py), `_detect_market`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai mã trần giống nhau không collision; unknown symbol không mặc định một thị trường để thực thi"
+    },
+    {
+      "id": "PLATFORM-003",
+      "title": "Market Calendar Service",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[paper calendar](../../agent/src/tools/paper_trade/calendar.py), [base engine](../../agent/backtest/engines/base.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Một holiday/weekend fixture có expected tradable/settlement instants theo venue và rule version"
+    },
+    {
+      "id": "PLATFORM-004",
+      "title": "Reference Currency Service",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[portfolio/fx.py](../../agent/src/portfolio/fx.py), `FxQuote`, `to_usd`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Thiếu FX ở as-of bị từ chối; giữ source time riêng retrieval time; không coi stablecoin luôn bằng USD"
+    },
+    {
+      "id": "PLATFORM-005",
+      "title": "Source Licensing Registry",
+      "priority": "P0",
+      "baseline_status": "PROPOSED",
+      "seam": "[loader registry](../../agent/backtest/loaders/registry.py) chưa thay entitlement registry",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Request có retrieve/cache/redistribute purpose bị chặn độc lập theo license và thời hạn"
+    },
+    {
+      "id": "PLATFORM-006",
+      "title": "Data Source Health Router",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[registry.py](../../agent/backtest/loaders/registry.py), `FALLBACK_CHAINS`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Lỗi auth không bị coi transient network; fallback ghi source thật và không vượt feed/account binding"
+    },
+    {
+      "id": "PLATFORM-007",
+      "title": "Raw Archive Store",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[run artifacts](../../agent/src/agent/result_artifacts.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto append-only local observation archive"
+      ],
+      "remaining_acceptance": "Cùng URL đổi bytes tạo revision khác; blob thiếu hoặc checksum sai làm evidence unresolved"
+    },
+    {
+      "id": "PLATFORM-008",
+      "title": "Canonical Data Normalizer",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[loaders/base.py](../../agent/backtest/loaders/base.py), [portfolio normalization](../../agent/src/portfolio/normalization.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN local reference and provenance"
+      ],
+      "remaining_acceptance": "Giá/volume/contract units không bị đổi ngầm; raw fields và transform version truy nguyên được"
+    },
+    {
+      "id": "PLATFORM-009",
+      "title": "Data Quality Gate",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[runner.py](../../agent/backtest/runner.py), `_sanitize_data_map`",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN local reference and provenance"
+      ],
+      "remaining_acceptance": "NaN, impossible OHLC, duplicate và incomplete coverage có reason riêng; không lấp bằng giá giả"
+    },
+    {
+      "id": "PLATFORM-010",
+      "title": "Point-in-Time Snapshot Manager",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[fundamentals loader](../../agent/backtest/loaders/fundamentals_loader.py), [run card](../../agent/backtest/run_card.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research",
+        "Crypto append-only local observation archive"
+      ],
+      "remaining_acceptance": "Query as-of giữ đúng revision đã công bố; snapshot hash ổn định sau ingest bản sửa"
+    },
+    {
+      "id": "PLATFORM-011",
+      "title": "Corporate Action Processor",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[paper corporate actions](../../agent/src/tools/paper_trade/corporate_actions.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Raw fills cộng cash/share action đúng một lần; adjusted price không làm ledger nhận cổ tức hai lần"
+    },
+    {
+      "id": "PLATFORM-012",
+      "title": "Trading Halt Manager",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[halt.py](../../agent/src/live/halt.py) là operator halt, không phải exchange suspension calendar",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Phân biệt operator stop với security suspension; suspended instrument không có fill dù còn cached quote"
+    },
+    {
+      "id": "PLATFORM-013",
+      "title": "Async Event Ingestion",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex adapters](../../agent/src/trading/forex/adapters/), [scheduling kernel](../../agent/src/scheduling/kernel.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Crash sau nhận trước checkpoint không mất event; replay duplicate không tạo hai effects"
+    },
+    {
+      "id": "PLATFORM-014",
+      "title": "Realtime Event Sequence Checker",
+      "priority": "P0",
+      "baseline_status": "PROPOSED",
+      "seam": "Native [chart snapshots](../../agent/src/trading/forex/chart.py) không phải tick sequence recorder",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Gap đánh dấu state invalid; không tính feature L2 trước khi hoàn tất rebuild đúng protocol"
+    },
+    {
+      "id": "PLATFORM-015",
+      "title": "Realtime Candle Aggregator",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex chart](../../agent/src/trading/forex/chart.py), [MT5 worker](../../agent/src/trading/forex/adapters/mt5_worker.py) đọc candles",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Late event/correction tạo candle revision; close-based strategy không đọc nến đang chạy"
+    },
+    {
+      "id": "PLATFORM-016",
+      "title": "Feature Computation Pipeline",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[factors](../../agent/src/factors/), [quantlib](../../agent/src/quantlib/)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex causal ATR-normalized SMA regime replay"
+      ],
+      "remaining_acceptance": "Warm-up, publication lag và feature availability được khóa; output không đổi khi thêm dữ liệu tương lai"
+    },
+    {
+      "id": "PLATFORM-017",
+      "title": "Strategy Definition DSL",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[strategy models](../../agent/src/strategy_store/models.py) lưu rule text, không phải DSL tổng quát",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Một rule compile thành evaluator có unit/timing/exit rõ; text không parse được không tự thực thi"
+    },
+    {
+      "id": "PLATFORM-018",
+      "title": "Strategy Lifecycle Registry",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[models.py](../../agent/src/strategy_store/models.py), `ArtifactStatus`, `ValidationStatus`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "ACTIVE không tự APPROVED/live; thay tham số tạo version với validation scope và input refs mới"
+    },
+    {
+      "id": "PLATFORM-019",
+      "title": "Backtest Run Registry",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[core/state.py](../../agent/src/core/state.py), [run_card.py](../../agent/backtest/run_card.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Run-card warnings and run-state evidence"
+      ],
+      "remaining_acceptance": "Run truy được code/config/data/spec hashes, warnings và terminal status khi tiến trình crash"
+    },
+    {
+      "id": "PLATFORM-020",
+      "title": "Portfolio Ledger",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[backtest models](../../agent/backtest/models.py), [paper engine](../../agent/src/tools/paper_trade/engine.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cash + marked inventory - liabilities đối chiếu NAV; giữ nguyên currency và cashflow labels"
+    },
+    {
+      "id": "PLATFORM-021",
+      "title": "Order Intent Store",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex store](../../agent/src/trading/forex/store.py), [pending action](../../agent/src/live/pending_action.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cùng idempotency key khác payload bị từ chối; transition unknown giữ barrier qua restart"
+    },
+    {
+      "id": "PLATFORM-022",
+      "title": "Risk Policy Engine",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex policy](../../agent/src/trading/forex/policy.py), [enforcement](../../agent/src/live/enforcement.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Authorization kiểm tra lại quote/account/policy trước side effect, không tin approval text từ agent"
+    },
+    {
+      "id": "PLATFORM-023",
+      "title": "Order Reconciliation Worker",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex service](../../agent/src/trading/forex/service.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "ACK không gắn fill; timeout phải query trạng thái trước retry; partial fill giữ residual exposure"
+    },
+    {
+      "id": "PLATFORM-024",
+      "title": "Secrets and Credential Broker",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[credentials.py](../../agent/src/trading/credentials.py), [redaction.py](../../agent/src/tools/redaction.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Tool/error/report không lộ credential values; rotation và vault unavailable không fallback sang plaintext"
+    },
+    {
+      "id": "PLATFORM-025",
+      "title": "Tenant Access Control",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[API security](../../agent/src/api/security.py), [session models](../../agent/src/session/models.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cache/artifact/memory lookup có principal scope; auth loopback không được gọi là SaaS tenant isolation"
+    },
+    {
+      "id": "PLATFORM-026",
+      "title": "Tool Capability Registry",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[tool registry](../../agent/src/agent/tools.py), [deferred registry](../../agent/src/agent/tool_loading.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Load schema không mở rộng permission; kiểm tra arguments thực tế và unknown tool tại server"
+    },
+    {
+      "id": "PLATFORM-027",
+      "title": "Read Tool Batch Scheduler",
+      "priority": "P1",
+      "baseline_status": "EXISTING",
+      "seam": "[tool_lifecycle.py](../../agent/src/agent/tool_lifecycle.py), read/write batching",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai reads độc lập có thể chạy cùng batch; write giữ thứ tự và không bị retry như read"
+    },
+    {
+      "id": "PLATFORM-028",
+      "title": "Tool Failure Classifier",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[tool_lifecycle.py](../../agent/src/agent/tool_lifecycle.py), [Forex errors](../../agent/src/trading/forex/errors.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Auth/schema/stale/transient/ambiguous write có retry disposition khác nhau và giữ root cause"
+    },
+    {
+      "id": "PLATFORM-029",
+      "title": "Goal DAG Orchestrator",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[runtime.py](../../agent/src/swarm/runtime.py), [task_store.py](../../agent/src/swarm/task_store.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Shared DAG input contract"
+      ],
+      "remaining_acceptance": "Failed/incomplete required parent chặn child; retry không nhập artifacts của attempt thất bại"
+    },
+    {
+      "id": "PLATFORM-030",
+      "title": "Specialist Agent Registry",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[Swarm models](../../agent/src/swarm/models.py), [presets](../../agent/src/swarm/presets.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Shared DAG input contract"
+      ],
+      "remaining_acceptance": "Role khai báo tool whitelist/timeout/model; tên role không cấp capability chưa có adapter"
+    },
+    {
+      "id": "PLATFORM-031",
+      "title": "Independent Evidence Review",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[grounding](../../agent/src/agent/grounding/), [report audit](../../agent/src/tools/report_audit_tool.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Grounded source citations and reply provenance"
+      ],
+      "remaining_acceptance": "Reviewer kiểm tra fact+locator từ nguồn, không chỉ lặp summary; unsupported claim không verified"
+    },
+    {
+      "id": "PLATFORM-032",
+      "title": "Disagreement Resolution Engine",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[investment committee](../../agent/src/swarm/presets/investment_committee.yaml)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai luận điểm dùng revision khác nhau phải hiện conflict; majority vote không thay financial evidence"
+    },
+    {
+      "id": "PLATFORM-033",
+      "title": "Research Artifact Revision Store",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[strategy store](../../agent/src/strategy_store/sqlite_store.py), [result artifacts](../../agent/src/agent/result_artifacts.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Immutable VN research revisions and bounded delta review",
+        "Research refresh attempt ledger and explicit save idempotency"
+      ],
+      "remaining_acceptance": "Revision cũ không bị overwrite; report ghi cụ thể source/strategy/attempt revision"
+    },
+    {
+      "id": "PLATFORM-034",
+      "title": "Session Memory and FTS",
+      "priority": "P1",
+      "baseline_status": "EXISTING",
+      "seam": "[session store](../../agent/src/session/store.py), [memory search](../../agent/src/memory/search_index.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Save/reload/search giữ scope, timestamps và links; empty result không bị thay bằng content tenant khác"
+    },
+    {
+      "id": "PLATFORM-035",
+      "title": "Semantic RAG Index",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[semantic_links.py](../../agent/src/memory/semantic_links.py) có BM25; không suy ra vector DB",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Corpus có relevance labels, đo retrieval recall/precision và citation resolution trước chọn embeddings"
+    },
+    {
+      "id": "PLATFORM-036",
+      "title": "Memory Quality Validator",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[lifecycle.py](../../agent/src/memory/lifecycle.py), [persistent.py](../../agent/src/memory/persistent.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Scoring chất lượng không gắn factual truth; stale fact không trở thành giá hiện tại khi recall"
+    },
+    {
+      "id": "PLATFORM-037",
+      "title": "Memory Garbage Collection",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[memory lifecycle](../../agent/src/memory/lifecycle.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "GC dry-run có manifest; evidence đang được report tham chiếu không bị xóa theo age đơn thuần"
+    },
+    {
+      "id": "PLATFORM-038",
+      "title": "Context Compression Controller",
+      "priority": "P0",
+      "baseline_status": "EXISTING",
+      "seam": "[context_budget.py](../../agent/src/agent/context_budget.py), [context_compact.py](../../agent/src/agent/context_compact.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Budget gồm static/schema; compaction giữ evidence refs, unknowns và source status; overflow có trần retry"
+    },
+    {
+      "id": "PLATFORM-039",
+      "title": "Model Router and Budgeter",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[Swarm models](../../agent/src/swarm/models.py) có model override; [provider factory](../../agent/src/providers/llm.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Swarm logical call admission and usage uncertainty"
+      ],
+      "remaining_acceptance": "Chọn model theo benchmark/task; budget tính retry/failed attempts và dừng trước vượt cap"
+    },
+    {
+      "id": "PLATFORM-040",
+      "title": "Token Usage Ledger",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[llm_usage.py](../../agent/src/agent/llm_usage.py), [Swarm usage](../../agent/src/swarm/models.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Swarm logical call admission and usage uncertainty"
+      ],
+      "remaining_acceptance": "Provider usage khác estimates; interrupted call không có usage phải ghi unknown, không kết luận miễn phí"
+    },
+    {
+      "id": "PLATFORM-041",
+      "title": "Cache and Singleflight Manager",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[tool_lifecycle.py](../../agent/src/agent/tool_lifecycle.py), deterministic cache/replay",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Key chứa source/snapshot/scope; live refresh bypass cache; không reuse write hoặc stale account read"
+    },
+    {
+      "id": "PLATFORM-042",
+      "title": "Prompt Injection Firewall",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[security scanner](../../agent/src/security/scanner.py), [grounding](../../agent/src/agent/grounding/)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Injection trong PDF/tool result không làm đổi tool permission; scanner pass không coi là bảo đảm tuyệt đối"
+    },
+    {
+      "id": "PLATFORM-043",
+      "title": "Tool Permission Firewall",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[MCP wrappers](../../agent/src/tools/mcp.py), [SDK gate](../../agent/src/live/sdk_order_gate.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Unknown write tool fail closed; restricted shell/file path không bị vượt bằng tool name alias"
+    },
+    {
+      "id": "PLATFORM-044",
+      "title": "Audit Ledger and Hash Chain",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[ledger.py](../../agent/src/governance/ledger.py), [live audit](../../agent/src/live/audit.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Sửa/xóa/đổi thứ tự record bị phát hiện; hash chain không bị mô tả là chữ ký số hoặc chống admin rewrite"
+    },
+    {
+      "id": "PLATFORM-045",
+      "title": "Metrics and Distributed Tracing",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[trace.py](../../agent/src/agent/trace.py), [Swarm events](../../agent/src/swarm/models.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Một run trace nối được request/tool/attempt/order refs; không dùng token/symbol tùy ý làm metric label vô hạn"
+    },
+    {
+      "id": "PLATFORM-046",
+      "title": "Structured Error Catalogue",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex errors](../../agent/src/trading/forex/errors.py), API errors theo module",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Stable reason code tách public message/scrubbed cause/retry policy, UI giữ partial/unknown"
+    },
+    {
+      "id": "PLATFORM-047",
+      "title": "Queue Backpressure Controller",
+      "priority": "P1",
+      "baseline_status": "PROPOSED",
+      "seam": "[Swarm ThreadPoolExecutor](../../agent/src/swarm/runtime.py) chưa là durable queue",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Producer vượt consumer không OOM; queue cap, rejection và replay cursor có policy đo được"
+    },
+    {
+      "id": "PLATFORM-048",
+      "title": "Durable Job Scheduler",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[job store](../../agent/src/scheduled_research/store.py), [kernel](../../agent/src/scheduling/kernel.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Restart không dispatch hai chủ cùng job; clock/lease/retry và ownership được kiểm tra riêng"
+    },
+    {
+      "id": "PLATFORM-049",
+      "title": "Worker Isolation Sandbox",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[core runner](../../agent/src/core/runner.py), AST scrubber [backtest runner](../../agent/backtest/runner.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Windows local và hardened Linux container có capability matrix riêng; degraded isolation hiện rõ"
+    },
+    {
+      "id": "PLATFORM-050",
+      "title": "Schema Evolution Registry",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[strategy sqlite](../../agent/src/strategy_store/sqlite_store.py), [paper schema](../../agent/src/tools/paper_trade/schema.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Reader cũ/new version gặp nhau có explicit compatibility; unknown schema không tự cast thành success"
+    },
+    {
+      "id": "PLATFORM-051",
+      "title": "Artifact Object Storage",
+      "priority": "P2",
+      "baseline_status": "PROPOSED",
+      "seam": "Local run artifacts là nền, chưa xác nhận object-store backend chung",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "DB commit và blob visibility có checksum, orphan cleanup an toàn và restore từ manifest"
+    },
+    {
+      "id": "PLATFORM-052",
+      "title": "Database Migration Manager",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[sqlite_store.py](../../agent/src/strategy_store/sqlite_store.py), versioned local migrations",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Crash giữa migration có recovery; rollback không làm mất revision hoặc duplicate ledger entry"
+    },
+    {
+      "id": "PLATFORM-053",
+      "title": "API Contract Test Harness",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[test_swarm_route_contracts.py](../../agent/tests/test_swarm_route_contracts.py) và test modules",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture so API/CLI/MCP semantics chung; runtime implementation không phải oracle duy nhất"
+    },
+    {
+      "id": "PLATFORM-054",
+      "title": "Release Feature Flag Manager",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[env schema](../../agent/src/config/env_schema.py) có knobs theo module",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Default off ở entrypoint liên quan; disable có effect rõ với in-flight work và rollback reader"
+    },
+    {
+      "id": "PLATFORM-055",
+      "title": "Incident Kill Switch Manager",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[halt.py](../../agent/src/live/halt.py), [Forex policy](../../agent/src/trading/forex/policy.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Halt chặn new effects theo paths đã xác minh; không báo đã flatten/cancel toàn exposure"
+    },
+    {
+      "id": "PLATFORM-056",
+      "title": "Backup and Restore Controller",
+      "priority": "P0",
+      "baseline_status": "PROPOSED",
+      "seam": "SQLite/file stores hiện có; chưa xác nhận coordinated restore controller",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Restore drill kiểm DB+WAL/blobs+hash refs; RPO/RTO đo từ event/cutover thực tế"
+    },
+    {
+      "id": "PLATFORM-057",
+      "title": "Clock and Timezone Monitor",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[Forex risk](../../agent/src/trading/forex/risk.py) kiểm quote age/timezone",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Quote tương lai do clock drift không fresh; wall clock khác monotonic timeout được xử lý"
+    },
+    {
+      "id": "PLATFORM-058",
+      "title": "Market Data Replay Engine",
+      "priority": "P1",
+      "baseline_status": "PROPOSED",
+      "seam": "Swarm event replay khác market tick/orderbook replay",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Snapshot+ordered event log tạo cùng features/orders paper; gap/finality policy có version"
+    },
+    {
+      "id": "PLATFORM-059",
+      "title": "User Consent and Mandate Manager",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[mandate model](../../agent/src/live/mandate/model.py), [store](../../agent/src/live/mandate/store.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Consent bound account/env/expiry/caps; prompt/human_approval boolean không tự tăng quyền"
+    },
+    {
+      "id": "PLATFORM-060",
+      "title": "Operational Runbooks",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[contributor guide](../../AGENT_CONTRIBUTOR_GUIDE.md), docs hiện có",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Một drill có actor/steps/expected state/reconcile/rollback và timestamp, không chỉ checklist"
+    },
+    {
+      "id": "PLATFORM-061",
+      "title": "Research Quality Dashboard",
+      "priority": "P2",
+      "baseline_status": "PROPOSED",
+      "seam": "[frontend router](../../frontend/src/router.tsx) có runtime/reports, chưa xác nhận dashboard chất lượng chung",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Citation/numeric/PIT metrics hiện denominator, missing results và version evaluation set"
+    },
+    {
+      "id": "PLATFORM-062",
+      "title": "Experiment Design Registry",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[hypotheses](../../agent/src/hypotheses/), [Strategy Store](../../agent/src/strategy_store/)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex persistent experiment registry",
+        "Forex EMA research variant and web lab",
+        "Forex within-fold frozen OOS trade-path bootstrap"
+      ],
+      "remaining_acceptance": "Trial thất bại và số lần tuning được giữ; OOS không bị dùng lại như train khi promote"
+    },
+    {
+      "id": "PLATFORM-063",
+      "title": "Provider Circuit Breakers",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[providers](../../agent/src/providers/), [Swarm retry](../../agent/src/swarm/runtime.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Timeout/retry không tạo storm; half-open probe budget riêng, auth fail không retry vô hạn"
+    },
+    {
+      "id": "PLATFORM-064",
+      "title": "Report Publishing Pipeline",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[pdf report](../../agent/src/tools/pdf_report.py), [report artifacts](../../agent/src/tools/report_artifacts.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Markdown export from stored research revisions"
+      ],
+      "remaining_acceptance": "Publish kiểm rights/redaction/citation resolution; draft khác delivered; delivery lỗi không đánh dấu sent"
+    },
+    {
+      "id": "PLATFORM-065",
+      "title": "Data Entitlement Audit",
+      "priority": "P0",
+      "baseline_status": "PROPOSED",
+      "seam": "Credentials/provider available không chứng minh rights audit",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hết license dừng fetch/redistribute đúng phạm vi; policy lịch sử và audit actor còn truy được"
+    },
+    {
+      "id": "PLATFORM-066",
+      "title": "Evaluation Dataset Manager",
+      "priority": "P1",
+      "baseline_status": "PARTIAL",
+      "seam": "[eval harness](../../agent/evals/harness/)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Dataset version + frozen split + expected facts/locators; ingestion không làm test set trôi ngầm"
+    },
+    {
+      "id": "PLATFORM-067",
+      "title": "Cross-Market Exposure Service",
+      "priority": "P0",
+      "baseline_status": "PARTIAL",
+      "seam": "[portfolio fx](../../agent/src/portfolio/fx.py), [composite engine](../../agent/backtest/engines/composite.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "VND/JPY/USDT exposure thiếu conversion/spec không cộng NAV; stress gross và correlated risk riêng"
+    },
+    {
+      "id": "VN-068",
+      "title": "VN Symbol and Venue Master",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[correlation.py](../../agent/backtest/correlation.py) `infer_market`; thiếu issuer/security/listing history Việt Nam",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN local reference and provenance"
+      ],
+      "remaining_acceptance": "Một ticker giả lập dùng lại cho hai issuer không nối nhầm; query trước/sau chuyển HOSE→HNX trả đúng venue và ngày hiệu lực; ISIN thiếu không tự sinh"
+    },
+    {
+      "id": "VN-069",
+      "title": "VN Exchange Calendar",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu lịch matching/settlement Việt Nam có revision; engine dùng bar cursor thay lịch chính thức",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture T thứ Sáu, thứ Hai nghỉ: phiên T+2 là thứ Tư; query trước ngày công bố thay lịch giữ lịch cũ; phân biệt ngày nghỉ và suspension một mã"
+    },
+    {
+      "id": "VN-070",
+      "title": "HOSE Trading Rules Engine",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[vietnam_equity.py](../../agent/backtest/engines/vietnam_equity.py) `hose_price_limits`, `hose_can_execute`, `round_size`; loader chưa giữ reference/raw đầy đủ",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN local reference and provenance"
+      ],
+      "remaining_acceptance": "Giá 9.990/10.000/49.950/50.000 dùng đúng tick hiện có; 199 shares→100; thiếu raw/reference hoặc rule hiệu lực phải chặn nhãn fidelity; composite áp cùng luật"
+    },
+    {
+      "id": "VN-071",
+      "title": "HNX Trading Rules Engine",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "[registry.py](../../agent/backtest/loaders/registry.py) `vietnam_equity` chỉ cho local HNX; chưa có HNX rule engine riêng",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture HNX có văn bản hiệu lực, board/session, tick, band, reference; không được dùng mặc định HOSE 7%; khác venue trả lỗi cấu hình rõ ràng"
+    },
+    {
+      "id": "VN-072",
+      "title": "UPCoM Market Rules Engine",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu UPCoM rule/status adapter; local loader không tạo luật thị trường",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture hạn chế giao dịch, phiên đầu và ngày trở lại giao dịch xử lý bằng rule version; thiếu trạng thái không suy ra từ OHLC; dữ liệu trễ không gắn realtime"
+    },
+    {
+      "id": "VN-073",
+      "title": "VN Settlement and Sellability",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[vietnam_equity.py](../../agent/backtest/engines/vietnam_equity.py) `newest_opening_bar_idx`, `hose_is_settled`; chưa có ledger từng lô",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mua T, mua thêm T+1, bán T+2 bị giữ theo logic hiện tại; khi thêm ledger, chỉ số lượng settled được bán và tổng settled+unsettled bằng holding; tiền/chứng khoán chờ về tách nhau"
+    },
+    {
+      "id": "VN-074",
+      "title": "VN Fees and Taxes",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[vietnam_equity.py](../../agent/backtest/engines/vietnam_equity.py) `calc_commission`; defaults chưa là lịch thuế/phí được xác minh",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Với notional 1.000.000 VND và defaults code: phí mua 1.500, phí+thuế bán 2.500; thay schedule có hiệu lực chỉ ảnh hưởng phiên tương ứng; thiếu investor/broker regime không gọi là phí thực"
+    },
+    {
+      "id": "VN-075",
+      "title": "VN Corporate Disclosures Crawl",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu collector HOSE/HNX/issuer; [web_search_tool.py](../../agent/src/tools/web_search_tool.py) chỉ là điểm tìm nguồn",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Một thông báo có hai attachments giữ đủ manifest và hash; 403/timeout ghi trạng thái riêng; retry không nhân đôi; bản PDF giữ nguyên bytes và không nhận HTML login làm PDF"
+    },
+    {
+      "id": "VN-076",
+      "title": "VN Disclosures Change Detection",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu revision registry cho disclosure; tái dùng input hash ở [artifact.py](../../agent/src/quantlib/valuation/artifact.py) sau khi có document contract",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cùng URL đổi bytes tạo revision mới; URL khác cùng bytes là mirror; HTML đổi navigation không tạo BCTC revision; hủy thông báo giữ bản cũ và trạng thái withdrawn"
+    },
+    {
+      "id": "VN-077",
+      "title": "VN PDF Table Parser",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu parser/fixture BCTC Việt Nam kiểm chứng; không suy ra từ PDF export",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "PDF text và scan giữ page/table/row/column; số `(1.250)` âm, `1.250,5` không tự dùng locale US; cột kỳ trước không bị lấy làm kỳ này; low-confidence ô trọng yếu bị chặn"
+    },
+    {
+      "id": "VN-078",
+      "title": "VN Financial Unit Converter",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu mapping đơn vị Việt Nam; `Assumption` trong [contracts.py](../../agent/src/quantlib/valuation/contracts.py) không thay unit normalization",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "1.250 triệu VND→1.250.000.000 VND đúng một lần; EPS đồng/cổ phiếu không nhân thêm scale BCTC; thiếu unit trả null+reason; round trip về số gốc đúng tolerance"
+    },
+    {
+      "id": "VN-079",
+      "title": "VN Quarterly Period Reconciler",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[fundamentals_loader.py](../../agent/backtest/loaders/fundamentals_loader.py) `_to_ttm_flow_series` là SEC path; chưa có lịch kỳ VN",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "Q1=80, 6T=190, 9T=330, năm=470 cho quý riêng 80/110/140/140; balance sheet không cộng bốn quý; đổi scope/revision không được trừ lũy kế trực tiếp"
+    },
+    {
+      "id": "VN-080",
+      "title": "VN Consolidated Separate Filter",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "[financial_statements_tool.py](../../agent/src/tools/financial_statements_tool.py) `_classify_market` chưa nhận `.VN`; thiếu VN scope contract",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "Cùng kỳ có hợp nhất và riêng: query scope trả đúng từng bộ; không có hợp nhất trả thiếu; PATMI, minority và equity phải cùng phạm vi khi tính tỷ số"
+    },
+    {
+      "id": "VN-081",
+      "title": "VN Restatement Tracker",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu VN fact revision/PIT query; [fundamentals_loader.py](../../agent/backtest/loaders/fundamentals_loader.py) là SEC-only",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "Bản sửa công bố sau D không xuất hiện ở query D; số so sánh được sửa có fact revision riêng; rerun snapshot cũ dùng hash cũ; không ghi đè bản kiểm toán vào bản quý"
+    },
+    {
+      "id": "VN-082",
+      "title": "VN Cash Flow Quality Analyst",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[accruals.py](../../agent/src/factors/zoo/fundamental/accruals.py) `compute`; thiếu BCTC VN và reconciliation",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "Net income 100, CFO 60, tài sản bình quân 1.000 cho accruals 0,04 theo định nghĩa đã chọn; phân loại phi tiền mặt/working capital; tiền thu bán tài sản không tự thành CFO"
+    },
+    {
+      "id": "VN-083",
+      "title": "VN Working Capital Analyzer",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[threestatement.py](../../agent/src/quantlib/valuation/threestatement.py) `project_three_statement`; chưa có mapping historical VN",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "AR/inventory/AP và DSO/DIO/DPO dùng average balances, số ngày kỳ; doanh thu/COGS 0 trả undefined; khách trả trước và lãi vay không lẫn operating working capital"
+    },
+    {
+      "id": "VN-084",
+      "title": "VN Balance Sheet Forensics",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[threestatement.py](../../agent/src/quantlib/valuation/threestatement.py) `check_balance_sheet`; cần raw VN facts",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research"
+      ],
+      "remaining_acceptance": "A=1.000, L=600, E=400 pass; E=390 fail 10 trước làm tròn; kiểm restricted cash, receivables liên quan và nợ bảo lãnh bằng locator, không sửa E cho cân"
+    },
+    {
+      "id": "VN-085",
+      "title": "VN Bank NIM and CASA",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu bank taxonomy VN; generic revenue/gross-profit không đại diện ngân hàng",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "NII 20/tài sản sinh lãi bình quân 400 cho NIM kỳ=5%; công bố annualization riêng; CASA 30/100=30% theo định nghĩa deposits đã ghi; thiếu mẫu số không xuất tỷ lệ"
+    },
+    {
+      "id": "VN-086",
+      "title": "VN Bank Asset Quality",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu bank asset-quality fact adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Nợ xấu 6/dư nợ 300=2%; allowance 9/NPL 6=150% với coverage definition rõ; cơ cấu lại và write-off không tự biến thành thu hồi; mẹ/hợp nhất không trộn"
+    },
+    {
+      "id": "VN-087",
+      "title": "VN Bank Capital Adequacy",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu regulatory capital/RWA fact và regime version",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "CAR chỉ tính khi capital và RWA cùng ngày/phạm vi/regime; không dùng equity/total assets thay CAR; báo cáo tỷ lệ đã công bố khác tỷ lệ tự tính phải giữ cả hai"
+    },
+    {
+      "id": "VN-088",
+      "title": "VN Bank Funding Liquidity",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu funding bucket VN/regulatory definition",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Tiền gửi khách hàng, interbank và phát hành giấy tờ có giá tách bucket; LDR chỉ so peer cùng định nghĩa; kỳ hạn thiếu không được mặc định ngắn hạn hoặc phân bổ đều"
+    },
+    {
+      "id": "VN-089",
+      "title": "VN Property Project Ledger",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu project-level evidence/ownership ledger",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai công ty con cùng dự án không cộng trùng NAV; mỗi dòng có ownership, legal stage, doanh số, cash received; land bank chưa có pháp lý không gọi là có thể bàn giao"
+    },
+    {
+      "id": "VN-090",
+      "title": "VN Property Debt Maturity",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu schedule principal/coupon/guarantee theo văn bản gốc",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Nợ 100 đáo hạn năm tới, cam kết trả 30: chưa thực hiện vẫn outstanding 100; đáo hạn kéo dài chỉ đổi sau văn bản có hiệu lực; double pledge/guarantee ghi linked exposure"
+    },
+    {
+      "id": "VN-091",
+      "title": "VN Industrial Sector Cost Drivers",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu sector-driver mapping VN",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Dự báo sản lượng×giá bán và unit cost có provenance riêng; giá nguyên liệu tăng không gán toàn bộ vào kỳ hiện tại khi chưa có tồn kho/hedge; capacity khác actual output"
+    },
+    {
+      "id": "VN-092",
+      "title": "VN Retail Same-Store Analytics",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu store-cohort disclosures",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Same-store growth chỉ tính trên cùng cohort đủ kỳ; doanh thu chuỗi tăng vì mở mới không tự thành SSSG; thiếu cohort trả unavailable dù có doanh thu tổng"
+    },
+    {
+      "id": "VN-093",
+      "title": "VN Steel Cycle Research",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu steel spread/inventory/volume datasets có quyền",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Gross margin từ BCTC đối chiếu spread giả định; đơn vị tấn/nghìn tấn nhất quán; stress giá bán, input và tồn kho riêng; không extrapolate peak margin thành vĩnh viễn"
+    },
+    {
+      "id": "VN-094",
+      "title": "VN Brokerage Balance Sheet",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu taxonomy chứng khoán VN; compact statement không đủ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Margin loans, FVTPL/HTM và customer monies giữ riêng; không cộng tiền khách hàng vào cash định giá; gain chưa thực hiện tách fee/margin interest với tài liệu đối chiếu"
+    },
+    {
+      "id": "VN-095",
+      "title": "VN Export Exposure Mapper",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu company geography/currency/hedge exposure table",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Doanh thu USD 100, chi phí USD 60 chỉ tạo net operating exposure 40 trước hedge; không gán 100 là lợi ích FX; destination không đồng nghĩa currency thanh toán"
+    },
+    {
+      "id": "VN-096",
+      "title": "VN Ownership and Related Parties",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "[stock_profile_tool.py](../../agent/src/tools/stock_profile_tool.py) chưa có VN contract; thiếu ownership timeline",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Sở hữu trực tiếp/gián tiếp, beneficial owner và ngày biết tách nhau; related-party balances cùng issuer không đếm hai lần; tin báo bán không được coi là đã hoàn tất bán"
+    },
+    {
+      "id": "VN-097",
+      "title": "VN Dividend and Rights Engine",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Thiếu VN event ledger; raw/adjusted OHLC hiện chưa đủ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture cổ tức tiền, thưởng cổ phiếu, quyền mua có ex-date/record/payment/tradeable date riêng; quyền bị hủy không ghi tiền; số lẻ làm tròn theo thông báo từng event"
+    },
+    {
+      "id": "VN-098",
+      "title": "VN Pledge and Margin Constraints",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu broker-specific eligibility/LTV và thông báo cầm cố",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Có tên trong margin list không tự tạo entitlement; cùng security hai broker có haircut khác nhau; đổi ngày hiệu lực không sửa lịch sử; pledge unknown không suy ra 0"
+    },
+    {
+      "id": "VN-099",
+      "title": "VN Foreign Ownership Room",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu foreign-room snapshot/history adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Room có timestamp/security/venue; không suy ngoại room từ foreign-flow; cùng ngày corporate action đổi shares không dùng mẫu số hôm qua; stale chặn claim khả năng mua hiện tại"
+    },
+    {
+      "id": "VN-100",
+      "title": "VN Earnings Calendar",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu lịch công bố VN confirmed/estimated",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Deadline theo quy định, lịch doanh nghiệp xác nhận và estimate là ba loại riêng; BCTC xuất muộn không backdate theo deadline; đổi lịch giữ revision và known_at"
+    },
+    {
+      "id": "VN-101",
+      "title": "VN Macro and SBV Desk",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu NSO/SBV collector; source registry phải giữ kỳ và vintage",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Công bố tháng 10 vào tháng 11 chỉ dùng từ publication gate; tỷ giá trung tâm khác bank buy/sell; sửa CPI tạo vintage mới, query as_of trước sửa giữ bản cũ"
+    },
+    {
+      "id": "VN-102",
+      "title": "VN Bond and Rate Curve",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu curve builder VN và licensed input",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mỗi node có instrument, yield convention, tenor, ngày; không nối yield trái phiếu credit-risky vào risk-free; nội suy phải ghi method, không ngoại suy tenor thiếu âm thầm"
+    },
+    {
+      "id": "VN-103",
+      "title": "VN Interbank Liquidity Watch",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu SBV interbank series adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Overnight/1W/1M tách series; non-publication không forward-fill thành observation mới; thay đổi so cùng tenor và unit; narrative thiếu dữ liệu trả unknown"
+    },
+    {
+      "id": "VN-104",
+      "title": "VN Credit Growth Watch",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu credit stock/growth vintage",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Số cuối tháng khác tăng trưởng YTD; quy đổi phải có đúng base period; mức tăng toàn hệ thống không gán cho một bank; revision giữ nguồn và release date"
+    },
+    {
+      "id": "VN-105",
+      "title": "VN Sector Rotation Monitor",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[factormodel.py](../../agent/src/quantlib/factormodel.py); thiếu VN PIT sector members và benchmark",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Sector return tính trên constituents hợp lệ tại từng ngày, weights nêu rõ; tăng do một mã tỷ trọng lớn được trình bày concentration; missing sector không thành return 0"
+    },
+    {
+      "id": "VN-106",
+      "title": "VN Foreign Flow Tracker",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu VN matched/negotiated foreign-flow adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Foreign buy 100, sell 80 cho net 20 theo cùng units/board; negotiated block không tự thành continuous demand; phân biệt value/volume và revision"
+    },
+    {
+      "id": "VN-107",
+      "title": "VN Proprietary Trading Flow",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu authorized proprietary-flow source",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Tổng tự doanh mua/bán có ngày và board; không định danh ý định/một công ty từ aggregate; thiếu nguồn hợp lệ trả unavailable, không suy từ price action"
+    },
+    {
+      "id": "VN-108",
+      "title": "VN Liquidity and Impact Model",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[factor_costs.py](../../agent/backtest/factor_costs.py) `apply_adv_capacity`; chưa có VN liquidity calibration",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "ADV dùng bars trước quyết định và matched volume đúng board; participation cap 5% trên ADV 100.000 giới hạn 5.000 trước lô; bar khóa trần/sàn không chứng nhận khớp"
+    },
+    {
+      "id": "VN-109",
+      "title": "VN Factor Screening",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[fundamental factors](../../agent/src/factors/zoo/fundamental/), [fundamentals_loader.py](../../agent/backtest/loaders/fundamentals_loader.py); thiếu VN PIT panels",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mã hủy niêm yết còn trong universe quá khứ; filing sau D không vào screen D; missing financial field không cho rank như 0; lưu hypothesis count và holdout"
+    },
+    {
+      "id": "VN-110",
+      "title": "VN PE Valuation Model",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[comps.py](../../agent/src/quantlib/valuation/comps.py) `run_comps`, `peer_multiple_set`; thiếu VN earnings/shares",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN annual PE and observed PB peer scenarios"
+      ],
+      "remaining_acceptance": "PATMI 100 tỷ/weighted shares 50 triệu→EPS 2.000 VND; PE 10×→20.000 VND chỉ khi multiple là assumption có cơ sở; EPS≤0 loại P/E và ghi lý do"
+    },
+    {
+      "id": "VN-111",
+      "title": "VN PB ROE Valuation",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "[comps.py](../../agent/src/quantlib/valuation/comps.py) không chứng minh bank PB–ROE model; cần module được test",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN annual PE and observed PB peer scenarios"
+      ],
+      "remaining_acceptance": "BVPS từ parent equity đúng shares; khi dùng justified PB phải ghi ROE/ke/g và kiểm ke>g; ROE mục tiêu là assumption, không coi median PB là quan hệ nhân quả"
+    },
+    {
+      "id": "VN-112",
+      "title": "VN DCF Corporate Model",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[dcf.py](../../agent/src/quantlib/valuation/dcf.py) `run_dcf`, `equity_bridge`; [contracts.py](../../agent/src/quantlib/valuation/contracts.py) `Assumption`",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "DCF JSON bridge and research caller",
+        "VN bounded DCF sensitivity and valuation workbench",
+        "VN price-implied terminal growth solver"
+      ],
+      "remaining_acceptance": "FCFF/tax/reinvestment nhất quán VND; thiếu WACC bridge/shares chặn; g≥WACC bị từ chối; restricted cash không được tự cộng vào equity; input hash ổn định khi đổi key order"
+    },
+    {
+      "id": "VN-113",
+      "title": "VN Sum of Parts Valuation",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu SOTP ownership/double-count contract; dùng `equity_bridge` sau khi từng phần hợp lệ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Ownership 60% của asset value 100 cho attributable 60 trước liabilities; associate đã nằm EV bridge không cộng lần hai; cross-holdings có reconciliation"
+    },
+    {
+      "id": "VN-114",
+      "title": "VN Bank Excess Return Model",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu bank residual-income/excess-return model",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Opening book+earnings−dividends=closing book; cost of equity cùng currency; không dùng WACC enterprise DCF thay ke; terminal excess ROE phải là assumption và stress được"
+    },
+    {
+      "id": "VN-115",
+      "title": "VN Dividend Discount Model",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu DDM/payout constraints cho VN",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Payout 120% không được tự cắt về 100%; retained earnings và dilution đối chiếu; terminal dividend growth≥ke bị từ chối; bank capital constraints là gap khi thiếu dữ liệu"
+    },
+    {
+      "id": "VN-116",
+      "title": "VN Valuation Consensus Comparison",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "[research_reports_tool.py](../../agent/src/tools/research_reports_tool.py) `ResearchReportsTool` là CN; thiếu SSI/VCBS adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai report cùng analyst kỳ forecast khác nhau không tạo median mù; target date/horizon/split basis cùng chuẩn; bản syndicated tính một forecast; không coi nguồn thứ ba là own valuation"
+    },
+    {
+      "id": "VN-117",
+      "title": "VN Fair Value Sensitivity",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[dcf.py](../../agent/src/quantlib/valuation/dcf.py) `sensitivity_grid`; [artifact.py](../../agent/src/quantlib/valuation/artifact.py)",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN bounded DCF sensitivity and valuation workbench",
+        "VN price-implied terminal growth solver"
+      ],
+      "remaining_acceptance": "Mỗi cell tái tính enterprise→equity bridge từ cùng explicit flows; g≥WACC là NaN với lý do; thay tax/currency giữ sensitivity riêng; không gán xác suất cho grid"
+    },
+    {
+      "id": "VN-118",
+      "title": "VN Economic Moat Analyzer",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[fundamental_research_team.yaml](../../agent/src/swarm/presets/fundamental_research_team.yaml) quality role; thiếu VN evidence rubric",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Claim moat phải có cơ chế, dữ kiện nhiều kỳ, peer và phản chứng; market share thiếu denominator không thành thị phần xác nhận; không xuất moat score từ một đoạn tin"
+    },
+    {
+      "id": "VN-119",
+      "title": "VN Governance Red Flags",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu VN governance event/related-party evidence classifier",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Phân biệt allegation, regulator decision và adjudicated fact; thay lãnh đạo không tự là fraud; mỗi flag có source/date/entity match và trạng thái dispute"
+    },
+    {
+      "id": "VN-120",
+      "title": "VN Audit Opinion Monitor",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Thiếu opinion/qualification parser VN",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Qualified/adverse/disclaimer/emphasis-of-matter tách nhãn; management explanation không đổi auditor opinion; bản corrected phải giữ cả opinion cũ; không suy từ từ khóa đơn lẻ"
+    },
+    {
+      "id": "VN-121",
+      "title": "VN Catalyst and Event Map",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Thiếu VN event dependency/confirmation ledger",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Dự kiến nghiệm thu dự án khác đã nghiệm thu; event có expected/confirmed/effective dates; event hủy giữ audit trail; chỉ báo tác động thành scenario có input"
+    },
+    {
+      "id": "VN-122",
+      "title": "VN Corporate Action Backtest",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[vietnam_equity.py](../../agent/backtest/engines/vietnam_equity.py) và [yahoo_client.py](../../agent/backtest/loaders/yahoo_client.py) `_parse_chart`; thiếu cash/share event ledger",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture cổ tức không vừa cộng cash vừa dùng dividend-adjusted return; shares thưởng chỉ tradeable khi có hiệu lực; rights subscription giảm cash đúng ngày; raw dùng cho tick/band"
+    },
+    {
+      "id": "VN-123",
+      "title": "VN Index Benchmark Alignment",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[benchmark.py](../../agent/backtest/benchmark.py) `resolve_benchmark`, `MARKET_BENCHMARKS`; chưa có default Vietnam",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Không fallback VN thành SPY/BTC; price/total-return basis giống strategy; cùng VND/cửa sổ/phiên; thiếu benchmark trả unavailable, không alpha=0"
+    },
+    {
+      "id": "VN-124",
+      "title": "VN Portfolio Construction",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[portfolio.py](../../agent/src/quantlib/portfolio.py) `hierarchical_risk_parity`; [constraints.py](../../agent/backtest/constraints.py) `MaxWeight`, `GroupExposure`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Portfolio target qua lô100, cash, settled shares và participation; weights sau constraint không âm/không vượt caps; infeasible phải báo, không renormalize làm vỡ cap"
+    },
+    {
+      "id": "VN-125",
+      "title": "VN Risk Exposure by Sector",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[constraints.py](../../agent/backtest/constraints.py) `GroupExposure`; [risk.py](../../agent/src/quantlib/risk.py)",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "PIT sector mapping, missing sector đi bucket unknown; exposure tính cả look-through holdings khi có evidence; sum sector+unknown khớp portfolio, cash tách rõ"
+    },
+    {
+      "id": "VN-126",
+      "title": "VN Corporate News Classifier",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[stock_news_tool.py](../../agent/src/tools/stock_news_tool.py) `StockNewsTool` không có dedicated VN corpus",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mười bài đăng lại cùng công bố thành một evidence origin; entity ambiguity giữ unresolved; rumor không thành fact; article sau as_of không đi vào thesis cũ"
+    },
+    {
+      "id": "VN-127",
+      "title": "VN Investment Committee Debate",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[task_store.py](../../agent/src/swarm/task_store.py) `validate_dag`, `resolve_dependencies`; preset fundamental cần data gate",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "DCF JSON bridge and research caller",
+        "Vietnam equity research council and contract",
+        "Vietnam deep research method grounded in supplied report samples"
+      ],
+      "remaining_acceptance": "Cùng input manifest cho bull/bear; tài chính lỗi thì valuation không chạy; risk có quyền WAIT; dissent giữ nguyên cùng claim/evidence, majority vote không xóa missing data"
+    },
+    {
+      "id": "VN-128",
+      "title": "VN Research Report Generator",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[pdf_report.py](../../agent/src/tools/pdf_report.py), [report_artifacts.py](../../agent/src/tools/report_artifacts.py) `publish_pdf`; thiếu VN report schema",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "VN curated financial research",
+        "Research web entry and provenance display",
+        "VN annual PE and observed PB peer scenarios",
+        "VN bounded DCF sensitivity and valuation workbench",
+        "Immutable VN research revisions and bounded delta review",
+        "VN price-implied terminal growth solver",
+        "Markdown export from stored research revisions",
+        "Vietnam deep research method grounded in supplied report samples"
+      ],
+      "remaining_acceptance": "Report có as_of/coverage/gaps và locator từng số trọng yếu; valuation unavailable vẫn xuất report có lý do; PDF tiếng Việt không mất dấu; export không cấp quyền nguồn vượt entitlement"
+    },
+    {
+      "id": "VN-129",
+      "title": "VN Watchlist Alert Engine",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[scheduled_research_tool.py](../../agent/src/tools/scheduled_research_tool.py) `ScheduledResearchTool`; thiếu materiality/event dedup VN",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cùng event revision thông báo một lần; chỉ đổi navigation không báo; cơ sở luận điểm bị phá vỡ tạo alert có before/after; nguồn lỗi không được báo doanh nghiệp xấu đi"
+    },
+    {
+      "id": "VN-130",
+      "title": "VN Research Delta Update",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[artifact.py](../../agent/src/quantlib/valuation/artifact.py) `ArtifactDiff`; thiếu claim→fact invalidation VN",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Immutable VN research revisions and bounded delta review",
+        "Research refresh attempt ledger and explicit save idempotency"
+      ],
+      "remaining_acceptance": "Restatement đổi earnings chỉ invalidates claims phụ thuộc; report cũ không restamp thành mới; input/model hash đổi hiện trong diff; failed update giữ report last-good kèm stale"
+    },
+    {
+      "id": "VN-131",
+      "title": "VN Independent Data Auditor",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[report_audit_tool.py](../../agent/src/tools/report_audit_tool.py) `extract_data_points`, `render_verdict`; parser chưa chứng minh đủ tiếng Việt",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "100% số trọng yếu đi source→unit→formula→claim; fixture tỷ/triệu/đồng và dấu âm đọc đúng; thiếu fetched evidence không PASS; hai mirror một origin không tính hai xác nhận độc lập"
+    },
+    {
+      "id": "FX-132",
+      "title": "MT5 Account Identity Guard",
+      "priority": "P0",
+      "baseline_status": "source-existing",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `Native.identity`, `dispatch`; `agent/src/trading/forex/service.py` — `current_binding`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Đổi từng login/server/demo-live hoặc fingerprint trong lúc đọc/submit phải bị từ chối; fake SDK đếm `order_send=0`; mỗi artifact giữ binding tại thời điểm quan sát."
+    },
+    {
+      "id": "FX-133",
+      "title": "MT5 Symbol Metadata Snapshot",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `instrument`, `instruments`, `prepare`; thiếu snapshot revision bền vững đủ tick value/freeze/session",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai fixture XAUUSD cùng tên nhưng contract size 100 và 1 phải có revision khác; min/step/tick/currency/valid-from lưu cùng run; spec đổi giữa preview và send phải revalue hoặc block."
+    },
+    {
+      "id": "FX-134",
+      "title": "MT5 Tick Feed Adapter",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `quote` đọc snapshot `symbol_info_tick`; absent recorder/sequence/replay",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Feed synthetic có duplicate timestamp, out-of-order và disconnect phải giữ bid/ask/flags nguyên gốc; không dùng timestamp làm khóa duy nhất; gap khóa entry, local sequence không giả làm sequence broker."
+    },
+    {
+      "id": "FX-135",
+      "title": "MT5 History Consistency Audit",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/runner.py` — `completed_bars`; `agent/src/trading/forex/analysis_context.py` — `_normalize_bars`; thiếu đối chiếu loader/terminal manifest",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture lệch một giờ, trùng/conflict candle, thiếu bar và hai native feeds phải có report phân loại; không tự merge hoặc đổi source; sai lệch giá đo theo tick size của revision."
+    },
+    {
+      "id": "FX-136",
+      "title": "Bid Ask Candle Builder",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent trong Forex; `agent/src/trading/forex/adapters/mt5_worker.py` — `_rates` là broker OHLC, chưa tổng hợp tick hai phía",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Replay tick cố định tạo riêng bid/ask/mid OHLC theo cùng UTC interval và policy late event; BUY dùng ask, thoát long dùng bid; một bar không đủ hai phía không được gắn executable."
+    },
+    {
+      "id": "FX-137",
+      "title": "Broker Clock and DST Guard",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `quote`, `_rates` xuất UTC; chưa có versioned session/DST calendar",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture hai lần chuyển DST New York/London, giờ không tồn tại và giờ lặp phải chọn session theo IANA zone; bar UTC không cộng offset server lần hai; clock skew vượt policy khóa entry."
+    },
+    {
+      "id": "FX-138",
+      "title": "XAU Spread Regime Monitor",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/risk.py` — `check` có cap spread points; absent phân vị causal và spread/ATR monitor",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Phân vị chỉ dùng mẫu đã biết trước tick quyết định; spike vượt hard cap bị block ngay dù percentile baseline thấp; thiếu ATR hoặc warmup trả unknown, không làm 0."
+    },
+    {
+      "id": "FX-139",
+      "title": "XAU Slippage and Fill Model",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/backtest/engines/forex.py` — `apply_slippage_for_symbol`; chưa có model hiệu chỉnh fills/latency broker",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fit trên train theo session/volatility/size; holdout báo sample size và residual; buy adverse slip tăng giá, sell giảm; gap qua SL dùng first executable price, không ép fill tại stop."
+    },
+    {
+      "id": "FX-140",
+      "title": "Swap and Overnight Cost Model",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/backtest/engines/forex.py` — `on_bar`, `calc_forex_swap` import; chưa gắn swap terms native theo revision",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture long/short đi qua rollover, ngày multiplier và DST phải charge đúng một lần theo terms fixture; đổi terms áp dụng từ effective time; credit giữ dấu, unavailable không thành free carry."
+    },
+    {
+      "id": "FX-141",
+      "title": "MT5 Netting Hedging Mode",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `account`, `prepare_close`; close hiện chỉ MT5 Demo Hedge",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hedge close bắt buộc đúng ticket/side/remaining quantity; Netting hoặc vị thế ngoài journal bị từ chối; mô phỏng lệnh ngược chiều phải phân biệt reduce/net với mở hedge, không tự gắn flatten thành closed."
+    },
+    {
+      "id": "FX-142",
+      "title": "XAU Global Macro Calendar",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "absent calendar hard gate; `agent/src/trading/forex/macro_context.py` — `get_macro_context` chỉ context series",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Event CPI bị dời giờ phải giữ revision và first-seen; thiếu feed trả calendar-unavailable; blackout join scheduled/actual/known-at theo policy; consensus tải sau release không được dùng như thông tin trước release."
+    },
+    {
+      "id": "FX-143",
+      "title": "XAU Real Yield Context",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/macro_context.py` — `parse_fred`, `get_macro_context`; chưa có vintage/lag evaluator",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Dữ liệu theo ngày giữ observation date/unit/available-at; join intraday chỉ từ bản đã phát hành; correlation rolling có window/n, không suy dấu cố định hoặc đưa daily yield stale thành tick mới."
+    },
+    {
+      "id": "FX-144",
+      "title": "XAU Intraday Session Profile",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent profile session broker; có `quote` và `_rates` trong `agent/src/trading/forex/adapters/mt5_worker.py` làm nguyên liệu",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Report phân bố spread/ATR/slippage theo session calendar revision, số mẫu và missingness; tuần DST lệch EU/US không gộp nhầm; tick count ghi feed-local, không gọi volume toàn thị trường."
+    },
+    {
+      "id": "FX-145",
+      "title": "XAU Market Structure Engine",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/price_action.py` — `candle_evidence`; có pivot 2-right-bar, chưa có stream feature event",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Pivot tại i chỉ available sau nến i+2 đóng; sửa dữ liệu sau thời điểm đó tạo correction/revision; append các nến tương lai không thay quyết định được lưu trước confirmation."
+    },
+    {
+      "id": "FX-146",
+      "title": "XAU Sideway Detector",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent detector ATR/ADX/slope có lifecycle; `agent/src/trading/forex/price_action.py` — `candle_evidence` chỉ `mixed_or_range` heuristic",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Rule khóa width/ATR, slope, ADX và số retest trong train; fixture đi ngang rồi breakout phải chuyển invalidated tại bar xác nhận; warmup thiếu trả unknown, không tự range."
+    },
+    {
+      "id": "FX-147",
+      "title": "XAU Trend Regime Detector",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/analysis_context.py` — `summarize_frame` có SMA alignment; absent hysteresis/dwell detector",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex causal ATR-normalized SMA regime replay"
+      ],
+      "remaining_acceptance": "Khóa thresholds vào/ra và min dwell; fixture quanh threshold không đổi regime mỗi bar; state tái tạo sau replay/restart bằng cùng feature/config hash; alignment không tự biến thành dự báo."
+    },
+    {
+      "id": "FX-148",
+      "title": "XAU Breakout Validator",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/price_action.py` — `candle_evidence` loại nến trigger khỏi prior range; thiếu tradeable filter tích hợp",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "High wick vượt range nhưng close nằm trong range không phát breakout; close vượt buffer causal mới là candidate; quote/spread stale chặn entry; prior range không chứa trigger."
+    },
+    {
+      "id": "FX-149",
+      "title": "XAU Pullback Entry Research",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent strategy thực thi; dùng `agent/src/trading/forex/price_action.py` — `candle_evidence` và registry hiện hữu làm seam",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Manifest định nghĩa trend trước pullback, vùng hồi, trigger, expiry và structural stop; một tập fixture dán nhãn trước replay phải cho cùng trigger/rejection; không chọn pivot chưa confirmed."
+    },
+    {
+      "id": "FX-150",
+      "title": "XAU Mean Reversion Research",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent range-reversion strategy; `agent/src/strategy_store/models.py` — `Artifact` làm seam đăng ký",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Khóa distance/band/range invalidation/time stop; fixture breakout có xác nhận phải ngừng fade và không tự DCA; OOS giữ nguyên rule, costs và các lần thất bại."
+    },
+    {
+      "id": "FX-151",
+      "title": "XAU Volatility Expansion Research",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent expansion strategy; `agent/src/trading/forex/analysis_context.py` — `summarize_frame` có ATR",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Percentile/width dùng lookback trước trigger; một shock có spread quá cap hoặc calendar thiếu bị reject theo policy; edge báo cả chi phí stressed, không lấy mid-only move thành profit."
+    },
+    {
+      "id": "FX-152",
+      "title": "XAU Price Action Rule Compiler",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/price_action.py` — `candle_evidence` có rule hardcoded; absent typed rule compiler",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Chỉ cho tập operator/field được duyệt, không eval code model; rule revision/hash tái tạo detector; OHLC sai/NaN/unknown operator bị reject; formation time tách confirmation time."
+    },
+    {
+      "id": "FX-153",
+      "title": "XAU Session Breakout Strategy",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent session strategy; tái sử dụng `agent/src/trading/forex/runner.py` — `completed_bars` sau calendar gap policy",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Khóa range build/end/release theo timezone; lệnh không xuất trước range đóng; Sunday/holiday/DST fixture xử lý rõ; period ngoài phiên không được tạo bar phẳng giả."
+    },
+    {
+      "id": "FX-154",
+      "title": "XAU Moving Average Strategies",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/runner.py` — `crossover`, `Runners.tick` có SMA; master đề cập EMA/OOS chưa được nối",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex past-only walk-forward research",
+        "Forex EMA research variant and web lab"
+      ],
+      "remaining_acceptance": "Baseline SMA có fast/slow revision, nến đóng và dedup; EMA phải là artifact riêng; tất cả parameter chỉ chọn từ train, output OOS chứa trial registry và broker costs, không dùng window analysis như retraining."
+    },
+    {
+      "id": "FX-155",
+      "title": "XAU ATR Stop Research",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/analysis_context.py` — `summarize_frame`; `agent/src/trading/forex/adapters/mt5_worker.py` — `prepare`; chưa nối ATR sizing",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "ATR at decision time quyết định distance theo revision; stop được chuẩn tick rồi revalue loss và broker stop-level; rounding làm vượt budget phải reduce quantity hoặc NO TRADE, không dời stop tùy ý."
+    },
+    {
+      "id": "FX-156",
+      "title": "XAU R Multiple and TP Study",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent net-R analytics xuyên fills/fees; `agent/src/trading/forex/runner.py` — `reward_ratio` chỉ dựng TP",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Frozen initial risk denominator lưu tại entry; net PnL gồm commissions/swap/slip; partial exits cộng đúng cashflow; zero/unknown risk trả undefined, không báo R vô hạn hoặc gross R như realized."
+    },
+    {
+      "id": "FX-157",
+      "title": "XAU Multi-Timeframe Consensus",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/analysis_context.py` — `research_context`, `summarize_frame`; chưa có historical availability join",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "M5 quyết định 10:35 UTC chỉ join H1 cuối cùng đã đóng/available; fixture H1 10:00–11:00 không rò close11:00; input hash lưu từng frame, thiếu khung trả partial/WAIT theo policy."
+    },
+    {
+      "id": "FX-158",
+      "title": "XAU Tick Replay Simulator",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent recorder/tick engine trong Forex; `agent/backtest/engines/forex.py` — `ForexEngine` là bar engine",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cùng tick log/spec/code/seed tạo cùng signal/order/fill/rejection hash; handle same-ms nhiều tick theo ingest order đã lưu; simulated fill luôn gắn giả định latency/liquidity, không gọi broker execution thật."
+    },
+    {
+      "id": "FX-159",
+      "title": "XAU Intrabar Ambiguity Policy",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "absent Forex acceptance contract SL/TP ambiguity; seam `agent/backtest/engines/forex.py` — `ForexEngine`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Bar O=2400,H=2415,L=2385,C=2405 với SL2390/TP2410 phải đánh ambiguous; thiếu tick chọn policy bảo thủ đã khóa hoặc báo bounds; cấm tự chọn TP trước để tăng win rate."
+    },
+    {
+      "id": "FX-160",
+      "title": "XAU Strategy Experiment Registry",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/strategy_store/models.py` — `Artifact`, `BenchResult`; chưa bắt buộc toàn bộ trial/split/spec manifests",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex past-only walk-forward research",
+        "Forex persistent experiment registry",
+        "Forex EMA research variant and web lab",
+        "Forex frozen OOS cost stress",
+        "Forex within-fold frozen OOS trade-path bootstrap"
+      ],
+      "remaining_acceptance": "Một trial thất bại vẫn có artifact/input/config/result status; đổi rule/data/cost tạo revision/lineage; reviewer truy từ best result về mọi attempt trong budget, không chỉ giữ winner."
+    },
+    {
+      "id": "FX-161",
+      "title": "XAU Walk-Forward Evaluator",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/backtest/validation.py` — `walk_forward_analysis` chỉ chia equity thành windows; `agent/src/quantlib/crossvalidation.py` — `purged_walk_forward_splits` là primitive",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex past-only walk-forward research",
+        "Forex EMA research variant and web lab",
+        "Forex frozen OOS cost stress",
+        "Forex within-fold frozen OOS trade-path bootstrap"
+      ],
+      "remaining_acceptance": "Với ít nhất hai folds fixture, refit chỉ thấy train; test và purge/embargo tính theo label horizon; lưu fitted params/fold boundaries; đổi test labels không đổi params train; concatenated OOS không chứa train PnL."
+    },
+    {
+      "id": "FX-162",
+      "title": "XAU Monte Carlo Trade Paths",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/backtest/validation.py` — `monte_carlo_test` hoán vị PnL; absent dependent block-resampling pipeline cho Forex",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex within-fold frozen OOS trade-path bootstrap"
+      ],
+      "remaining_acceptance": "Report nêu permutation hay bootstrap, block length/seed/n; cùng seed tái tạo bands; chuỗi losses clustered được giữ trong block; không diễn giải hoán vị tập trade cố định thành probability of future profitability."
+    },
+    {
+      "id": "FX-163",
+      "title": "XAU Cost Stress Tester",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/backtest/engines/forex.py` — `spread_pips_override`, `slippage_pips`, `on_bar`; thiếu broker-calibrated sweep manifest",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex frozen OOS cost stress"
+      ],
+      "remaining_acceptance": "Chạy cùng signals với base/2x/3x spread và explicit commission/gap fixtures; report break-even cost và net expectancy, kể cả negative; multiplier không được giảm spread hoặc double-charge bid/ask đã có."
+    },
+    {
+      "id": "FX-164",
+      "title": "XAU Paper Trading Driver",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent Forex paper driver; `agent/src/tools/paper_trade/schema.py` — `MARKETS` chỉ cn_a/hk/us; không sửa tên market để lách schema",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Driver mới phải định nghĩa lots/spec/mark-to-market/margin/swap, append immutable simulated fills và ledger; bid/ask roundtrip flat price có loss bằng costs; profile MT5 `paper` ghi broker Demo, không trộn internal paper."
+    },
+    {
+      "id": "FX-165",
+      "title": "XAU Order Sizing Service",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `prepare`, `usd_notional`; hiện validate quantity caller, chưa tìm quantity từ budget",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Ví dụ synthetic ở Lab cho 0.04 lot từ budget 50 USD/cost 1,057 USD per lot; minimum 0.01 vượt budget thì NO TRADE; đúng grid `(q-min)%step=0`; sau rounding gọi valuation/margin lại, giữ account currency."
+    },
+    {
+      "id": "FX-166",
+      "title": "XAU Pre-Trade Risk Gate",
+      "priority": "P0",
+      "baseline_status": "source-existing",
+      "seam": "`agent/src/trading/forex/risk.py` — `check`; `agent/src/trading/forex/policy.py` — `authorize`; worker recheck trước send",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex raw provider boundary"
+      ],
+      "remaining_acceptance": "Bất kỳ stale quote, account khác USD, invalid SL/tick/lot, thiếu exposure/margin, halt hoặc mandate sai đều khiến fake `order_send=0`; confidence model cao không nới cap; ACK không được coi fill."
+    },
+    {
+      "id": "FX-167",
+      "title": "XAU Daily Drawdown Halt",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/policy.py` — `authorize`, `equity_peaks`; peak hiện chỉ quan sát khi authorize, không daily cashflow-aware monitor",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Chốt timezone/day boundary, deposit/withdraw adjustment, equity và realized basis; latch bền qua restart và không tự reset sau process launch; loss vượt threshold ngay giữa hai signal được phát hiện bởi monitor đề xuất."
+    },
+    {
+      "id": "FX-168",
+      "title": "XAU Basket Hedge Risk",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `account` tính gross USD; thiếu basket stress/swap allocation",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Long1 và short1 lot có net0 nhưng gross2; report margin/financing/SL gap theo ticket/account mode; một leg không định giá được khiến gross unavailable và block entry, không bỏ qua leg."
+    },
+    {
+      "id": "FX-169",
+      "title": "XAU DCA Grid Path Stress",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent grid stress harness nối margin/native specs; `agent/backtest/engines/forex.py` — `ForexEngine` chỉ primitive",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Với levels/lot escalation khóa trước, replay đơn hướng nhiều ATR + gap + spread spike; báo max lots, margin-call/stop-out point và max loss; không gán budget hữu hạn cho grid không chặn số cấp."
+    },
+    {
+      "id": "FX-170",
+      "title": "XAU Trailing Stop State Machine",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent modify action trong `agent/src/trading/forex/models.py` — `Order` chỉ open/close",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Đề xuất riêng action/schema có ownership/ticket/SL revision; long SL chỉ tăng, short chỉ giảm; duplicate modify không gửi lại; freeze/stops/requote thất bại giữ last confirmed SL, không ghi desired như broker-confirmed."
+    },
+    {
+      "id": "FX-171",
+      "title": "XAU Breakeven Trigger Validator",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent SL modification trong Forex; `agent/src/trading/forex/adapters/mt5_worker.py` — `prepare_close` không sửa SL",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Trigger dựa net excursion sau spread/commission/swap với cost snapshot; price=entry nhưng phí âm không gắn break-even; stale conversion/min-stop/freeze không cho update; không hứa guaranteed zero-loss khi gap."
+    },
+    {
+      "id": "FX-172",
+      "title": "XAU Order Intent Reconciliation",
+      "priority": "P0",
+      "baseline_status": "source-existing",
+      "seam": "`agent/src/trading/forex/store.py` — `create_intent`, `claim`, `active`; `agent/src/trading/forex/service.py` — `submit`, `execution`; `Native.reconcile`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai submit cùng intent chỉ một send; crash sau claim/send giữ active barrier; unknown không tạo key mới; không/đa history match vẫn unknown; operator reconcile xong còn cần clear halt đúng scope và start riêng."
+    },
+    {
+      "id": "FX-173",
+      "title": "XAU Broker Disconnect Gate",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/service.py` — `submit` unknown trips halt; `runner.py` — `_loop`; absent continuous reconnect readiness machine",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Ngắt feed khi có exposure không tự gắn closed; SAFE_HALT là trạng thái đề xuất, current unknown giữ barrier; reconnect cần identity + orders/positions/history reconciliation + fresh feed trước operator resume."
+    },
+    {
+      "id": "FX-174",
+      "title": "XAU News Shock Circuit",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent calendar/volatility shock hard gate; `agent/src/trading/forex/risk.py` — `check` chỉ cap spread/freshness",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Replay shock spread/vol hoặc calendar-high-impact phải block entry bằng code dù news agent lỗi; unverified headline không tạo BUY; circuit cooldown/release cần policy và fresh data, không chỉ hết timer."
+    },
+    {
+      "id": "FX-175",
+      "title": "XAU Multi-Strategy Conflict Solver",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent portfolio allocator; `agent/src/trading/forex/runner.py` — `start` hiện một task/connection, SMA đợi toàn account flat",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai revision gửi opposite intent cùng bar phải resolve deterministically theo policy đã khóa, caps tính atomic; không đổi side để churn; không gọi một runner slot là multi-strategy scheduling."
+    },
+    {
+      "id": "FX-176",
+      "title": "XAU Slippage Attribution",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `submit` có filled price/quantity; thiếu signal/arrival/deal timeline join",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Lưu signal decision/arrival quote/submit/fill time và side; buy fill cao hơn benchmark cho adverse cost dương, sell thấp hơn cũng dương; partial dùng VWAP fills, missing benchmark giữ unavailable, không 0."
+    },
+    {
+      "id": "FX-177",
+      "title": "XAU Trade Journal Forensics",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/store.py` — `events`, `executions`; `agent/src/trading/forex/audit.py` — `record_outcome`; chưa deal/exit forensic join",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Từ realized trade truy được intent/revision/input hash/fills/fees/session/regime; group report có denominator/sample size và unknown exit; không lấy intent filled entry làm closed winning trade."
+    },
+    {
+      "id": "FX-178",
+      "title": "XAU Strategy Drift Monitor",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent Forex sequential drift service; `agent/src/strategy_store/models.py` — `DecaySignal`, `DecaySnapshot` làm seam",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Khóa reference window, min n, thresholds và multiple-look policy; false alarm đo bằng stable fixture; drift tạo review/halt theo policy, không tự tune rồi ghi đè OOS/baseline."
+    },
+    {
+      "id": "FX-179",
+      "title": "XAU Auto Kill Switch Testing",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/service.py` — `submit`; `policy.py` — `authorize`; `adapters/mt5_worker.py` — `submit` recheck; chưa hardware race acceptance",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Barrier fixture bật halt trước worker authorize phải send 0; halt giữa authorize và SDK send phải có policy admission rõ, current code chưa atomic; nếu send đã bắt đầu thì drain receipt; halt hiện chặn cả close qua app, không flatten."
+    },
+    {
+      "id": "FX-180",
+      "title": "XAU MT5 Windows Service Packaging",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent Windows service acceptance; `agent/src/trading/forex/adapters/mt5.py` — `MT5.call` subprocess và `runner.py` — `status` không auto-resume",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Test đúng Windows user/session/vault/terminal build; restart không tự bật execution/runner; shutdown drain hoặc persist unknown; service account không nhìn terminal desktop phải báo unavailable, không auto-login sang tài khoản khác."
+    },
+    {
+      "id": "FX-181",
+      "title": "XAU M1 Scalping Capacity",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent M1 runner/capacity study; `agent/src/trading/forex/models.py` — `Strategy` chỉ 5m/15m/1h/4h; chart có1m",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Chỉ nghiên cứu M1 sau recorder/slip dataset; báo latency p50/p95/p99 và capacity theo size/session trên holdout; chart M1/poll3s không được chứng nhận low-latency engine; thiếu fill sample ghi insufficient."
+    },
+    {
+      "id": "FX-182",
+      "title": "XAU M5 Swing Timing",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/models.py` — `Strategy` có5m; `analysis_context.py` — `research_context`; chưa M5-H1 strategy artifact",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Dùng fixture M5/H1 as-of, H1 forming không quyết định bias; freeze stop/expiry/spread rule; OOS cùng input timeline cho cùng entry, không lấy context hiện tại để tái dựng bias quá khứ."
+    },
+    {
+      "id": "FX-183",
+      "title": "XAU Exit Reason Taxonomy",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent taxonomy deal-level Forex; `agent/src/trading/forex/store.py` — `events` chỉ lifecycle event",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Exit reason từ broker deal/history và local action có precedence; TP/SL/manual/risk-close/stop-out/unknown tách biệt; halt không đóng lệnh thì không ghi risk_exit; partial exits giữ quantity và cashflow riêng."
+    },
+    {
+      "id": "FX-184",
+      "title": "XAU Risk-of-Ruin Scenario",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent Forex ruin definition/horizon; `agent/backtest/validation.py` — `monte_carlo_test` không model dynamic margin/cost",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Khóa ruin threshold/horizon/account model và stress assumptions; báo counts, interval, n và zero-observed-event bound thay vì risk0; include serial-loss blocks + gap + costs, không suy từ win rate độc lập."
+    },
+    {
+      "id": "FX-185",
+      "title": "XAU Margin Stop-Out Simulator",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "absent native stop-out engine; `agent/src/trading/forex/adapters/mt5_worker.py` — `prepare` chỉ margin estimate trước order",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Snapshot account margin/stop-out mode/threshold/currency; synthetic price path trigger đúng threshold fixture, broker liquidation-order unknown ghi scenario bounds; equity còn dương vẫn có thể stop-out khi margin level thấp."
+    },
+    {
+      "id": "FX-186",
+      "title": "XAU Weekend Gap Policy",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/runner.py` — `completed_bars` chặn gap; `agent/backtest/engines/forex.py` — `can_execute` luônTrue, chưa lịch broker",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture Friday close/Sunday reopen chỉ trade trong broker session; gap qua SL xử lý first quote; current runner đợi lookback liên tục, không giả đã có calendar-aware warmup; policy hold/exit cần khả năng close thực tế."
+    },
+    {
+      "id": "FX-187",
+      "title": "XAU Broker Trade Context Guard",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `prepare`, `submit`; `agent/src/trading/connectors/mt5/orders.py` — `_filling_mode` fallback RETURN, còn dựa broker `order_check`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Unsupported filling/execution mode fail closed trước send; bổ sung fixture mask rỗng và execution-mode hạn chế RETURN; SL sai min/tick bị reject; không retry type khác; pending của connector cũ không mở rộng `Order` Forex."
+    },
+    {
+      "id": "FX-188",
+      "title": "XAU Alert De-duplication",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent Forex recipient delivery ledger; `agent/src/trading/forex/runner.py` — `Runners.tick` có signal request-key dedup, không phải notification",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Poll cùng candle 1.000 lần chỉ một alert cho recipient/channel/strategy/state transition; crash sau delivery phải có receipt-aware recovery; stale/recovered là thay đổi trạng thái, không spam mỗi poll; chưa tích hợp kênh thì không claim đã gửi."
+    },
+    {
+      "id": "FX-189",
+      "title": "XAU Signal Explainability",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/price_action.py` — `candle_evidence`; `runner.py` — `crossover`; chưa lưu đủ rule trace mỗi signal",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Signal lưu values, thresholds, known-at, code/config/input hash và rejected gates; render explanation từ trace; LLM paraphrase không sửa số hoặc phát minh điều kiện; replay cùng hash giải thích cùng rule result."
+    },
+    {
+      "id": "FX-190",
+      "title": "XAU Strategy Canary Rollout",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "absent promotion/canary workflow; `agent/src/strategy_store/models.py` — `ValidationStatus`; `agent/src/trading/forex/policy.py` — `authorize` giữ mandate riêng",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Thiếu OOS/paper/Demo/operator sign-off chặn stage promotion; cap canary nhỏ vẫn phải hợp min lot/risk, không tự nâng cap; rollback dừng entry, giữ journal/exposure và có broker close procedure."
+    },
+    {
+      "id": "FX-191",
+      "title": "XAU Data Freshness Watchdog",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/risk.py` — `check` giới hạn age; `runner.py` — `completed_bars`; absent background SLO watchdog",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Forex raw provider boundary"
+      ],
+      "remaining_acceptance": "Với max_age10s fixture, age10.001s hoặc future>2s bị block; receive/computed timestamp không refresh quote cũ; SLO theo feed/strategy revision, monitor gap không cần đợi LLM hoặc signal mới."
+    },
+    {
+      "id": "FX-192",
+      "title": "XAU Broker Fill Policy Test",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "`agent/src/trading/forex/adapters/mt5_worker.py` — `submit`, `reconcile`; `agent/tests/test_forex_mt5.py` fake retcodes; chưa Demo fill acceptance",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture10009/10010/10008/10012/10031 phân biệt filled/partial/working/unknown; partial exposure phải hiện trong account và chưa-owned-close được nêu rõ; broker Demo test phải operator approve riêng, MT5 Demo không gọi testnet."
+    },
+    {
+      "id": "FX-193",
+      "title": "XAU Portfolio Exposure Correlator",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "absent factor mapper xuyên desks; `agent/src/trading/forex/adapters/mt5_worker.py` — `account`, `usd_notional` chỉ grossUSD",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai account/desk cùng USD/rates risk được aggregate bằng as-of aligned positions và factor revision; correlation/beta có lookback/n/stress, không net trừ XAU risk chỉ vì hedge FX có dấu ngược; thiếu factor mapping giữ unknown."
+    },
+    {
+      "id": "CRYPTO-194",
+      "title": "Crypto Venue Instrument Master",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) `_parse_ccxt_symbol`; thiếu registry contract có hiệu lực thời gian",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture BTC-USDT spot, BTC-USDT-PERP, BTC-USDC-PERP và inverse sinh identity khác; hai loại sau bị từ chối nếu chưa hỗ trợ; không đổi collateral để chạy tiếp."
+    },
+    {
+      "id": "CRYPTO-195",
+      "title": "Crypto Exchange Connectivity",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) `DataLoader._get_exchange`, `_fetch_one`; thiếu health feed liên tục",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Timeout/429 trong fixture kết thúc trong budget, trả source+range+reason; không phát quote có nhãn live sau stale deadline; fallback khác sản phẩm bị chặn."
+    },
+    {
+      "id": "CRYPTO-196",
+      "title": "Crypto WebSocket Lifecycle",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "[orderbook_depth_tool.py](../../agent/src/tools/orderbook_depth_tool.py) `_fetch_raw_book` chỉ REST; chưa có lifecycle L2 crypto",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Disconnect sau delta 104 → trạng thái REBUILDING; socket mới phải có subscription ack và snapshot/cursor hợp lệ; delta socket cũ bị loại bằng session generation."
+    },
+    {
+      "id": "CRYPTO-197",
+      "title": "Crypto Order Book Snapshot Delta",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "[orderbook_depth_tool.py](../../agent/src/tools/orderbook_depth_tool.py) `OrderBookDepthTool.execute`; chưa có delta reducer",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto offline snapshot-delta replay"
+      ],
+      "remaining_acceptance": "Binance snapshot 100, delta 101–103 rồi 105–106 phải invalidate vì thiếu 104; OKX nhận prev/seq heartbeat và reset đúng policy; không bắt checksum 0 đã deprecated thành CRC hợp lệ."
+    },
+    {
+      "id": "CRYPTO-198",
+      "title": "Crypto Market Trades Normalizer",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có trade-tape adapter lưu aggressor semantics và replay cursor",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Binance buyer-is-maker=true được chuẩn hóa aggressor sell theo contract đã chọn; side không biết giữ UNKNOWN; cùng trade ID phát hai lần không tăng volume."
+    },
+    {
+      "id": "CRYPTO-199",
+      "title": "Crypto Candle Integrity Audit",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) `DataLoader._fetch_one`; chưa có audit đóng nến đầy đủ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Bộ bar có duplicate, thiếu interval và nến chưa đóng tạo ba flags riêng; volume=0 hợp lệ không tự thành outage; nến chưa đóng không vào backtest bar-close."
+    },
+    {
+      "id": "CRYPTO-200",
+      "title": "Crypto Funding Rate Ingestor",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) `_fetch_funding_history`, `_fetch_perpetual`; lịch cố định/intersection còn giới hạn",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto funding fidelity and accounting identity",
+        "Crypto public derivatives research",
+        "Crypto append-only local observation archive"
+      ],
+      "remaining_acceptance": "Ba settlement 00/08/16 trong một daily bar được giữ đủ ba cash events hoặc interval bị từ chối; thay cadence sang 4h không mất event; forecast không được ghi realized."
+    },
+    {
+      "id": "CRYPTO-201",
+      "title": "Crypto Open Interest History",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có OI archive chuyên biệt với unit và availability",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto public derivatives research",
+        "Crypto append-only local observation archive"
+      ],
+      "remaining_acceptance": "1.000 contracts × 0,001 BTC ở 50.000 USDT thành 50.000 USDT notional; missing contract size bị chặn; request ngoài actual coverage không forward-fill giả thành lịch sử."
+    },
+    {
+      "id": "CRYPTO-202",
+      "title": "Crypto Basis Curve Engine",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có adapter curve spot/dated futures đồng bộ expiry",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto supplied dated-futures gross basis curve"
+      ],
+      "remaining_acceptance": "Spot 100, futures 102, còn 30 ngày cho simple gross basis 24,3333%/năm theo ACT/365; loại perpetual/expiry≤as_of và quote lệch quá budget trước annualize."
+    },
+    {
+      "id": "CRYPTO-203",
+      "title": "Crypto Mark Index Protection",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) `execution_open`, `valuation_open`; [ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) `_fetch_perpetual`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fixture execution=50.100, mark=49.900 dùng execution cho fill và mark cho margin; thiếu mark không lấy last thay; chưa có index thì nêu capability gap."
+    },
+    {
+      "id": "CRYPTO-204",
+      "title": "Crypto Leverage Tier Resolver",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[perpetual_risk.py](../../agent/backtest/perpetual_risk.py) `maintenance_margin`; [ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) `_validate_bracket_artifact`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Test ngay dưới/đúng/trên cap chọn đúng tier, deduct cumulative amount; hash sai hoặc artifact sai symbol bị chặn; account/effective-range không rõ không gắn historical parity."
+    },
+    {
+      "id": "CRYPTO-205",
+      "title": "Crypto Liquidation Risk Model",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[perpetual_risk.py](../../agent/backtest/perpetual_risk.py) `evaluate_isolated`, `CrossMarginRiskModel.evaluate`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mark shock làm margin dưới maintenance phát liquidation target, fee và terminal state đúng fixture; báo bar-sequence ambiguity, không gọi estimated liquidation price là giá sàn chắc chắn."
+    },
+    {
+      "id": "CRYPTO-206",
+      "title": "Crypto Liquidation Heatmap Review",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "[crypto_trading_desk.yaml](../../agent/src/swarm/presets/crypto_trading_desk.yaml) là nhiệm vụ; chưa có heatmap provider có schema",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Provider thiếu methodology/coverage → không xuất cluster notional; model grid tổng hợp phải gắn estimated và phân biệt observed liquidations; stale map không tạo trigger thực thi."
+    },
+    {
+      "id": "CRYPTO-207",
+      "title": "Crypto Spot Market Depth",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[orderbook_depth_tool.py](../../agent/src/tools/orderbook_depth_tool.py) `_walk_book`, `OrderBookDepthTool.execute`; chưa có latency model",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Ask 100×1 và 101×1, yêu cầu mua 3 base → filled=2, quote=201, unfilled=1; không ngoại suy phần thiếu; timestamp client không được đổi thành exchange."
+    },
+    {
+      "id": "CRYPTO-208",
+      "title": "Crypto Cross Venue Arbitrage",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có bộ tính hai venue gắn transfer/capital availability",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Spread gross 0,4% nhưng phí hai chân 0,3% và transfer/impact 0,2% → net âm; withdrawal paused hoặc vốn chưa pre-positioned → NOT_EXECUTABLE, không chỉ báo lãi."
+    },
+    {
+      "id": "CRYPTO-209",
+      "title": "Crypto Stablecoin Peg Monitor",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có multi-venue peg feed và collateral haircut policy",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "10.000 stablecoin ở 0,97 USD chỉ ghi 9.700 USD theo price policy; thiếu redemption entitlement không định giá 1:1; lưu skew/stale từng venue."
+    },
+    {
+      "id": "CRYPTO-210",
+      "title": "Crypto Exchange Reserve Risk",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có nguồn proof-of-reserves/liabilities intake",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Chỉ có asset attestation thì liabilities=UNKNOWN, không phát solvency score xác nhận; lưu as_of, phạm vi pháp nhân, excluded assets và nguồn báo cáo."
+    },
+    {
+      "id": "CRYPTO-211",
+      "title": "Crypto Onchain Chain Registry",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có chain/asset registry theo block; [crypto_research_lab.yaml](../../agent/src/swarm/presets/crypto_research_lab.yaml) chỉ định nhiệm vụ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cùng ticker trên hai chain hoặc native/wrapped tạo khóa khác; RPC chain ID sai bị quarantine; decimals thiếu không mặc định 18."
+    },
+    {
+      "id": "CRYPTO-212",
+      "title": "Crypto Chain Reorg Handler",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có persistent canonical/orphaned block graph và rewind",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Nhánh A101/A102 bị thay B101/B102 → event A bị orphaned, balance/flow tính lại; chạy replay hai lần không nhân đôi; fork vượt bound dừng ingest thay vì xóa hết."
+    },
+    {
+      "id": "CRYPTO-213",
+      "title": "Crypto Token Transfer Parser",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có log decoder gắn ABI/decimals theo block",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "raw 1.234.567, decimals=6 → 1,234567 token; metadata thiếu → UNKNOWN_UNIT; zero transfer là event hợp lệ; fee/rebase token không được suy balance chỉ bằng cộng Transfer."
+    },
+    {
+      "id": "CRYPTO-214",
+      "title": "Crypto Address Label Confidence",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có versioned label store với known_at/evidence",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Nhãn ví được biết ngày 10 không vào backtest ngày 5; hai nguồn mâu thuẫn giữ cả confidence; không biến wallet label thành danh tính pháp lý đã xác minh."
+    },
+    {
+      "id": "CRYPTO-215",
+      "title": "Crypto Exchange Inflow Outflow",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có entity-adjusted flow reducer",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Chuyển 100 token giữa hai ví cùng exchange entity → internal=100, external inflow/outflow=0; ví chưa có nhãn giữ unclassified; deposit không bị gọi là sell."
+    },
+    {
+      "id": "CRYPTO-216",
+      "title": "Crypto Whale Behavior Monitor",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có wallet-entity graph và concentration window",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai ví cùng custodian không thành hai whale độc lập; concentration báo cả raw-wallet và adjusted-entity cùng coverage; threshold/token unit lưu trong manifest."
+    },
+    {
+      "id": "CRYPTO-217",
+      "title": "Crypto Stablecoin Liquidity Flow",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có mint/burn/treasury-flow adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mint 1 triệu vào treasury chưa phân phối → issued thay đổi nhưng exchange demand=UNKNOWN; bridge lock/mint một underlying không tăng net global liquidity hai lần."
+    },
+    {
+      "id": "CRYPTO-218",
+      "title": "Crypto TVL Methodology",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có TVL adapter/methodology version; preset không thay dữ liệu",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "100 underlying + receipt đại diện cùng 100 không báo TVL 200 trong scope loại trùng; price-only shock tách khỏi net deposits; giữ raw/adjusted và toggles."
+    },
+    {
+      "id": "CRYPTO-219",
+      "title": "Crypto Protocol Revenue Model",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có fees/revenue/holder distribution ledger",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fees 100, LP share 70, protocol share 30, holders 5 → không cộng revenue thành 105 hay coi fees=holder income; period/currency và source split tái tính được."
+    },
+    {
+      "id": "CRYPTO-220",
+      "title": "Crypto Token Unlock Scheduler",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có release schedule versioned và circulation reconciliation",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cliff 10 triệu tokens tạo scheduled/unlocked/released/circulating bốn trạng thái; đổi disclosure giữ bản cũ; lịch đến hạn chưa có event không gắn sold."
+    },
+    {
+      "id": "CRYPTO-221",
+      "title": "Crypto Vesting Contract Watch",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có watcher ABI/proxy/beneficiary và block-state",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Contract vesting đã chạy 50%, nạp thêm 20 → tính releasable theo code contract thật; release log đối chiếu state, owner transfer/upgrade phát review, không xem lịch PDF là transaction."
+    },
+    {
+      "id": "CRYPTO-222",
+      "title": "Crypto Token Holder Concentration",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có holder snapshot theo block và entity attribution",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Top-10 có omnibus exchange/bridge giữ nhãn và exposure riêng; numerator/denominator cùng supply definition; unknown owners không tự phân bổ cho retail."
+    },
+    {
+      "id": "CRYPTO-223",
+      "title": "Crypto Smart Contract Risk Intake",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có audit-report/code-hash risk intake chuyên biệt",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Audit code hash A không xác nhận proxy implementation B; unresolved critical finding và privileged role xuất hiện trong memo; audit cũ không thành safety guarantee."
+    },
+    {
+      "id": "CRYPTO-224",
+      "title": "Crypto Oracle Risk",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có dependency map oracle/heartbeat/deviation",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Oracle vượt heartbeat hoặc L2 sequencer downtime → STALE/UNAVAILABLE theo policy; fallback DEX cùng dependency không được tính nguồn độc lập; lưu stale threshold."
+    },
+    {
+      "id": "CRYPTO-225",
+      "title": "Crypto Bridge Risk",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có bridge trust-model, canonical mapping và withdrawal delay",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Bridge token 1:1 vẫn có bridge/custody risk riêng; signer threshold, pause/admin và recovery delay thiếu thì UNKNOWN; halted bridge chặn giả thuyết cần chuyển chain."
+    },
+    {
+      "id": "CRYPTO-226",
+      "title": "Crypto Governance Capture",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có delegation/voting-power/timelock graph",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "100 địa chỉ delegate về 1 thực thể không được báo phân quyền 100 voters; quyền emergency admin được ghi ngoài voting; snapshot block khóa denominator."
+    },
+    {
+      "id": "CRYPTO-227",
+      "title": "Crypto Exchange API Permissions",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[profiles.py](../../agent/src/trading/connectors/binance/profiles.py) `BINANCE_PROFILES`; [usdm.py](../../agent/src/trading/connectors/binance/usdm.py) `assert_exchange_endpoints`; chưa chứng minh key scope inspection đầy đủ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Spy client USD-M chỉ nhận account v2 và positionRisk v3; research không nhận write/withdraw call; key permission không đọc được → UNKNOWN, không tự công bố read-only credential."
+    },
+    {
+      "id": "CRYPTO-228",
+      "title": "Crypto Order Precision Rules",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) `round_size` chỉ 6 decimals; chưa có filter-aware quantizer thống nhất",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "tick=0,05, step=0,003 và min notional fixture phải quantize rồi kiểm lại; round-size hợp 6 decimals nhưng lệch step bị từ chối; không retry cùng sai filter vô hạn."
+    },
+    {
+      "id": "CRYPTO-229",
+      "title": "Crypto Order Type Compatibility",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[sdk.py](../../agent/src/trading/connectors/binance/sdk.py) `place_order`, `_reject_unsupported_usdm_surface`; chưa có perp order adapter",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "USD-M submit qua surface read-only bị chặn trước network; unsupported reduce-only/hedge-mode không bị bỏ flag; không downgrade limit/post-only thành market."
+    },
+    {
+      "id": "CRYPTO-230",
+      "title": "Crypto Cross Margin Accounting",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[perpetual_risk.py](../../agent/backtest/perpetual_risk.py) `CrossMarginRiskModel.evaluate`, `AccountState`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai positions share wallet, PnL và initial/maintenance tổng được cộng một lần; isolate credit không cấp sang cross; mixed collateral/haircut chưa hỗ trợ bị từ chối."
+    },
+    {
+      "id": "CRYPTO-231",
+      "title": "Crypto Isolated Margin Accounting",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[perpetual_risk.py](../../agent/backtest/perpetual_risk.py) `evaluate_isolated`; [crypto.py](../../agent/backtest/engines/crypto.py) `_isolated_margins`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Position margin 100, wallet dư 900 không tự cứu position; funding debit/fee làm buffer giảm đúng fixture; top-up chỉ có hiệu lực sau recorded event."
+    },
+    {
+      "id": "CRYPTO-232",
+      "title": "Crypto Funding PnL Ledger",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) `_apply_data_funding`, `_record_event`; dedup hiện trong RAM",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto funding fidelity and accounting identity"
+      ],
+      "remaining_acceptance": "Long 0,1 BTC × mark 50.000 × rate 0,0001 → cash -0,5 USDT; short đảo dấu; duplicate/restart không post lại; spot không nhận funding event."
+    },
+    {
+      "id": "CRYPTO-233",
+      "title": "Crypto Futures Contract Multiplier",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) dùng size×price; chưa có coin-margined/inverse contract model",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Linear 100×0,001 BTC, giá +1.000 → +100 quote; inverse USD face phải dùng reciprocal-price formula và settle coin; Decimal ở boundary không nhận float mất precision."
+    },
+    {
+      "id": "CRYPTO-234",
+      "title": "Crypto Portfolio Delta Exposure",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "[perpetual_risk.py](../../agent/backtest/perpetual_risk.py) `PositionRisk` có notional; chưa có multi-product delta/FX rollup",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "+1 BTC spot, -1 BTC linear perp cho delta base≈0 nhưng gross exposure=2 BTC và basis/collateral risk còn; USDC/USD conversion stale làm summary incomplete."
+    },
+    {
+      "id": "CRYPTO-235",
+      "title": "Crypto Liquidation Cascade Research",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có cascade model được hiệu chỉnh; preset heatmap chỉ hypothesis",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Synthetic depth giảm 90% cùng mark gap phải tăng impact/shortfall; output ghi scenario, không future liquidation fact; thiếu OI/depth không sinh cluster số."
+    },
+    {
+      "id": "CRYPTO-236",
+      "title": "Crypto Market Making Research",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có historical L2 queue/cancel simulator",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Chạm limit price không tự fill nếu chưa đủ trade volume trước queue; maker rebate không áp taker fill; latency/cancel-race làm inventory và fee ledger tái tính được."
+    },
+    {
+      "id": "CRYPTO-237",
+      "title": "Crypto Momentum Factor Lab",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[runner.py](../../agent/backtest/runner.py) `fetch_data_map`; factor/backtest seam có sẵn, thiếu crypto PIT universe",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Đồng coin delisted nằm trong universe trước ngày delist; turnover/fees làm gross/net khác; split dùng membership biết ở từng decision_time, không today's winners."
+    },
+    {
+      "id": "CRYPTO-238",
+      "title": "Crypto Mean Reversion Lab",
+      "priority": "P2",
+      "baseline_status": "source-partial",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) `run_backtest`; chưa có crypto regime-conditioned strategy protocol",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Fit z-score/threshold trên train, khóa trước holdout; stress trend kéo dài phải báo drawdown/stop; thiếu liquidity gate không đủ điều kiện deployment."
+    },
+    {
+      "id": "CRYPTO-239",
+      "title": "Crypto Funding Carry Lab",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) là perp một loại; chưa có cash-spot+perp ledger chung",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "+1 spot/-1 perp lưu hai legs, fees và funding độc lập; funding đảo dấu/spot haircut có thể làm net âm; perp liquidation vẫn xảy ra dù delta≈0."
+    },
+    {
+      "id": "CRYPTO-240",
+      "title": "Crypto Basis Arbitrage Lab",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có dated-contract settlement/borrow availability model",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Quote 102/100 không thành executable carry khi borrow cap=0; roll/expiry và actual settlement price ghi ledger; không gán expiry cho perpetual."
+    },
+    {
+      "id": "CRYPTO-241",
+      "title": "Crypto Token Due Diligence",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[crypto_research_lab.yaml](../../agent/src/swarm/presets/crypto_research_lab.yaml) có vai trò; thiếu normalized token evidence pack",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Memo tách circulating cap/FDV, unlock/contract state và token-holder rights; roadmap chỉ proposal; unknown revenue rights không bị chấm thành dividends."
+    },
+    {
+      "id": "CRYPTO-242",
+      "title": "Crypto Security Event Intake",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có confirmed/alleged/resolved incident feed chuyên biệt",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai bản tin cùng incident không nhân severity; allegation chưa nguồn chính thức giữ unconfirmed; retraction tạo revision và invalidate claim phụ thuộc, không tự phát lệnh."
+    },
+    {
+      "id": "CRYPTO-243",
+      "title": "Crypto Listing Delisting Monitor",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có notice-to-instrument lifecycle feed có effective_at",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Thông báo ngày 1, halt ngày 3 → biết ngày 1 nhưng chỉ khóa trading từ thời điểm áp dụng; backtest giữ delisted asset và settlement outcome."
+    },
+    {
+      "id": "CRYPTO-244",
+      "title": "Crypto Contract Migration Handler",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có old/new contract relation theo conversion/effective block",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Swap 1 old→100 new phải lưu ratio, decimals và ngày hiệu lực; không nối giá 10→0,1 thành -99% return; thiếu migration proof giữ series tách."
+    },
+    {
+      "id": "CRYPTO-245",
+      "title": "Crypto Chain Gas Fees",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có gas-cost adapter/replay theo receipt và chain currency",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "gasUsed 100.000 × effectiveGasPrice 20 gwei = 0,002 ETH; FX theo thời điểm và L2 extra fee riêng; reverted transaction vẫn chịu gas, không xóa chi phí."
+    },
+    {
+      "id": "CRYPTO-246",
+      "title": "Crypto Blockchain RPC Failover",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có RPC health/canonical checkpoint failover",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Provider B chain ID đúng nhưng hash khác finalized checkpoint A → quarantine; provider thiếu archive không fallback latest cho historical call; cursor không nhảy qua gap."
+    },
+    {
+      "id": "CRYPTO-247",
+      "title": "Crypto Perp Funding Forecast Audit",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "[ccxt_loader.py](../../agent/backtest/loaders/ccxt_loader.py) có realized history; chưa có forecast-vintage archive",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Dự báo 07:00 cho settlement 08:00 chỉ join realized cùng venue/contract/settlement; MAE/sign accuracy tính trên vintage đã khóa; missing outcome không thay bằng forecast."
+    },
+    {
+      "id": "CRYPTO-248",
+      "title": "Crypto Orderbook Spoofing Monitor",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có delta/trade tape persistence model; REST depth không đủ",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Quote lớn bị cancel trước trade được báo short-lived displayed liquidity; không kết luận intent thao túng hay actor identity từ L2 ẩn danh; gap invalidates cancel statistics."
+    },
+    {
+      "id": "CRYPTO-249",
+      "title": "Crypto Stablecoin Issuer Disclosure",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có issuer-disclosure parser/scope registry",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Attestation tại một ngày không thành audit toàn kỳ; entity, redemption right, reserve mix và report lag hiện rõ; PDF cũ không gắn as_of hiện tại."
+    },
+    {
+      "id": "CRYPTO-250",
+      "title": "Crypto Portfolio Stress Scenarios",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[perpetual_risk.py](../../agent/backtest/perpetual_risk.py) có shock-evaluation seam; thiếu scenario orchestrator multi-asset",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Gộp price -30%, stablecoin -5%, venue outage, depth -90% trong cùng path; unavailable collateral không tự rebalance; report exposure/shortfall thay vì chỉ VaR."
+    },
+    {
+      "id": "CRYPTO-251",
+      "title": "Crypto Governance Proposal Watch",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có proposal/vote/timelock/execution state feed",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Proposal passed nhưng queued chưa execute giữ deployed=false; executed tx/block hash mới cập nhật effective rules; canceled/expired không thành live protocol setting."
+    },
+    {
+      "id": "CRYPTO-252",
+      "title": "Crypto Exchange Status Gate",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[service.py](../../agent/src/trading/service.py) `place_order`, `cancel_order` có gate; thiếu maintenance-status integration",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Stale heartbeat/maintenance khóa new-risk theo policy; read/reconcile và cancellation được đánh giá khả dụng riêng; không tự khẳng định có thể cancel khi venue down."
+    },
+    {
+      "id": "CRYPTO-253",
+      "title": "Crypto Onchain Data Provenance",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có chain-fact manifest và parser/label revision store",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Feature có chain ID, range+hashes, finality checkpoint, raw hash, parser/label version; replay cùng manifest cùng output; orphaned dependency đánh dấu report cần revision."
+    },
+    {
+      "id": "CRYPTO-254",
+      "title": "Crypto Cross Chain Identity",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có bridge-origin mapping versioned; symbol parser không phải chain registry",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "USDC contract A trên chain 1 và USDC.e contract B chain 2 không tự net; canonical/bridged relation cần issuer/bridge proof; migration đổi identity giữ lineage."
+    },
+    {
+      "id": "CRYPTO-255",
+      "title": "Crypto Retail Flow Proxy",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có trade-size distribution dataset và proxy calibration",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Threshold small trades được lưu theo venue/unit; order splitting/bots ghi confounders; không xuất exact retail investor count từ địa chỉ hoặc prints."
+    },
+    {
+      "id": "CRYPTO-256",
+      "title": "Crypto Volatility Surface Research",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có options quote/expiry/strike feed; thư viện tính option không chứng minh surface",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Bid>ask, quote stale/zero liquidity loại khỏi fit; expiry convention, premium currency và forward rõ; test monotonicity/convexity/calendar bounds trước xuất surface."
+    },
+    {
+      "id": "CRYPTO-257",
+      "title": "Crypto Derivatives OI vs Price",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có time-aligned OI-price feature dataset",
+      "acceptance_status": "open",
+      "implementation_status": "partial_delivered",
+      "deliveries": [
+        "Crypto public derivatives research",
+        "Research web entry and provenance display",
+        "Crypto supplied dated-futures gross basis curve"
+      ],
+      "remaining_acceptance": "Contracts giữ nguyên, price tăng 10% → notional OI tăng 10% nhưng quantity OI delta=0; output không suy bullish chỉ từ notional tăng; join theo available_at."
+    },
+    {
+      "id": "CRYPTO-258",
+      "title": "Crypto Venue Concentration",
+      "priority": "P1",
+      "baseline_status": "proposed",
+      "seam": "Chưa có custody/venue concentration rollup",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "10 coin cùng một venue → venue concentration=100%; outage scenario khóa collateral đó, không coi token diversity là custody diversity; subaccount/common custodian relation giữ rõ."
+    },
+    {
+      "id": "CRYPTO-259",
+      "title": "Crypto Regulation & Access Gate",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "Chưa có entitlement/geo/terms policy riêng crypto; source fallback không phải access approval",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Venue/product bị cấm trong quyền tài khoản → DENIED trước private call; không đổi proxy/region để vượt restriction; policy revision/time và reason được lưu."
+    },
+    {
+      "id": "CRYPTO-260",
+      "title": "Crypto Independent Research Critic",
+      "priority": "P1",
+      "baseline_status": "source-partial",
+      "seam": "[crypto_research_lab.yaml](../../agent/src/swarm/presets/crypto_research_lab.yaml) có nhiều vai trò; chưa chứng minh independent evidence gate",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Hai agents dẫn cùng một bài không thành hai nguồn; critic phải trả contradiction hoặc evidence gap; missing branch giữ UNKNOWN và có quyền chặn memo conviction."
+    },
+    {
+      "id": "CRYPTO-261",
+      "title": "Crypto Funding and Margin Replay",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[crypto.py](../../agent/backtest/engines/crypto.py) `_apply_data_funding`, `_write_artifacts`; [perpetual_evidence.py](../../agent/backtest/perpetual_evidence.py) `write_perpetual_evidence`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Path fill→funding→margin→liquidation có order rõ; duplicate settlement không đổi cash; restart từ committed checkpoint cho output hash giống uninterrupted; bar ambiguity phải được gắn flag."
+    },
+    {
+      "id": "CRYPTO-262",
+      "title": "Crypto Webhook Alert Throttler",
+      "priority": "P2",
+      "baseline_status": "proposed",
+      "seam": "Chưa có crypto signal-state dedup/outbox chuyên biệt",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Cùng signal+severity+revision 100 lần chỉ một alert; severity tăng tạo alert mới; restart giữ dedup cursor; delivery retry không gửi lại alert đã ack."
+    },
+    {
+      "id": "CRYPTO-263",
+      "title": "Crypto Market Data Quality Score",
+      "priority": "P0",
+      "baseline_status": "proposed",
+      "seam": "[orderbook_depth_tool.py](../../agent/src/tools/orderbook_depth_tool.py) có local validation; chưa có cross-feed quality gate",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Mark thiếu hoặc book gap là hard gate dù average score cao; score giữ raw gaps/lag/reset counters và policy version; missing dataset không nhận neutral 50/100."
+    },
+    {
+      "id": "CRYPTO-264",
+      "title": "Crypto Position Reconciliation",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[binance_account_reconciliation.py](../../agent/backtest/binance_account_reconciliation.py) `reconcile_binance_account`; [binance_shadow_evidence.py](../../agent/backtest/binance_shadow_evidence.py) `build_binance_drift_evidence`",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Synthetic manual trade làm quantity mismatch → discrepancy giữ nguyên và new-risk freeze được test khi tích hợp; comparison_complete không đồng nghĩa match; hiện chưa reconcile toàn fills/transfers/open orders."
+    },
+    {
+      "id": "CRYPTO-265",
+      "title": "Crypto Strategy Canary",
+      "priority": "P0",
+      "baseline_status": "source-partial",
+      "seam": "[service.py](../../agent/src/trading/service.py) `place_order` và profiles/mandate là seam; chưa có crypto canary controller",
+      "acceptance_status": "open",
+      "implementation_status": "baseline_only",
+      "deliveries": [],
+      "remaining_acceptance": "Approval gắn strategy/config hash+notional cap; hết hạn/kill switch/drift breach khóa new-risk; không tự promotion sau paper profit; rollback giữ ledger và cho operator reconciliation."
+    }
+  ]
+}

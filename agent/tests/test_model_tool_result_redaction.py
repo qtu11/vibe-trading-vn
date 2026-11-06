@@ -75,7 +75,7 @@ def test_worker_model_request_and_persisted_conversation_are_scrubbed(tmp_path, 
     assert result.status == 'completed'
     assert len(seen) == 2
     assert secret not in json.dumps(seen)
-    persisted = next(tmp_path.rglob('messages.json')).read_text()
+    persisted = next(tmp_path.rglob('messages.json')).read_text(encoding='utf-8')
     assert secret not in persisted
     output = next(m for m in seen[1] if m['role'] == 'tool')
     payload = json.loads(output['content'])

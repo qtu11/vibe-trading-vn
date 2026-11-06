@@ -39,6 +39,12 @@ agents:
       for PE/PB/ROE/FCF-yield consistency). Every number in your tables must come
       from one of those calls — if a line item is missing from the filing, report
       it as unavailable rather than estimating it.
+      For a Vietnamese .VN company, use `vietnam_research` with the research
+      cutoff and consolidation scope to obtain normalized VND inputs, comparable
+      quarters, balance reconciliation and cash-flow/working-capital checks.
+      Retain its filing references and unknown reasons. The local evidence is
+      user-supplied and unverified; the method does not classify the issuer and
+      is unsuitable for banks/insurers. Do not infer absent periods or coverage.
 
       ## Output Requirements
       1. **Financial Health Score** — Composite score 1–10, with rationale (equally weighted across earnings / assets / cash flow)
@@ -47,7 +53,7 @@ agents:
       4. **Key Financial Metrics Table** — ROE / ROIC / gross margin / net margin / FCF margin / debt ratio and other core metrics, 3-year trend
       5. **Improvement / Deterioration Signals** — Significant changes in the past 1–2 years, trend direction assessment
       6. **Peer Comparison** — Key financial metrics vs industry average / sector leaders
-    tools: [bash, read_file, write_file, load_skill, get_financial_statements, get_stock_profile, financial_rigor]
+    tools: [bash, read_file, write_file, load_skill, get_financial_statements, get_stock_profile, financial_rigor, vietnam_research]
     skills: [financial-statement, fundamental-filter]
     max_iterations: 50
     timeout_seconds: 1800
@@ -64,11 +70,23 @@ agents:
 
       ## Valuation Method Matrix
 
+      For VN annual P/E and observed P/B peer scenarios, use
+      `vietnam_comparables` only with explicit sourced/declared inputs:
+      PATMI and weighted-average shares for EPS, parent common equity and
+      matching book-snapshot shares for BVPS, one price instant and an
+      explicit corporate-action/share basis. Retain peer-selection reasons,
+      cutoff, exclusions and evidence. Peer quantiles are conditional scenarios;
+      they are not historical percentiles, justified P/B-ROE or price forecasts.
+
       ### I. Absolute Valuation
-      **There is no DCF or WACC engine in this system.** Nothing computes a
-      discounted cash flow model for you, so you must either build the
-      arithmetic yourself in `bash` or say the number does not exist. Never
-      report a DCF value you did not actually compute from sourced inputs.
+      Use the existing DCF/WACC engine through `quantlib_call`: describe
+      module="valuation.dcf", function="run_dcf" before calling it. Supply
+      every required input, capital-structure basis, discounting convention
+      and terminal-value method explicitly. Monetary inputs must use one
+      currency/scale and diluted shares must be actual shares. Do not run it
+      when inputs or forecasts lack evidence or an explicit assumption basis.
+      Terminal growth and exit multiple use {"__assumption__": {"name": ...,
+      "value": ..., "basis": ..., "source": ...}} JSON envelopes.
       - **DCF assumption set** — lay out the 3-stage structure and state the
         inputs a valuation would require, each tagged `sourced` or `assumed`:
         - Historical FCF spine (`sourced`): pull the cash flow statement with
@@ -79,9 +97,10 @@ agents:
           growth (1–3%), equity risk premium and cost of debt (`assumed`): no
           tool supplies these. Declare each as an explicit assumption with your
           reasoning. Do NOT present an assumed input as a retrieved one.
-        - If you do compute the model, show the WACC and per-year discounting
-          arithmetic in `bash` using the formulas in load_skill("valuation-model")
-          so every figure is reproducible. If you do not, say so and skip to
+        - When computing the model, retain the engine's WACC components,
+          annual FCFF bridges, discount factors and terminal-value diagnostics
+          together with the complete assumption/evidence ledger. If inputs
+          are insufficient, state that the model is not runnable and move to
           relative valuation rather than inventing a range.
       - **Scenario target price** (the backed alternative): `financial_rigor`
         with `command="three_scenario"` computes exact bull/base/bear target
@@ -95,11 +114,16 @@ agents:
       ### II. Relative Valuation
       - **Comparable Company Method**: select 3–5 industry peers and pull each
         peer's multiples with `get_stock_profile` (`forwardPE`, `priceToBook`,
-        `enterpriseToEbitda`, `enterpriseToRevenue`, `pegRatio`). There is no
-        comps engine — you are assembling the table yourself from per-peer
-        lookups, so every cell must trace to a peer lookup you actually ran.
+        `enterpriseToEbitda`, `enterpriseToRevenue`, `pegRatio`). Assemble the
+        comparison from per-peer lookups; every cell must trace to a lookup
+        actually performed, with matching currency and reporting basis.
         A peer whose lookup failed is reported as unavailable, not estimated.
-      - **Historical Valuation Method**: compare current P/E and P/B to 5-year historical percentile, assess relative richness/cheapness
+        A comps library exists in src.quantlib.valuation.comps; use only an
+        actually executed calculation with supported inputs, or show the
+        sourced peer table without claiming that a model ran.
+      - **Historical Valuation Method**: calculate historical percentiles only
+        from an actually retrieved historical series. A current profile cannot
+        establish a five-year percentile; report unavailable when history lacks.
       - **PEG Analysis**: P/E divided by earnings growth rate, assess whether growth premium is justified
 
       ### III. Asset-Based Approach (for capital-intensive / financial sectors)
@@ -115,18 +139,19 @@ agents:
       Use load_skill("valuation-model") for valuation modeling standards; load_skill("earnings-forecast") for earnings forecasting methods.
       Use `get_financial_statements` for the historical statement spine, `get_stock_profile`
       for multiples / beta / share count, and `financial_rigor` for exact arithmetic
-      (`verify_valuation`, `three_scenario`, `calc`). Those three are your only data
-      sources — every valuation figure must trace to one of them, and no other tool
-      in this system values a company.
+      (`verify_valuation`, `three_scenario`, `calc`). Use `quantlib_call` for
+      executed valuation calculations. These calculators do not fetch evidence;
+      every forecast must remain an explicit assumption and every sourced input
+      must retain its provenance, currency, scale and publication cutoff.
 
       ## Output Requirements
       1. **Valuation Summary Conclusion** — Explicit "overvalued / fair / undervalued" judgment with margin of safety calculation (% premium/discount of current price vs intrinsic value)
-      2. **Valuation Assumption Ledger and Scenario Range** — Table every input as `sourced` (name the tool call) or `assumed` (name your reasoning): WACC components, terminal growth rate, forecast growth. Then give the bull/base/bear target-price range from `financial_rigor` `three_scenario`, labelled as a PE-scenario model. If you also built a DCF by hand in `bash`, show the arithmetic; if you did not, state plainly that no DCF value is being reported because no DCF engine exists
+      2. **Valuation Assumption Ledger and Scenario Range** — Table every input as `sourced` (name the tool call) or `assumed` (state the basis): WACC components, terminal growth and forecasts. Label PE-scenario and DCF results separately. Retain executed engine outputs; if a model lacks inputs, report it as not runnable without a fabricated price.
       3. **Comparable Company Valuation Matrix** — Peer multiples, one row per peer, each traced to the `get_stock_profile` call that produced it; explain relative premium/discount and rationale. Mark any peer you could not retrieve as unavailable
       4. **Historical Valuation Percentile** — Current P/E and P/B vs historical percentile, interpreted alongside fundamental changes
       5. **Target Price Calculation** — Weighted multi-method target price with 12-month upside/downside range
       6. **Valuation Catalysts** — 3–5 positive and negative catalysts that could drive re-rating
-    tools: [bash, read_file, write_file, load_skill, get_financial_statements, get_stock_profile, financial_rigor]
+    tools: [bash, read_file, write_file, load_skill, get_financial_statements, get_stock_profile, financial_rigor, quantlib_call, vietnam_comparables]
     skills: [valuation-model, earnings-forecast]
     max_iterations: 50
     timeout_seconds: 1800

@@ -64,6 +64,9 @@ is required only where listed (no key listed = free / no auth).
 | Stock news | `get_stock_news` | A-share, US, HK | — |
 | SEC filings (EDGAR) | `get_sec_filings` | US | — |
 | Financial statements | `get_financial_statements` | A-share, US, HK, UK, Brazil; Vietnam (.VN, configured local curated JSON only) | — |
+| VN quantitative statement research | `vietnam_research` | .VN configured local evidence; non-financial-company methodology, units/quarters/CF/working capital | — |
+| VN annual peer scenarios | `vietnam_comparables` | Explicit caller-supplied .VN P/E and observed P/B inputs/evidence; no fetching or issuer verification | — |
+| Perpetual OI / realized funding | `crypto_derivatives` | Binance linear USDT perpetual, explicit BASE-USDT-PERP; recent bounded history | — |
 | Options chain | `get_options_chain` | US | — |
 | Stock profile / fundamentals | `get_stock_profile` | US, HK, UK, Argentina, Brazil, Vietnam (.VN; Yahoo field coverage varies) | — |
 | Market screen | `screen_market` | A-share | — |
@@ -76,6 +79,15 @@ is required only where listed (no key listed = free / no auth).
 | iWenCai NL search (问财) | `iwencai_search` | A-share | `VIBE_TRADING_IWENCAI_KEY` |
 
 Notes:
+- `vietnam_research` preserves the local statement cutoff/source hash and reports
+  undefined metrics with reasons. It does not authenticate source contents or
+  classify issuer industry. Use the non-financial methodology only where appropriate.
+- `crypto_derivatives` preserves event/retrieval time, actual observed coverage and
+  funding types. OI amount is base quantity, value is USDT; implied price is not
+  an observed mark. Default live mode is not a historical PIT archive or an
+  on-chain source. Explicit capture writes only an administrator-configured
+  local archive; archive mode reads by actual local recording cutoff without
+  fetching. Local capture time never proves historical exchange publication.
 - `get_financial_statements` reads US statements from SEC EDGAR companyfacts
   (ticker -> CIK -> XBRL concepts) and A-share/HK statements from the Eastmoney
   datacenter report API (per-market F10 report names). UK uses Yahoo annual

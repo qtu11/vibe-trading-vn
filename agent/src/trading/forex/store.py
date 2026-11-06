@@ -28,6 +28,13 @@ CREATE TABLE IF NOT EXISTS equity_peaks (connection_id TEXT PRIMARY KEY, equity 
 CREATE INDEX IF NOT EXISTS execution_state ON intents(connector,state);
 CREATE TABLE IF NOT EXISTS ai_decisions (
  decision_key TEXT PRIMARY KEY, connection_id TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_experiments (id TEXT PRIMARY KEY, created_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS research_runs (
+ id TEXT PRIMARY KEY, experiment_id TEXT NOT NULL, attempt INTEGER NOT NULL,
+ input_hash TEXT NOT NULL, request TEXT NOT NULL, engine TEXT NOT NULL,
+ status TEXT NOT NULL, result TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL, finished_at TEXT,
+ UNIQUE(experiment_id, attempt));
+CREATE INDEX IF NOT EXISTS research_experiment_runs ON research_runs(experiment_id, attempt);
 """
 
 
@@ -45,15 +52,15 @@ class Store:
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=FULL")
             version = conn.execute("PRAGMA user_version").fetchone()[0]
-            if version not in (0, 1, 2, 3):
+            if version not in (0, 1, 2, 3, 4):
                 raise ForexError("STORE_VERSION", "Forex store has an unsupported schema")
-            if version != 3:
+            if version != 4:
                 conn.executescript(_SCHEMA)
                 conn.execute("BEGIN IMMEDIATE")
                 if "binding" not in {row[1] for row in conn.execute("PRAGMA table_info(intents)")}:
                     # Old rows retain an empty snapshot rather than invented provenance.
                     conn.execute("ALTER TABLE intents ADD COLUMN binding TEXT NOT NULL DEFAULT '{}'")
-                conn.execute("PRAGMA user_version=3")
+                conn.execute("PRAGMA user_version=4")
                 conn.commit()
             yield conn
             conn.commit()
@@ -285,3 +292,72 @@ class Store:
             "INSERT INTO events(connection_id,intent_id,kind,payload,created_at) VALUES(?,?,?,?,?)",
             (connection_id, intent_id, kind, json.dumps(payload), utcnow().isoformat()),
         )
+
+    def start_research_run(self, request: dict, engine: dict, experiment_id: str | None = None) -> dict:
+        """Append an attempt before evaluation, without any broker connection."""
+        run_id, created_at = "fxrun_" + uuid.uuid4().hex, utcnow().isoformat()
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            if experiment_id is None:
+                experiment_id = "fxexp_" + uuid.uuid4().hex
+                db.execute("INSERT INTO research_experiments VALUES(?,?)", (experiment_id, created_at))
+            elif not db.execute("SELECT 1 FROM research_experiments WHERE id=?", (experiment_id,)).fetchone():
+                raise ForexError("EXPERIMENT_NOT_FOUND", "Unknown research experiment")
+            attempt = db.execute(
+                "SELECT count(*)+1 FROM research_runs WHERE experiment_id=?", (experiment_id,)
+            ).fetchone()[0]
+            db.execute(
+                "INSERT INTO research_runs(id,experiment_id,attempt,input_hash,request,engine,status,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                (run_id, experiment_id, attempt, digest({"request": request, "engine": engine}),
+                 json.dumps(request, allow_nan=False), json.dumps(engine, allow_nan=False), "running", created_at),
+            )
+        return self.research_run(experiment_id, run_id)
+
+    def finish_research_run(self, experiment_id: str, run_id: str, result: dict) -> dict:
+        status = result.get("status")
+        if status not in ("ok", "incomplete", "error"):
+            raise ValueError("Unexpected research result status")
+        with self.db() as db:
+            changed = db.execute(
+                "UPDATE research_runs SET status=?,result=?,finished_at=? WHERE experiment_id=? AND id=? AND status='running'",
+                (status, json.dumps(result, allow_nan=False), utcnow().isoformat(), experiment_id, run_id),
+            ).rowcount
+            if not changed:
+                raise ForexError("RESEARCH_RUN_IMMUTABLE", "Completed research evidence cannot be replaced")
+        return self.research_run(experiment_id, run_id)
+
+    def research_run(self, experiment_id: str, run_id: str) -> dict:
+        with self.db() as db:
+            row = db.execute(
+                "SELECT * FROM research_runs WHERE experiment_id=? AND id=?", (experiment_id, run_id)
+            ).fetchone()
+        if row is None:
+            raise ForexError("RESEARCH_RUN_NOT_FOUND", "Unknown research experiment run")
+        result = dict(row)
+        for field in ("request", "engine", "result"):
+            result[field] = json.loads(result[field])
+        return result
+
+    def research_experiments(self, limit: int = 20, offset: int = 0) -> dict:
+        limit, offset = max(1, min(limit, 100)), max(0, offset)
+        with self.db() as db:
+            total = db.execute("SELECT count(*) FROM research_experiments").fetchone()[0]
+            rows = db.execute(
+                "SELECT e.id,e.created_at,count(r.id) AS attempt_count FROM research_experiments e "
+                "LEFT JOIN research_runs r ON r.experiment_id=e.id GROUP BY e.id "
+                "ORDER BY e.created_at DESC,e.id LIMIT ? OFFSET ?", (limit, offset),
+            ).fetchall()
+        return {"experiments": [dict(row) for row in rows], "total": total, "offset": offset, "limit": limit}
+
+    def research_experiment(self, experiment_id: str, limit: int = 20, offset: int = 0) -> dict:
+        limit, offset = max(1, min(limit, 100)), max(0, offset)
+        with self.db() as db:
+            row = db.execute("SELECT * FROM research_experiments WHERE id=?", (experiment_id,)).fetchone()
+            if row is None:
+                raise ForexError("EXPERIMENT_NOT_FOUND", "Unknown research experiment")
+            total = db.execute("SELECT count(*) FROM research_runs WHERE experiment_id=?", (experiment_id,)).fetchone()[0]
+            runs = db.execute(
+                "SELECT id,attempt,input_hash,status,created_at,finished_at FROM research_runs "
+                "WHERE experiment_id=? ORDER BY attempt DESC LIMIT ? OFFSET ?", (experiment_id, limit, offset),
+            ).fetchall()
+        return {**dict(row), "runs": [dict(run) for run in runs], "attempt_count": total, "offset": offset, "limit": limit}

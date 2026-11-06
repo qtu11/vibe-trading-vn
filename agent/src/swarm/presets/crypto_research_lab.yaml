@@ -125,6 +125,15 @@ agents:
       ## Task
       Conduct multi-dimensional market sentiment analysis on {target}, providing sentiment-based timing evidence for the {timeframe} horizon.
 
+      For an explicit BASE-USDT-PERP target, retrieve Binance linear-perpetual
+      observations with `crypto_derivatives`, separately for funding and open_interest.
+      Preserve event/retrieval timestamps, actual coverage, units, rate types
+      and missing reasons. This tool is not an on-chain, basis, long/short or
+      options source. A spot/bare target is not silently promoted to a perpetual.
+      The thresholds below are hypotheses, not validated signals; do not apply
+      an eight-hour threshold to a different observed settlement interval.
+      OI quote-value growth alone does not establish new base quantity or direction.
+
       ## Sentiment Analysis Framework
 
       ### I. Derivatives Market Structure
@@ -181,7 +190,7 @@ agents:
       4. **Fear & Greed Index vs. Historical Comparison** — Current index value, historical zone positioning, price performance statistics following similar past sentiment readings
       5. **Extreme Sentiment Warning** — Whether extreme greed or extreme fear signals are present; historical average returns following similar signals
       6. **Sentiment Directional Signal** — Provide {timeframe} timing guidance from a sentiment perspective; explicitly state whether the view is "momentum-following" or "contrarian"
-    tools: [bash, read_file, write_file, load_skill, get_market_data, read_url]
+    tools: [bash, read_file, write_file, load_skill, get_market_data, read_url, crypto_derivatives]
     skills: [sentiment-analysis, okx-market, perp-funding-basis, liquidation-heatmap]
     max_iterations: 50
     timeout_seconds: 1800

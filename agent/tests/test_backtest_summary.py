@@ -9,6 +9,7 @@ and no summary on any failure path or corrupt input.
 from __future__ import annotations
 
 import csv
+import errno
 import json
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -24,6 +25,19 @@ from src.tools.backtest_summary import (
     try_build_backtest_summary,
 )
 from src.tools.backtest_tool import run_backtest
+
+
+def _symlink_or_skip(link: Path, target: Path) -> None:
+    """Skip only a missing symlink privilege or explicit OS non-support."""
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314 or exc.errno in {
+            errno.ENOSYS, errno.ENOTSUP, errno.EOPNOTSUPP,
+        }:
+            pytest.skip(f"Host cannot create the symlink required by this test: {exc}")
+        raise
+
 
 CARD_METRICS = {
     "sharpe": 1.25,
@@ -483,14 +497,14 @@ def test_summary_refuses_artifact_symlink_outside_run(summary_run_dir, tmp_path,
     outside = tmp_path / "external"
     outside.write_bytes(path.read_bytes())
     path.unlink()
-    path.symlink_to(outside)
+    _symlink_or_skip(path, outside)
     assert try_build_backtest_summary(summary_run_dir) is None
 
 
 def test_ohlcv_paths_skip_external_symlinks_and_directories(summary_run_dir, tmp_path):
     external = tmp_path / "external.csv"
     external.write_text("timestamp,open\n2024-01-01,1\n")
-    (summary_run_dir / "artifacts/ohlcv_SECRET.csv").symlink_to(external)
+    _symlink_or_skip(summary_run_dir / "artifacts/ohlcv_SECRET.csv", external)
     (summary_run_dir / "artifacts/ohlcv_DIRECTORY.csv").mkdir()
     assert set(collect_ohlcv_paths(summary_run_dir)) == {"BTC-USDT"}
 

@@ -1,0 +1,68 @@
+{
+  "as_of": "2026-11-06T08:00:00Z",
+  "base": "CASE",
+  "quote": "USDT",
+  "spot": {
+    "venue": "synthetic-spot",
+    "instrument_id": "CASE-USDT-SPOT",
+    "kind": "spot",
+    "base": "CASE",
+    "quote": "USDT",
+    "bid": "99.9",
+    "ask": "100.1",
+    "event_time": "2026-11-06T07:59:59Z",
+    "available_at": "2026-11-06T08:00:00Z",
+    "source_ref": "synthetic:spot-quote-001"
+  },
+  "futures": [
+    {
+      "venue": "synthetic-futures",
+      "instrument_id": "CASE-USDT-20261206",
+      "kind": "dated_future",
+      "base": "CASE",
+      "quote": "USDT",
+      "settle": "USDT",
+      "linear": true,
+      "expiry": "2026-12-06T08:00:00Z",
+      "bid": "101.9",
+      "ask": "102.1",
+      "event_time": "2026-11-06T07:59:59Z",
+      "available_at": "2026-11-06T08:00:00Z",
+      "source_ref": "synthetic:future-quote-001"
+    },
+    {
+      "venue": "synthetic-futures",
+      "instrument_id": "CASE-USDT-20270105",
+      "kind": "dated_future",
+      "base": "CASE",
+      "quote": "USDT",
+      "settle": "USDT",
+      "linear": true,
+      "expiry": "2027-01-05T08:00:00Z",
+      "bid": "98.9",
+      "ask": "99.1",
+      "event_time": "2026-11-06T07:59:59Z",
+      "available_at": "2026-11-06T08:00:00Z",
+      "source_ref": "synthetic:future-quote-002"
+    },
+    {
+      "venue": "synthetic-futures",
+      "instrument_id": "CASE-USDT-PERP",
+      "kind": "perpetual",
+      "base": "CASE",
+      "quote": "USDT",
+      "settle": "USDT",
+      "linear": true,
+      "expiry": null,
+      "bid": "100.9",
+      "ask": "101.1",
+      "event_time": "2026-11-06T07:59:59Z",
+      "available_at": "2026-11-06T08:00:00Z",
+      "source_ref": "synthetic:perpetual-quote-003"
+    }
+  ],
+  "policy": {
+    "max_quote_age_seconds": 5,
+    "max_pair_skew_seconds": 2
+  }
+}

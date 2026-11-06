@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import threading
 import uuid
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from pathlib import Path
 
-from src.swarm.models import SwarmTask, TaskStatus
+from src.swarm.models import SwarmAgentSpec, SwarmTask, TaskStatus
 
 
 class TaskStore:
@@ -51,6 +51,8 @@ class TaskStore:
         Args:
             task: SwarmTask instance.
         """
+        from src.swarm.store import _replace_with_retry
+
         path = self._task_path(task.id)
         # self._lock is per instance, and resolve_dependencies() writes the same
         # files without it; a shared ".tmp" name let one writer's rename consume
@@ -58,7 +60,7 @@ class TaskStore:
         tmp_path = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
         with self._lock:
             tmp_path.write_text(task.model_dump_json(indent=2), encoding="utf-8")
-            tmp_path.replace(path)
+            _replace_with_retry(tmp_path, path)
 
     def load_task(self, task_id: str) -> SwarmTask:
         """Load a task by ID.
@@ -128,6 +130,8 @@ def resolve_dependencies(tasks_dir: Path, completed_task_id: str) -> list[str]:
     Returns:
         List of newly unblocked task IDs (blocked_by went from non-empty to empty).
     """
+    from src.swarm.store import _replace_with_retry
+
     newly_unblocked: list[str] = []
 
     for path in tasks_dir.glob("task-*.json"):
@@ -146,33 +150,65 @@ def resolve_dependencies(tasks_dir: Path, completed_task_id: str) -> list[str]:
         updated_task = SwarmTask.model_validate(updated_data)
         tmp_path = path.with_suffix(f".{uuid.uuid4().hex}.tmp")
         tmp_path.write_text(updated_task.model_dump_json(indent=2), encoding="utf-8")
-        tmp_path.replace(path)
+        _replace_with_retry(tmp_path, path)
 
     return newly_unblocked
 
 
-def validate_dag(tasks: list[SwarmTask]) -> None:
-    """DFS cycle detection to ensure the task DAG is acyclic.
+def validate_dag(
+    tasks: list[SwarmTask], agents: list[SwarmAgentSpec] | None = None
+) -> None:
+    """Validate identities, dependency edges and upstream context references.
 
     Args:
         tasks: List of SwarmTask.
+        agents: Agent roster, when validating a complete run rather than a graph.
 
     Raises:
-        ValueError: If a cycle is detected; message includes the cycle path.
+        ValueError: If identities/references are invalid or a cycle is detected.
     """
-    graph: dict[str, list[str]] = {t.id: list(t.depends_on) for t in tasks}
-    all_ids = {t.id for t in tasks}
+    errors: list[str] = []
+    task_counts = Counter(task.id for task in tasks)
+    all_ids = set(task_counts)
+    if any(not task_id.strip() for task_id in all_ids):
+        errors.append("Task id must not be empty")
+    for task_id, count in task_counts.items():
+        if count > 1:
+            errors.append(f"Duplicate task id: {task_id}")
+
+    if agents is not None:
+        agent_counts = Counter(agent.id for agent in agents)
+        if any(not agent_id.strip() for agent_id in agent_counts):
+            errors.append("Agent id must not be empty")
+        for agent_id, count in agent_counts.items():
+            if count > 1:
+                errors.append(f"Duplicate agent id: {agent_id}")
+        for task in tasks:
+            if task.agent_id not in agent_counts:
+                errors.append(
+                    f"Task '{task.id}' references unknown agent '{task.agent_id}'"
+                )
 
     for task in tasks:
         for dep in task.depends_on:
             if dep not in all_ids:
-                raise ValueError(
+                errors.append(
                     f"Task '{task.id}' depends on unknown task '{dep}'"
                 )
+        for key, source in task.input_from.items():
+            if source not in all_ids:
+                errors.append(
+                    f"Task '{task.id}' input_from '{key}' references unknown task '{source}'"
+                )
+    if errors:
+        raise ValueError("\n".join(errors))
+
+    graph: dict[str, list[str]] = {t.id: list(t.depends_on) for t in tasks}
 
     WHITE, GRAY, BLACK = 0, 1, 2
     color: dict[str, int] = {tid: WHITE for tid in all_ids}
     path: list[str] = []
+    ancestors: dict[str, set[str]] = {tid: set() for tid in all_ids}
 
     def dfs(node: str) -> None:
         """DFS traversal to detect back edges.
@@ -195,13 +231,25 @@ def validate_dag(tasks: list[SwarmTask]) -> None:
                 )
             if color[neighbor] == WHITE:
                 dfs(neighbor)
+            ancestors[node].add(neighbor)
+            ancestors[node].update(ancestors[neighbor])
 
         path.pop()
         color[node] = BLACK
 
-    for tid in all_ids:
+    for tid in graph:
         if color[tid] == WHITE:
             dfs(tid)
+
+    for task in tasks:
+        for key, source in task.input_from.items():
+            if source not in ancestors[task.id]:
+                errors.append(
+                    f"Task '{task.id}' input_from '{key}' references '{source}', "
+                    "which is not upstream in the DAG"
+                )
+    if errors:
+        raise ValueError("\n".join(errors))
 
 
 def topological_layers(tasks: list[SwarmTask]) -> list[list[str]]:

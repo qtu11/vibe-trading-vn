@@ -15,12 +15,15 @@ from unittest.mock import patch
 import pytest
 
 from backtest.loaders import eastmoney_client, yahoo_client
+from src.tools import stock_news_tool as news_tool
 from src.tools.stock_news_tool import (
     StockNewsTool,
     _bare_query,
     _clamp_limit,
+    _parse_rss_articles,
     _snippet,
     _suffix_of,
+    _vn_query,
 )
 
 
@@ -203,6 +206,138 @@ class TestExecuteSuccess:
 
         assert out["ok"] is True
         srch.assert_called_once_with("AAPL", 50)
+
+
+class TestVietnamNews:
+    """``FPT.VN`` routes to Google News RSS, with CafeF as the fallback."""
+
+    @staticmethod
+    def _google_rss() -> str:
+        return """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>FPT - Google News</title>
+<item>
+  <title>FPT doanh thu quý III đạt 1.234,5 tỷ đồng - CafeF</title>
+  <link>https://news.google.com/rss/articles/CBMi-fpt</link>
+  <source url="https://cafef.vn">CafeF</source>
+  <pubDate>Wed, 05 Nov 2026 10:00:00 GMT</pubDate>
+  <description>&lt;a href="https://cafef.vn/fpt"&gt;FPT&lt;/a&gt; doanh thu 1.234,5 tỷ đồng.</description>
+</item>
+<item>
+  <title>Giá vàng hôm nay tăng mạnh - VnExpress</title>
+  <link>https://news.google.com/rss/articles/CBMi-gold</link>
+  <source url="https://vnexpress.net">VnExpress</source>
+  <pubDate>Wed, 05 Nov 2026 09:00:00 GMT</pubDate>
+  <description>Giá vàng trong nước tăng.</description>
+</item>
+</channel></rss>"""
+
+    @staticmethod
+    def _cafef_rss() -> str:
+        return """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>CafeF chứng khoán</title>
+<item>
+  <title>FPT công bố kết quả kinh doanh quý III</title>
+  <link>https://cafef.vn/fpt-kqkd.chn</link>
+  <pubDate>Wed, 05 Nov 2026 11:00:00 GMT</pubDate>
+  <description>Lợi nhuận sau thuế 456,7 tỷ đồng.</description>
+</item>
+</channel></rss>"""
+
+    @staticmethod
+    def _response(text: str) -> Any:
+        class _Response:
+            def raise_for_status(self) -> None:
+                return None
+
+        response = _Response()
+        response.text = text
+        return response
+
+    def test_vn_query_is_market_scoped_not_a_bare_ticker(self) -> None:
+        query = _vn_query("FPT.VN")
+
+        assert '"FPT"' in query
+        assert "cổ phiếu" in query
+        assert "FPT.VN" in query
+
+    def test_google_news_parses_publisher_and_drops_unrelated_items(self) -> None:
+        articles = _parse_rss_articles(
+            self._google_rss(), 10, provider="google_news", code="FPT.VN"
+        )
+
+        assert len(articles) == 1
+        article = articles[0]
+        assert article["title"] == "FPT doanh thu quý III đạt 1.234,5 tỷ đồng"
+        assert article["source"] == "CafeF"
+        assert article["publisher_url"] == "https://cafef.vn"
+        assert article["published"] == "2026-11-05T10:00:00+00:00"
+        assert "doanh thu 1.234,5 tỷ đồng" in article["snippet"]
+
+    def test_vn_stock_news_uses_google_news_first(self) -> None:
+        calls: list[tuple[str, dict[str, Any]]] = []
+
+        def fake_get(url: str, **kwargs: Any) -> Any:
+            calls.append((url, kwargs))
+            return self._response(self._google_rss())
+
+        with patch.object(news_tool, "throttled_get", fake_get):
+            out = json.loads(StockNewsTool().execute(code="FPT.VN", limit=5))
+
+        assert [url for url, _ in calls] == [news_tool._GOOGLE_NEWS_RSS]
+        _, kwargs = calls[0]
+        assert kwargs["params"]["hl"] == "vi"
+        assert kwargs["params"]["gl"] == "VN"
+        assert kwargs["params"]["ceid"] == "VN:vi"
+        assert kwargs["host_key"] == "google_news_rss"
+        assert out["ok"] is True
+        assert out["market"] == "vietnam"
+        assert out["source"] == "google_news"
+        assert out["data"]["code"] == "FPT.VN"
+        assert len(out["data"]["articles"]) == 1
+
+    def test_vn_stock_news_falls_back_to_cafef(self) -> None:
+        calls: list[str] = []
+
+        def fake_get(url: str, **kwargs: Any) -> Any:
+            calls.append(url)
+            if url == news_tool._GOOGLE_NEWS_RSS:
+                raise RuntimeError("google blocked")
+            return self._response(self._cafef_rss())
+
+        with patch.object(news_tool, "throttled_get", fake_get):
+            out = json.loads(StockNewsTool().execute(code="FPT.VN"))
+
+        assert calls == [news_tool._GOOGLE_NEWS_RSS, news_tool._CAFEF_MARKET_RSS]
+        assert out["ok"] is True
+        assert out["source"] == "cafef"
+        assert out["partial"] is True
+        assert out["provider_errors"] == [
+            {"provider": "google_news", "error": "google blocked"}
+        ]
+        assert out["data"]["articles"][0]["source"] == "cafef"
+
+    def test_vn_stock_news_fails_only_when_every_provider_fails(self) -> None:
+        def fake_get(url: str, **kwargs: Any) -> Any:
+            raise RuntimeError(f"down: {url}")
+
+        with patch.object(news_tool, "throttled_get", fake_get):
+            out = json.loads(StockNewsTool().execute(code="FPT.VN"))
+
+        assert out["ok"] is False
+        assert "vietnam news fetch failed" in out["error"]
+        assert "google_news" in out["error"]
+        assert "cafef" in out["error"]
+
+    def test_vn_stock_news_returns_empty_success_when_feeds_are_empty(self) -> None:
+        def fake_get(url: str, **kwargs: Any) -> Any:
+            return self._response("<rss version='2.0'><channel/></rss>")
+
+        with patch.object(news_tool, "throttled_get", fake_get):
+            out = json.loads(StockNewsTool().execute(code="FPT.VN"))
+
+        assert out["ok"] is True
+        assert out["market"] == "vietnam"
+        assert out["data"]["articles"] == []
 
 
 class TestExecuteError:

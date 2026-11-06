@@ -170,6 +170,7 @@ class WorkerStatus(str, Enum):
     token_limit = "token_limit"
     incomplete = "incomplete"
     cancelled = "cancelled"
+    budget_limit = "budget_limit"
 
 
 class SwarmAgentSpec(BaseModel):
@@ -324,6 +325,10 @@ class SwarmRun(BaseModel):
     reasoning_effort: str | None = None
     use_responses_api: bool | None = None
     grounding_data: dict[str, list[dict]] | None = None
+    max_llm_calls: int | None = Field(default=None, gt=0, strict=True)
+    llm_calls_started: int | None = None
+    llm_calls_unknown_usage: int | None = None
+    budget_stop_reason: str | None = None
 
 
 class WorkerResult(BaseModel):

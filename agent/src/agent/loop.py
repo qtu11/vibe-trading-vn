@@ -1215,6 +1215,14 @@ class AgentLoop(ToolCallLifecycle):
         )
         if outcome.mark == "success" and self._forex_trade_plan is not None:
             result["forex_trade_plan"] = self._forex_trade_plan
+        if self._grounding is not None:
+            # The citation list is the visible half of the grounding gate: a
+            # reader can resolve every [S#] in the answer to a tiered source
+            # with its publication and data-effective timestamps. Full quotes
+            # and hashes stay in grounding_evidence.json.
+            citations = self._grounding.source_citations()
+            if citations:
+                result["sources"] = citations
 
         self._run_done.set()
 

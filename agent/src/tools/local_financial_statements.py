@@ -138,7 +138,7 @@ def _record(row: object) -> tuple[tuple, datetime, dict]:
     return key, available, normalized
 
 
-def load_local_statement(code: str, statement: str, period: str, as_of: str | None) -> dict:
+def load_local_statement(code: str, statement: str | None, period: str | None, as_of: str | None) -> dict:
     """Select latest eligible whole-record revisions; never fetch or certify a filing."""
     cutoff = _timestamp(as_of, "as_of") if as_of is not None else datetime.now(timezone.utc)
     path = _configured_path(code)
@@ -171,7 +171,7 @@ def load_local_statement(code: str, statement: str, period: str, as_of: str | No
             revisions.add((key, normalized["revision"]))
         except ValueError as exc:
             raise ValueError(f"Record {index}: {exc}") from None
-        if key[0:2] == (statement, period) and available <= cutoff:
+        if (statement is None or key[0] == statement) and (period is None or key[1] == period) and available <= cutoff:
             if key not in selected or available > selected[key][0]:
                 selected[key] = (available, normalized)
     rows = [item[1] for _, item in sorted(selected.items(), reverse=True)]

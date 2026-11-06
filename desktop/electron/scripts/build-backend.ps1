@@ -86,6 +86,10 @@ function Resolve-SevenZip {
     if (${env:ProgramFiles(x86)}) {
         $candidates.Add((Join-Path ${env:ProgramFiles(x86)} '7-Zip\7z.exe'))
     }
+    $ebCache7z = Join-Path $env:LOCALAPPDATA 'electron-builder\Cache\7zip@1.0.0\7zip-win-x64-a34pt\bin\7za.exe'
+    if (Test-Path -LiteralPath $ebCache7z) {
+        $candidates.Add($ebCache7z)
+    }
     foreach ($candidate in ($candidates | Select-Object -Unique)) {
         if (Test-Path -LiteralPath $candidate) {
             return (Resolve-Path -LiteralPath $candidate).Path

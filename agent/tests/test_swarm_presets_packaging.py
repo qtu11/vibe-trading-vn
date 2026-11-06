@@ -19,7 +19,7 @@ from src.swarm.presets import PRESETS_DIR, list_presets, load_preset
 
 # Lock to the canonical roster shipped today. Bump intentionally if a preset
 # is added or removed so a release that silently drops files is caught here.
-EXPECTED_PRESET_COUNT = 30
+EXPECTED_PRESET_COUNT = 31
 
 
 def test_presets_dir_lives_inside_swarm_package() -> None:
@@ -39,6 +39,7 @@ def test_list_presets_returns_full_roster() -> None:
         f"expected {EXPECTED_PRESET_COUNT} presets, got {len(presets)} — "
         "check pyproject package-data and that YAMLs were not dropped"
     )
+    assert "vietnam_equity_council" in {preset["name"] for preset in presets}
 
 
 def test_value_investing_committee_is_routable() -> None:
@@ -61,7 +62,7 @@ def test_every_preset_yaml_is_loadable() -> None:
 
 @pytest.mark.parametrize(
     "preset_name",
-    ["investment_committee", "quant_strategy_desk", "risk_committee"],
+    ["investment_committee", "quant_strategy_desk", "risk_committee", "vietnam_equity_council"],
 )
 def test_known_presets_load(preset_name: str) -> None:
     """Spot-check a few headline presets advertised in docs/UI."""

@@ -99,6 +99,7 @@ def register_swarm_routes(
                 preset_name,
                 user_vars,
                 include_shell_tools=_host_shell_tools_enabled_for_request(http_request),
+                **({"max_llm_calls": payload["max_llm_calls"]} if payload.get("max_llm_calls") is not None else {}),
             )
             return {"id": run.id, "status": run.status.value, "preset_name": run.preset_name}
         except FileNotFoundError as e:
@@ -176,6 +177,10 @@ def register_swarm_routes(
             "provider": public_provider_metadata(run.provider),
             "model": public_model_metadata(run.model),
             "token_source": run.token_source,
+            "max_llm_calls": run.max_llm_calls,
+            "llm_calls_started": run.llm_calls_started,
+            "llm_calls_unknown_usage": run.llm_calls_unknown_usage,
+            "budget_stop_reason": run.budget_stop_reason,
         }
 
     @app.get(
@@ -271,6 +276,7 @@ def register_swarm_routes(
                 reconciled.user_vars or {},
                 include_shell_tools=_host_shell_tools_enabled_for_request(http_request),
                 resume_from=reconciled if resume else None,
+                **({"max_llm_calls": reconciled.max_llm_calls} if reconciled.max_llm_calls is not None else {}),
             )
             return {
                 "id": new_run.id,

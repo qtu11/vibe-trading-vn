@@ -6,7 +6,7 @@ Zero API key required for HK/US/crypto research markets (yfinance, OKX,
 AKShare are free). Trading connector tools are profile-scoped and require the
 selected connector's own local app or OAuth setup.
 
-Surfaces 82 tools: skills, research goals, strategy discovery,
+Surfaces 85 tools: skills, research goals, strategy discovery,
 backtest/factor/options/pattern
 analysis, deterministic paper-trading matching (paper_trade_step), market data, fundamentals & capital-flow & news & discovery
 (get_fund_flow / get_dragon_tiger / get_northbound_flow / get_southbound_flow /
@@ -65,7 +65,7 @@ import sys
 from copy import deepcopy
 from importlib import import_module
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 # Ensure agent/ is on sys.path
 AGENT_DIR = Path(__file__).resolve().parent
@@ -73,7 +73,7 @@ if str(AGENT_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_DIR))
 
 from fastmcp import Context, FastMCP
-from pydantic import BeforeValidator
+from pydantic import BeforeValidator, StrictInt
 
 from cli._version import __version__ as APP_VERSION
 from src.market_data import (
@@ -129,7 +129,7 @@ def _resolve_include_shell_tools(cli_opt_in: bool) -> bool:
         True only when the operator opted in via the flag or the
         ``VIBE_TRADING_ENABLE_SHELL_TOOLS`` environment variable.
     """
-    return bool(cli_opt_in) or _env_shell_tools_enabled()
+    return cli_opt_in or _env_shell_tools_enabled()
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +304,7 @@ def _security_middleware(allowed_hosts: list[str]) -> list[Any]:
     ]
 
 
-def _build_network_app(transport: str, allowed_hosts: list[str]):
+def _build_network_app(transport: Literal["http", "sse", "streamable-http"], allowed_hosts: list[str]) -> Any:
     """Build a DNS-rebinding-hardened FastMCP ASGI app for a network transport.
 
     Args:
@@ -314,7 +314,10 @@ def _build_network_app(transport: str, allowed_hosts: list[str]):
     Returns:
         A Starlette ASGI app (with MCP lifespan) ready for ``uvicorn.run``.
     """
-    return mcp.http_app(transport=transport, middleware=_security_middleware(allowed_hosts))
+    app = mcp.http_app(transport=transport, middleware=_security_middleware(allowed_hosts))
+    if app is None:
+        raise RuntimeError(f"FastMCP failed to build HTTP app for transport '{transport}'")
+    return app
 
 
 def _get_skills_loader():
@@ -676,8 +679,9 @@ def add_goal_evidence(
         caveat: Optional limitation note.
         contradicts_claim_ids: Claim ids contradicted by this evidence.
     """
+    from src.goal import EvidenceInput, StaleGoalError
+
     try:
-        from src.goal import EvidenceInput, StaleGoalError
 
         store = _get_goal_store()
         resolved_session_id = _resolve_session_id(session_id, ctx)
@@ -755,8 +759,9 @@ def update_research_goal_status(
         audit: Optional list of criterion audit rows.
         recap: Optional concise status recap.
     """
+    from src.goal import GoalStatus, StaleGoalError
+
     try:
-        from src.goal import GoalStatus, StaleGoalError
 
         store = _get_goal_store()
         resolved_session_id = _resolve_session_id(session_id, ctx)
@@ -1811,6 +1816,7 @@ async def run_swarm(
     wait_seconds: int = 3600,
     start_only: bool = False,
     ctx: Context | None = None,
+    max_llm_calls: StrictInt | None = None,
 ) -> str:
     """Run a swarm multi-agent team and stream progress back to the caller.
 
@@ -1834,6 +1840,9 @@ async def run_swarm(
             stays connected for the full budget.
         start_only: If True, kick off the run and return immediately with
             ``run_id`` + current status. Ignores ``wait_seconds``.
+        max_llm_calls: Optional cap on Swarm-owned stream_chat invocations,
+            including worker retries. SDK retries and the provider wrapper's
+            internal fallback are outside this logical invocation cap.
     """
     import asyncio
     import time
@@ -1850,7 +1859,12 @@ async def run_swarm(
     runtime = SwarmRuntime(store=store, agent_config=agent_config)
 
     try:
-        run = runtime.start_run(preset_name, variables, include_shell_tools=_include_shell_tools)
+        run = runtime.start_run(
+            preset_name,
+            variables,
+            include_shell_tools=_include_shell_tools,
+            max_llm_calls=max_llm_calls,
+        )
     except FileNotFoundError as exc:
         return json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False)
     except ValueError as exc:
@@ -2350,6 +2364,68 @@ def get_sec_filings(
         params["metric"] = metric
     registry = _get_registry()
     return registry.execute("get_sec_filings", params)
+
+
+@mcp.tool
+def vietnam_research(
+    code: str, as_of: str | None = None, period: str = "quarter",
+    consolidation: str = "consolidated", offset: int = 0,
+) -> str:
+    """Research a curated local .VN non-financial company with statement evidence.
+
+    Returns normalized VND inputs, standalone quarters, balance/cash-flow/working
+    capital checks and filing references. Missing data remains unknown; contents
+    are user-supplied and unverified. No prices, predictions or broker calls.
+    Pass response as_of and paging.next_offset back to continue a stable snapshot.
+    """
+    params = {"code": code, "period": period, "consolidation": consolidation, "offset": offset}
+    if as_of is not None:
+        params["as_of"] = as_of
+    return _get_registry().execute("vietnam_research", params)
+
+
+@mcp.tool
+def vietnam_comparables(payload: dict[str, Any], offset: int = 0) -> str:
+    """Compare explicitly supplied VN annual P/E and P/B peer inputs with evidence.
+
+    Caller-selected peers, cutoff, price/share basis and sources remain declared
+    and unverified. Conditional peer-quantile prices are scenarios, not forecasts.
+    Never fetches data or writes an artifact. Page peers using offset.
+    """
+    return _get_registry().execute("vietnam_comparables", {"payload": payload, "offset": offset})
+
+
+@mcp.tool
+def crypto_basis_curve(payload: dict[str, Any], offset: int = 0) -> str:
+    """Read a supplied spot/dated-futures basis curve, with declared timing and quote units.
+
+    Quotes and sources remain caller-supplied/unverified. Annualized simple
+    gross basis is not executable carry yield; perpetuals have no expiry basis.
+    Does not fetch prices, save revisions or send orders. Page rows by offset.
+    """
+    return _get_registry().execute("crypto_basis_curve", {"payload": payload, "offset": offset})
+
+
+@mcp.tool
+def crypto_derivatives(
+    symbol: str, metric: str = "open_interest", period: str = "1h", limit: int = 30,
+    mode: Literal["live", "archive"] = "live", as_of: str | None = None,
+) -> str:
+    """Read public Binance linear USDT perpetual OI or realized funding history.
+
+    Use explicit BASE-USDT-PERP. Reports actual coverage and source timestamps,
+    units, funding cadence and OI value decomposition; no inferred price signals
+    or trading actions. Summary covers all selected observations; latest ten shown.
+    mode=archive reads the configured local archive without fetching and requires
+    as_of. Recording time is local observation time, not exchange publication.
+    This MCP surface never captures or writes archive data.
+    """
+    if mode not in ("live", "archive"):
+        return json.dumps({"ok": False, "error_code": "INVALID_ARGUMENT", "error": "MCP supports only live/archive read modes; capture requires the write-auth API"})
+    params: dict[str, Any] = {"symbol": symbol, "metric": metric, "period": period, "limit": limit}
+    if mode != "live" or as_of is not None:
+        params.update(mode=mode, as_of=as_of)
+    return _get_registry().execute("crypto_derivatives", params)
 
 
 @mcp.tool
@@ -2929,6 +3005,10 @@ def _run_to_dict(run, *, timed_out: bool = False, is_stale: bool = False) -> dic
         "final_report": run.final_report,
         "total_input_tokens": run.total_input_tokens,
         "total_output_tokens": run.total_output_tokens,
+        "max_llm_calls": getattr(run, "max_llm_calls", None),
+        "llm_calls_started": getattr(run, "llm_calls_started", None),
+        "llm_calls_unknown_usage": getattr(run, "llm_calls_unknown_usage", None),
+        "budget_stop_reason": getattr(run, "budget_stop_reason", None),
         "provider": public_provider_metadata(run.provider),
         "model": public_model_metadata(run.model),
         "reasoning_effort": public_reasoning_effort(run.reasoning_effort),
@@ -3138,6 +3218,7 @@ def retry_run(run_id: str, resume: bool = False) -> str:
             reconciled.user_vars or {},
             include_shell_tools=_include_shell_tools,
             resume_from=reconciled if resume else None,
+            max_llm_calls=reconciled.max_llm_calls,
         )
     except FileNotFoundError as exc:
         return json.dumps({"status": "error", "error": str(exc)}, ensure_ascii=False)
@@ -3373,6 +3454,8 @@ def main():
         allowed_hosts = _parse_allowed_hosts(get_env_config().api.vibe_trading_mcp_allowed_hosts)
         transport = "streamable-http" if args.transport == "http" else "sse"
         app = _build_network_app(transport, allowed_hosts)
+        if app is None:
+            raise RuntimeError("FastMCP HTTP app could not be created")
         uvicorn.run(app, host=args.host, port=args.port)
     else:
         mcp.run()

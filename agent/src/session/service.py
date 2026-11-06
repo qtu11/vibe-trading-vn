@@ -421,6 +421,11 @@ class SessionService:
                         result["forex_trade_plan"]).model_dump(mode="json")
                 except (ValueError, TypeError):
                     logger.warning("Discarded invalid Forex trade-plan reply metadata")
+            if isinstance(result.get("sources"), list) and result["sources"]:
+                # Grounding sources are already a compact projection; keep them
+                # on the reply so [S#] markers resolve after a page reload, not
+                # only while the live tool result is on screen.
+                reply_metadata["sources"] = result["sources"]
 
             reply = Message(
                 session_id=session.session_id, role="assistant",
@@ -455,7 +460,7 @@ class SessionService:
                 {"attempt_id": attempt.attempt_id, "status": attempt.status.value,
                  "summary": reply.content, "error": attempt.error, "run_dir": attempt.run_dir,
                  "started_at": wall_started_at, "ended_at": time.time(),
-                 **{key: reply_metadata[key] for key in ("elapsed_ms", *runtime_keys, "forex_trade_plan") if key in reply_metadata}},
+                 **{key: reply_metadata[key] for key in ("elapsed_ms", *runtime_keys, "forex_trade_plan", "sources") if key in reply_metadata}},
             )
 
         except asyncio.CancelledError:

@@ -1,4 +1,8 @@
 import i18n from "@/i18n";
+import type { CryptoRequest, ResearchResult, VietnamRequest } from "@/lib/research";
+import type { ForexCostStressRequest, ForexTradePathsRequest, ForexExperimentDetail, ForexExperimentList, ForexExperimentRun, ForexResearchRequest, ForexResearchResult } from "@/lib/forexResearch";
+import type { ResearchObject } from "@/lib/research";
+import type { ResearchAttemptList, ResearchKind, ResearchRevision, ResearchRevisionList } from "@/lib/researchArtifacts";
 import { authHeaders, withAuthTicket } from "@/lib/apiAuth";
 import type {
   OptionsChainResponse,
@@ -55,6 +59,14 @@ export async function downloadGeneratedReport(reportId: string, filename: string
   link.href = url;
   link.download = filename;
   link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function downloadResearchMarkdown(revisionId: string, markdown: string): void {
+  if (!/^rr_[0-9a-f]{32}$/.test(revisionId)) throw new Error("Invalid research revision ID");
+  const url = URL.createObjectURL(new Blob([markdown], { type: "text/markdown;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url; link.download = `research-${revisionId}.md`; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
@@ -387,6 +399,17 @@ async function errorFromResponse(res: Response): Promise<ApiError> {
     const raw = body.detail ?? body.message ?? body.error;
     if (typeof raw === "string" && raw) {
       detail = raw;
+    } else if (Array.isArray(raw)) {
+      const entries = raw.slice(0, 8).flatMap((value: unknown) => {
+        if (!value || typeof value !== "object") return [];
+        const row = value as { loc?: unknown; msg?: unknown };
+        if (typeof row.msg !== "string") return [];
+        const location = Array.isArray(row.loc) ? row.loc.slice(0, 6)
+          .filter((part): part is string | number => typeof part === "string" || typeof part === "number")
+          .map((part) => String(part).slice(0, 80)).join(".") : "input";
+        return [`${location || "input"}: ${row.msg.slice(0, 300)}`];
+      });
+      if (entries.length) detail = entries.join("; ");
     } else if (raw && typeof raw === "object") {
       const structured = raw as { code?: unknown; message?: unknown; max_length?: unknown };
       if (typeof structured.code === "string" && structured.code) code = structured.code;
@@ -451,6 +474,59 @@ function appendQueryParam(url: string, key: string, value: string): string {
 }
 
 export const api = {
+  forexCostStress: (payload: ForexCostStressRequest, signal?: AbortSignal) =>
+    request<ForexResearchResult>("/api/forex/cost-stress", { method: "POST", body: JSON.stringify(payload), signal }),
+  saveForexCostStressExperiment: (payload: ForexCostStressRequest, experimentId?: string) =>
+    request<ForexExperimentRun>(experimentId ? `/api/forex/cost-stress/experiments/${encodeURIComponent(experimentId)}/runs` : "/api/forex/cost-stress/experiments", { method: "POST", body: JSON.stringify(payload) }),
+  researchVietnamComparables: (payload: ResearchObject, offset = 0, signal?: AbortSignal) =>
+    request<ResearchObject>("/api/research/vietnam/comparables", { method: "POST", body: JSON.stringify({ payload, offset }), signal }),
+  researchVietnamDCF: (payload: ResearchObject, signal?: AbortSignal) =>
+    request<ResearchObject>("/api/research/vietnam/dcf", { method: "POST", body: JSON.stringify(payload), signal }),
+  researchVietnamReverseDCF: (payload: ResearchObject, signal?: AbortSignal) =>
+    request<ResearchObject>("/api/research/vietnam/reverse-dcf", { method: "POST", body: JSON.stringify(payload), signal }),
+  researchCryptoBasis: (payload: ResearchObject, signal?: AbortSignal) =>
+    request<ResearchObject>("/api/research/crypto/basis", { method: "POST", body: JSON.stringify(payload), signal }),
+  forexTradePaths: (payload: ForexTradePathsRequest, signal?: AbortSignal) =>
+    request<ForexResearchResult>("/api/forex/trade-paths", { method: "POST", body: JSON.stringify(payload), signal }),
+  saveForexTradePathsExperiment: (payload: ForexTradePathsRequest, experimentId?: string) =>
+    request<ForexExperimentRun>(experimentId ? `/api/forex/trade-paths/experiments/${encodeURIComponent(experimentId)}/runs` : "/api/forex/trade-paths/experiments", { method: "POST", body: JSON.stringify(payload) }),
+  saveResearchRevision: (kind: ResearchKind, input: ResearchObject, parentRevisionId?: string, idempotencyKey?: string) =>
+    request<ResearchRevision>("/api/research/artifacts", { method: "POST", body: JSON.stringify({ kind, request: input, parent_revision_id: parentRevisionId, idempotency_key: idempotencyKey }) }),
+  listResearchAttempts: (kind?: ResearchKind, parentRevisionId?: string, idempotencyKey?: string, offset = 0, signal?: AbortSignal) =>
+    request<ResearchAttemptList>(`/api/research/artifacts/attempts?${new URLSearchParams({ ...(kind ? { kind } : {}), ...(parentRevisionId ? { parent_revision_id: parentRevisionId } : {}), ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}), limit: "10", offset: String(offset) })}`, { signal }),
+  researchRevisionReport: (id: string, signal?: AbortSignal) =>
+    performRequest(`/api/research/artifacts/${encodeURIComponent(id)}/report`, { headers: authHeaders(), signal }, async (response) => {
+      if ((response.headers.get("content-type") ?? "").split(";", 1)[0].trim().toLowerCase() !== "text/markdown") throw new ApiError(i18n.t("researchRevision.reportInvalid"), response.status);
+      const text = await response.text();
+      if (new TextEncoder().encode(text).byteLength > 262144) throw new ApiError(i18n.t("researchRevision.reportTooLarge"), response.status);
+      return text;
+    }),
+  forexRegime: (payload: ResearchObject, signal?: AbortSignal) =>
+    request<ResearchObject>("/api/forex/regime", { method: "POST", body: JSON.stringify(payload), signal }),
+  listResearchRevisions: (kind?: ResearchKind, offset = 0, signal?: AbortSignal) =>
+    request<ResearchRevisionList>(`/api/research/artifacts?${new URLSearchParams({ ...(kind ? { kind } : {}), offset: String(offset), limit: "10" })}`, { signal }),
+  getResearchRevision: (id: string, signal?: AbortSignal) =>
+    request<ResearchRevision>(`/api/research/artifacts/${encodeURIComponent(id)}`, { signal }),
+  diffResearchRevisions: (before: string, after: string, signal?: AbortSignal) =>
+    request<ResearchObject>(`/api/research/artifacts/${encodeURIComponent(after)}/diff?${new URLSearchParams({ before, limit: "100" })}`, { signal }),
+  reviewResearchRevision: (id: string, decision: "acknowledged" | "changes_requested", note: string, reviewer: string) =>
+    request<ResearchObject>(`/api/research/artifacts/${encodeURIComponent(id)}/reviews`, { method: "POST", body: JSON.stringify({ decision, note, reviewer }) }),
+  forexWalkForward: (payload: ForexResearchRequest, signal?: AbortSignal) =>
+    request<ForexResearchResult>("/api/forex/walk-forward", { method: "POST", body: JSON.stringify(payload), signal }),
+  saveForexExperiment: (payload: ForexResearchRequest, experimentId?: string) =>
+    request<ForexExperimentRun>(experimentId ? `/api/forex/experiments/${encodeURIComponent(experimentId)}/runs` : "/api/forex/experiments", { method: "POST", body: JSON.stringify(payload) }),
+  listForexExperiments: (offset = 0, signal?: AbortSignal) =>
+    request<ForexExperimentList>(`/api/forex/experiments?limit=10&offset=${offset}`, { signal }),
+  getForexExperiment: (id: string, offset = 0, signal?: AbortSignal) =>
+    request<ForexExperimentDetail>(`/api/forex/experiments/${encodeURIComponent(id)}?limit=10&offset=${offset}`, { signal }),
+  getForexExperimentRun: (experimentId: string, runId: string, signal?: AbortSignal) =>
+    request<ForexExperimentRun>(`/api/forex/experiments/${encodeURIComponent(experimentId)}/runs/${encodeURIComponent(runId)}`, { signal }),
+  researchVietnam: (payload: VietnamRequest, signal?: AbortSignal) =>
+    request<ResearchResult>("/api/research/vietnam", { method: "POST", body: JSON.stringify(payload), signal }),
+  researchCrypto: (payload: CryptoRequest, signal?: AbortSignal) =>
+    request<ResearchResult>("/api/research/crypto", { method: "POST", body: JSON.stringify(payload), signal }),
+  captureCrypto: (payload: Omit<CryptoRequest, "mode" | "as_of">) =>
+    request<ResearchResult>("/api/research/crypto/captures", { method: "POST", body: JSON.stringify(payload) }),
   getPixelOffice: () => request<OfficeSnapshot>("/api/pixel-office"),
   updatePixelOffice: (action: "create" | "assign" | "complete" | "rank", arguments_: Record<string, unknown>) =>
     request<OfficeSnapshot>("/api/pixel-office/actions", { method: "POST", body: JSON.stringify({ action, arguments: arguments_ }) }),

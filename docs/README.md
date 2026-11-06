@@ -1,6 +1,20 @@
 # Tài liệu Vibe-Trading Multi-Market AI
 
-**Cập nhật:** 05/11/2026. Bộ tài liệu đối chiếu master plan với source cục bộ `0.1.18`, nguồn chính thức và các sửa code local. Mục tiêu là đủ cụ thể để triển khai và nghiệm thu, đồng thời giữ rõ phần đang có, phần còn thiếu và phần chưa kiểm tra runtime.
+**Cập nhật:** 06/11/2026. Bộ tài liệu đối chiếu master plan với source cục bộ `0.1.18`, nguồn chính thức và các sửa code local. Mục tiêu là đủ cụ thể để triển khai và nghiệm thu, đồng thời giữ rõ phần đang có, phần còn thiếu và phần chưa kiểm tra runtime.
+
+**Đợt7 — 06/11/2026:** [reverse DCF VN](VN_REVERSE_DCF.md), [bootstrap trade OOS Forex](FOREX_RESEARCH_LAB.md#bootstrap-đường-vốn-từ-các-trade-oos-đã-khóa) và [Crypto dated-futures basis](CRYPTO_BASIS_CURVE.md) đã nối API/Web/MCP phù hợp từng luồng. Xem [kiểm thử, giới hạn và rollback đợt7](IMPLEMENTATION_STATUS_2026-11-06_07.md).
+
+**Đợt8 — 06/11/2026:** [Regime Forex nhân quả](FOREX_REGIME_RESEARCH.md), [refresh attempts/idempotency](RESEARCH_REVISIONS.md#idempotency-attempt-và-refresh-state) và [Markdown từ revision đã lưu](RESEARCH_REPORT_EXPORT.md) đã nối các luồng API/Web/MCP tương ứng. [Source trust/citation/hội đồng nghiên cứu](RESEARCH_COUNCIL_SOURCE_TRUST_PLAN.md) giữ phân biệt nguồn chưa xác minh. [Tracker 265 ID](IMPLEMENTATION_TRACKER.md) ghi **44 ID có phần bổ sung / 221 baseline**; xem [kiểm chứng và rollback đợt8](IMPLEMENTATION_STATUS_2026-11-06_08.md). Acceptance toàn đặc tả vẫn mở.
+
+Theo yêu cầu đọc bộ mẫu trong `docs/mau-baocao`, xem [đối chiếu bốn PDF FPT và các điểm bất thường](REPORT_SAMPLE_FINDINGS.md), rồi [phương pháp cơ bản sâu + nến + kịch bản mua/bán/chờ](VIETNAM_DEEP_RESEARCH_METHOD.md). Skill và hướng dẫn council đã nối vào chat; dữ liệu phiên/quote/book/holdings chưa được lấy nên wrapper luôn giữ `execution_ready=false`, không biến giá đóng cửa thành giá hiện tại hoặc SELL thành mở short. Báo cáo mẫu, mức định giá cũ và proxy volume không tự thành khuyến nghị giao dịch hôm nay.
+
+[Đợt6](IMPLEMENTATION_STATUS_2026-11-06_06.md) nối DCF/sensitivity VN, stress chi phí và research revisions/diff/review; các phần này tiếp tục được dùng lại trong đợt7.
+
+[Biên bản đợt5](IMPLEMENTATION_STATUS_2026-11-06_05.md) ghi phạm vi [VN P/E–P/B comparables](VN_COMPARABLES.md), [Forex lab/EMA](FOREX_RESEARCH_LAB.md), [Crypto local archive](CRYPTO_DERIVATIVES_ARCHIVE.md) và quyền ghi/read projection trước đó.
+
+Theo dõi triển khai tại [tracker đủ 265 ID](IMPLEMENTATION_TRACKER.md). [Đợt3](IMPLEMENTATION_STATUS_2026-11-05_03.md) nối các luồng nghiên cứu VN/DCF, Forex walk-forward, Crypto Funding/OI và DAG; xem [hướng dẫn và fixtures](MULTI_MARKET_RESEARCH_USAGE.md). Tracker giữ riêng phần đã có code/test và acceptance còn mở.
+
+[Đợt4](IMPLEMENTATION_STATUS_2026-11-05_04.md) bổ sung trang `/research`, registry thí nghiệm Forex, offline Binance USD-M Order Book replay và Swarm call cap; có kiểm thử tích hợp và hướng dẫn rollback schema4.
 
 Đọc [master plan đã đối chiếu](../VIBE_TRADING_MULTI_MARKET_MASTER_PLAN_V1.md), [265 đặc tả +54 scenarios +10 giai đoạn +16 quyết định](specs/README.md) và [đợt triển khai code đầu tiên](IMPLEMENTATION_STATUS_2026-11-05.md). Các ID/tiêu đề trong catalog được kiểm tra tự động khớp bản master gốc; trạng thái phê duyệt chương trình không tự thay đổi vì đã viết code local.
 
@@ -15,7 +29,10 @@
 | Thiết kế toàn hệ thống | [Multi-market architecture](MULTI_MARKET_ARCHITECTURE.md) | Domain ownership, control/data plane, Swarm, storage, risk và UI |
 | Chốt semantics dữ liệu | [Data & evidence contracts](DATA_EVIDENCE_CONTRACTS.md) | Identity, timestamps, PIT, revisions, snapshots, null và failure states |
 | Nghiên cứu cổ phiếu Việt Nam | [Vietnam Equity Research](VIETNAM_EQUITY_RESEARCH.md) | BCTC, nguồn gốc, định giá, HOSE/HNX/UPCoM và acceptance gates |
+| Đọc cách các báo cáo mẫu lập luận | [Đối chiếu mẫu FPT](REPORT_SAMPLE_FINDINGS.md) · [Phương pháp nghiên cứu sâu](VIETNAM_DEEP_RESEARCH_METHOD.md) | Trang/basis/đơn vị, cơ bản–tiền–tin–nến, anomalies và kịch bản hành động có điều kiện |
+| Lưu và đọc đúng phiên bản nghiên cứu | [Research revisions](RESEARCH_REVISIONS.md) · [Markdown export](RESEARCH_REPORT_EXPORT.md) | Schema2 attempts/idempotency, giữ last good, review chưa xác minh và xuất snapshot không gọi AI |
 | Phát triển Forex/XAUUSD | [Forex & XAUUSD Lab](FOREX_XAUUSD_LAB.md) | Native data, closed bars, strategies, sizing, replay, OOS và execution gates |
+| Replay regime trên nến cung cấp | [Forex regime research](FOREX_REGIME_RESEARCH.md) | ATR/SMA causal, train-fitted thresholds, hysteresis/dwell và hash; không tín hiệu đặt lệnh |
 | Phát triển Crypto | [Crypto Intelligence](CRYPTO_INTELLIGENCE.md) | Spot/perp, funding/OI, order book, on-chain và simulator fidelity |
 | Chọn việc tiếp theo | [Implementation roadmap](IMPLEMENTATION_ROADMAP.md) | Milestones, dependencies, Definition of Done và brief cho coding agent |
 | Xem phạm vi đã kiểm tra | [Documentation verification](DOCUMENTATION_VERIFICATION.md) | Backup, checks đã chạy, giới hạn và kết quả thật |

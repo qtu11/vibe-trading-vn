@@ -13,8 +13,9 @@ This tool reuses that same connectivity — ccxt's unified ``fetch_order_book``
 Symbol convention matches the rest of this repo (see CLAUDE.md: "OKX pairs
 use ``BTC-USDT`` format, hyphen, uppercase") and ``ccxt_loader._parse_ccxt_symbol``:
 the caller passes ``BASE-QUOTE`` (e.g. ``BTC-USDT``), which is upper-cased and
-translated to ccxt's ``BASE/QUOTE`` form before the request. Perpetuals
-(``-PERP``) are out of scope here — this tool is spot-book depth only.
+translated to ccxt's ``BASE/QUOTE`` form before the request. REST is spot only.
+Optional caller-supplied replay explicitly uses Binance USD-M
+diff-depth sequencing and never opens a socket or infers exchange provenance.
 
 What ccxt's ``fetch_order_book`` actually returns (read from the installed
 ``ccxt==4.5.54`` source, not assumed): ``parse_order_book`` always returns
@@ -85,6 +86,8 @@ from typing import Any
 
 from backtest.loaders.ccxt_loader import _CCXT_TIMEOUT_MS, _ccxt_proxy_config
 from src.agent.tools import BaseTool
+from src.config.limits import TOOL_RESULT_LIMIT
+from src.tools.binance_orderbook_replay import MAX_EVENTS, PROTOCOL, replay_binance_usdm
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +305,10 @@ class OrderBookDepthTool(BaseTool):
         "false' with the actually-filled amount, never a fabricated full "
         "fill. An empty book, a one-sided-empty book, or a crossed book "
         "(best_bid >= best_ask, a data error) is refused with an explicit "
-        "error rather than a guessed number. Spot only, no perpetuals. "
+        "error rather than a guessed number. REST is spot only. Optional 'replay' "
+        "verifies caller-supplied Binance USD-M snapshot/delta events offline "
+        "(exchange='binance', protocol='binance_usdm_depth_v1'); after a gap "
+        "a new snapshot and bridge are required. No live WebSocket recorder. "
         'Example: {"symbol": "BTC-USDT", "exchange": "okx", "levels": 10, '
         '"notional_quote": 10000}.'
     )
@@ -330,6 +336,24 @@ class OrderBookDepthTool(BaseTool):
                 ),
                 "default": _DEFAULT_LEVELS,
             },
+            "replay": {
+                "type": "object",
+                "description": (
+                    "Optional offline Binance USD-M replay; never fetches. "
+                    "Use exchange='binance'. Supply snapshots as type='snapshot', "
+                    "lastUpdateId,bids,asks; deltas as type='delta',e='depthUpdate',"
+                    "s,U,u,pu,b,a and optional E/T milliseconds. Event order is receive order. "
+                    "Only final synchronized state emits features; provenance is unverified. "
+                    "Returns the latest 20 event statuses plus complete status counts."
+                ),
+                "properties": {
+                    "protocol": {"type": "string", "const": PROTOCOL},
+                    "events": {"type": "array", "minItems": 1, "maxItems": MAX_EVENTS,
+                               "items": {"type": "object"}},
+                },
+                "required": ["protocol", "events"],
+                "additionalProperties": False,
+            },
             "notional_quote": {
                 "type": "number",
                 "description": (
@@ -348,7 +372,7 @@ class OrderBookDepthTool(BaseTool):
 
         Args:
             **kwargs: ``symbol`` (required), plus optional ``exchange``,
-                ``levels``, ``notional_quote``.
+                ``levels``, ``notional_quote``, and offline ``replay``.
 
         Returns:
             A JSON string. On success: ``{"ok": true, "source": "ccxt",
@@ -382,10 +406,27 @@ class OrderBookDepthTool(BaseTool):
         if notional_quote is None or notional_quote <= 0:
             return _error(f"notional_quote must be a positive number (got {notional_raw!r})")
 
-        try:
-            raw_book = _fetch_raw_book(exchange_id, ccxt_symbol, _BOOK_FETCH_LIMIT)
-        except Exception as exc:  # noqa: BLE001 - surface as error envelope
-            return _error(f"{exchange_id} order book request failed for {display_symbol}: {exc}")
+        replay_request = kwargs.get("replay")
+        replay_diagnostics = None
+        if replay_request is not None:
+            if exchange_id != "binance":
+                return _error("offline replay requires exchange='binance' and the USD-M protocol")
+            try:
+                raw_book, replay_diagnostics = replay_binance_usdm(
+                    replay_request, display_symbol.replace("-", "")
+                )
+            except ValueError as exc:
+                return _error(str(exc))
+            if raw_book is None:
+                return json.dumps(
+                    {"ok": False, "error": "replay has no synchronized book; see replay state",
+                     "replay": replay_diagnostics}, ensure_ascii=False
+                )
+        else:
+            try:
+                raw_book = _fetch_raw_book(exchange_id, ccxt_symbol, _BOOK_FETCH_LIMIT)
+            except Exception as exc:  # noqa: BLE001 - surface as error envelope
+                return _error(f"{exchange_id} order book request failed for {display_symbol}: {exc}")
 
         if not isinstance(raw_book, dict):
             return _error(f"unexpected order book payload shape from {exchange_id}")
@@ -415,7 +456,7 @@ class OrderBookDepthTool(BaseTool):
                 "This is a data error — refusing to compute a spread from it."
             )
 
-        mid_price = (best_bid_price + best_ask_price) / 2.0
+        mid_price = best_bid_price + (best_ask_price - best_bid_price) / 2.0
         spread_abs = best_ask_price - best_bid_price
         spread_bps = (spread_abs / mid_price) * 10_000.0
 
@@ -426,7 +467,10 @@ class OrderBookDepthTool(BaseTool):
                 .isoformat()
                 .replace("+00:00", "Z")
             )
-            timestamp_source = "exchange"
+            timestamp_source = "supplied_exchange_event" if replay_diagnostics else "exchange"
+        elif replay_diagnostics:
+            timestamp = None
+            timestamp_source = "unavailable"
         else:
             # Binance spot depth carries no server timestamp field at all
             # (ccxt's parser only finds one in the futures/options response
@@ -501,7 +545,23 @@ class OrderBookDepthTool(BaseTool):
             },
             "levels_available": {"bids": len(bids), "asks": len(asks)},
         }
-        return json.dumps(
-            {"ok": True, "source": "ccxt", "market": "crypto", "units": _UNITS, "data": data},
-            ensure_ascii=False,
-        )
+        result = {"ok": True, "source": "ccxt", "market": "crypto", "units": _UNITS, "data": data}
+        if replay_diagnostics:
+            result["source"] = "caller_supplied_replay"
+            result["replay"] = replay_diagnostics
+            data["product"] = replay_diagnostics["product"]
+            data["ccxt_symbol"] = None
+            data["binance_symbol"] = display_symbol.replace("-", "")
+            for side in (buy, sell):
+                if not side["fully_filled"]:
+                    side["note"] = (
+                        "Partial fill within caller-supplied replay levels; "
+                        "unobserved depth is unknown and is not extrapolated."
+                    )
+        try:
+            serialized = json.dumps(result, ensure_ascii=False, allow_nan=False)
+            if replay_diagnostics and len(serialized) > TOOL_RESULT_LIMIT:
+                return _error("replay response exceeds result limit; reduce levels or replay event batch")
+            return serialized
+        except ValueError:
+            return _error("book or requested notional overflows supported feature arithmetic")

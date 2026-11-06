@@ -23,6 +23,7 @@ from src.agent.grounding.identity import (
 from src.agent.grounding import identity_checks  # noqa: F401  (registers declared checks)
 from src.agent.grounding import figures_checks  # noqa: F401  (registers declared checks)
 from src.agent.grounding.registry import GROUNDING_CHECKS, grounding_check
+from src.agent.grounding.sources import source_ids_in, value_in_source
 from src.agent.grounding.evidence import (
     EvidenceRecord,
     _is_metadata_count_leaf,
@@ -565,6 +566,27 @@ class _PolicyMixin:
                     issues.extend(found)
                     continue
             if declaration is None:
+                auto_sources = (
+                    self._table_cited_sources(figure)
+                    if figure.shape == "measured"
+                    else []
+                )
+                if auto_sources:
+                    if not any(value_in_source(source, figure.value) for source in auto_sources):
+                        issues.append(
+                            self._figure_issue(
+                                "numeric_claim_conflict",
+                                figure,
+                                "cited",
+                                symbol,
+                                "citation_value_not_in_source",
+                                "sits under a table caption citing "
+                                + ", ".join(f"[{source.source_id}]" for source in auto_sources)
+                                + " but does not appear in that source",
+                                source_ids=[source.source_id for source in auto_sources],
+                            )
+                        )
+                    continue
                 found = GROUNDING_CHECKS.run("undeclared-figure", self, figure, symbol, records, block)
                 issues.extend(found)
                 # An undeclared figure rejected at the declaration boundary did
@@ -2278,6 +2300,25 @@ class _PolicyMixin:
             )
         ]
 
+    def _table_cited_sources(self, figure: Figure) -> list[Any]:
+        """Sources a table caption above or below this figure cites.
+
+        Only an explicit ``[S#]`` caption counts. A legacy source name in a
+        caption still satisfies the visible-name rule for a *declared* cited
+        figure, but it does not silently turn an undeclared cell into a
+        citation.
+        """
+        content = getattr(self, "_active_content", "") or ""
+        if not content:
+            return []
+        from src.agent.grounding.figures import table_caption_text
+
+        caption = table_caption_text(content, figure.line)
+        if not caption:
+            return []
+        records = [self.source_by_id(source_id) for source_id in source_ids_in(caption)]
+        return [record for record in records if record is not None]
+
     @grounding_check(name="figure-cited", code="numeric_claim_conflict",
                      additional_codes=("numeric_claim_unavailable",),
                      description="Validate the cited figure contract against evidence.")
@@ -2291,10 +2332,20 @@ class _PolicyMixin:
     ) -> list[dict[str, Any]]:
         """A cited figure names a source the reader can see and does not pose as a print.
 
-        Its value is unchecked, so the citation may not launder an observation
-        (the value may not also be declared observed). The block is stripped
-        before release, so a source only the note names is no citation: a note
-        token (``_note_tokens``) must appear on the figure's own line.
+        Two citation forms are accepted:
+
+        * **Source id (v2).** ``[S1]`` in the note (or ``ref``) must resolve to
+          a source collected this run. Its value must appear in that source's
+          text, and the same ``[S#]`` must be visible on the figure's line or in
+          a caption within two lines of its table. This is the form the tool
+          result's ``_sources`` index advertises.
+        * **Legacy visible name.** A note token (``_note_tokens``) must appear
+          on the figure's own line, or in the caption of the figure's table.
+          Its value is not checked; this form predates the source ledger.
+
+        The block is stripped before release, so a source only the note names
+        is no citation. The value may not also be declared observed: a citation
+        may not launder an observation.
         """
         if not declaration.note.strip():
             return [
@@ -2319,7 +2370,73 @@ class _PolicyMixin:
                     "instrument",
                 )
             ]
-        folded = line.casefold()
+
+        content = getattr(self, "_active_content", "") or ""
+        cited_ids = source_ids_in(declaration.ref) or source_ids_in(declaration.note)
+        visible_text = line
+        table_text = ""
+        if figure.line is not None and content:
+            from src.agent.grounding.figures import table_caption_text
+
+            table_text = table_caption_text(content, figure.line)
+            if table_text:
+                visible_text = f"{line}\n{table_text}"
+        if not cited_ids and table_text:
+            # A table caption is the table's citation: every cited cell in it
+            # inherits the id the caption shows.
+            cited_ids = source_ids_in(table_text)
+
+        if cited_ids:
+            missing = [source_id for source_id in cited_ids if self.source_by_id(source_id) is None]
+            if missing:
+                return [
+                    self._figure_issue(
+                        "numeric_claim_conflict",
+                        figure,
+                        "cited",
+                        symbol,
+                        "citation_unknown_source",
+                        f"cites {', '.join(f'[{item}]' for item in missing)}, which "
+                        "this session did not collect; use a source id from the "
+                        "tool result's _sources index",
+                        source_ids=list(cited_ids),
+                        missing_sources=missing,
+                    )
+                ]
+            sources = [self.source_by_id(source_id) for source_id in cited_ids]
+            sources = [source for source in sources if source is not None]
+            if not any(value_in_source(source, figure.value) for source in sources):
+                return [
+                    self._figure_issue(
+                        "numeric_claim_conflict",
+                        figure,
+                        "cited",
+                        symbol,
+                        "citation_value_not_in_source",
+                        f"does not appear in {', '.join(f'[{item}]' for item in cited_ids)}; "
+                        "quote the source's own number or declare the arithmetic "
+                        "that derives this one",
+                        source_ids=list(cited_ids),
+                    )
+                ]
+            bracketed = [f"[{source_id.casefold()}]" for source_id in cited_ids]
+            folded_visible = visible_text.casefold()
+            if not any(marker in folded_visible for marker in bracketed):
+                return [
+                    self._figure_issue(
+                        "numeric_claim_conflict",
+                        figure,
+                        "cited",
+                        symbol,
+                        "citation_not_visible",
+                        "names a source id in the stripped note, but the id is not "
+                        "on the figure's line or in its table caption",
+                        source_ids=list(cited_ids),
+                    )
+                ]
+            return []
+
+        folded = visible_text.casefold()
         if not any(token in folded for token in _note_tokens(declaration.note)):
             return [
                 self._figure_issue(

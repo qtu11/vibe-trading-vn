@@ -15,10 +15,18 @@ agents:
 
       ## Analysis Requirements
 
+      Use `crypto_derivatives` only for an explicit BASE-USDT-PERP target:
+      the supported source is public Binance linear USDT perpetual history.
+      Keep actual intervals, event/retrieval times, rate types, coverage and
+      missing values. Do not infer an OKX/Bybit reading, seven-day history,
+      annualized yield, basis, long/short ratio or causal signal from it.
+      Requirements below remain unavailable unless their separate inputs were
+      actually retrieved; do not replace missing data with assumptions or zeros.
+
       ### I. Funding Rate Regime
-      - Current 8h funding rate on OKX, Binance, and Bybit
+      - Realized funding by venue and actual settlement interval when available
       - 7-day average and trend (rising / stable / declining)
-      - Annualized funding rate and regime classification (overheated / bullish carry / neutral / bearish / oversold)
+      - State observed rates/cadences; annualized scenarios require explicit assumptions and are not realized yield
       - Funding rate divergence from price action (key reversal signal)
 
       ### II. Basis Structure
@@ -38,7 +46,7 @@ agents:
       - Long/short ratio (retail contrarian indicator)
 
       Use load_skill for funding rate analysis patterns and OKX data interfaces.
-    tools: [bash, read_file, write_file, load_skill, get_market_data]
+    tools: [bash, read_file, write_file, load_skill, get_market_data, crypto_derivatives]
     skills: [perp-funding-basis, okx-market, crypto-derivatives]
     max_iterations: 50
     timeout_seconds: 1800

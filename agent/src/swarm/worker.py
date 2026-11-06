@@ -35,6 +35,7 @@ from src.swarm.models import (
     WorkerResult,
 )
 from src.swarm.context import WorkerContext
+from src.swarm.budget import SwarmBudgetExceeded, SwarmCallBudget
 from src.tools import build_swarm_registry
 from src.tools.mcp import MCPRemoteTool
 from src.tools.redaction import redact_payload, redact_tool_result
@@ -541,6 +542,7 @@ def run_worker(
     grounding_block: str = "",
     agent_config: AgentConfig | None = None,
     cancel_event: threading.Event | None = None,
+    call_budget: SwarmCallBudget | None = None,
 ) -> WorkerResult:
     """Run one worker task, releasing the per-task LLM client on exit.
 
@@ -591,6 +593,7 @@ def run_worker(
             grounding_block=grounding_block,
             agent_config=agent_config,
             cancel_event=cancel_event,
+            call_budget=call_budget,
         )
     finally:
         llm.close()
@@ -609,6 +612,7 @@ def _run_worker_impl(
     *,
     llm: ChatLLM,
     cancel_event: threading.Event | None = None,
+    call_budget: SwarmCallBudget | None = None,
 ) -> WorkerResult:
     """Execute a single worker task using a lightweight ReAct loop.
 
@@ -890,26 +894,37 @@ def _run_worker_impl(
                 stream_kwargs: dict[str, Any] = {}
                 if cancel_event is not None:
                     stream_kwargs["should_cancel"] = cancel_event.is_set
+                call_index = (
+                    call_budget.reserve(agent_id, task_id, iteration)
+                    if call_budget is not None else None
+                )
                 with HeartbeatTimer(
                     tool_name=f"llm:{agent_spec.model_name or 'default'}",
                     interval=_HEARTBEAT_INTERVAL_S,
                     emit=_on_llm_heartbeat,
                 ):
                     try:
-                        return llm.stream_chat(
+                        response = llm.stream_chat(
                             messages,
                             tools=tool_defs,
                             timeout=remaining_timeout,
                             on_text_chunk=_on_text_chunk,
                             **stream_kwargs,
                         )
-                    except ProviderStreamError as error:
+                    except Exception as error:
                         usage = getattr(error, "usage_metadata", None)
                         account_response(LLMResponse(usage_metadata=usage))
-                        _emit(event_callback, "worker_stream_usage", agent_id, task_id,
-                              {"iteration": iteration, "usage": usage,
-                               "status": "failed_stream"})
+                        if call_budget is not None:
+                            call_budget.record(call_index, usage, "failed", agent_id, task_id)
+                        if isinstance(error, ProviderStreamError):
+                            _emit(event_callback, "worker_stream_usage", agent_id, task_id,
+                                  {"iteration": iteration, "usage": usage,
+                                   "status": "failed_stream"})
                         raise
+                    account_response(response)
+                    if call_budget is not None:
+                        call_budget.record(call_index, response.usage_metadata, "returned", agent_id, task_id)
+                    return response
 
 
             # A transient mid-stream hiccup (connection reset) used to be
@@ -984,7 +999,7 @@ def _run_worker_impl(
             logger.warning(error_msg)
             _emit(event_callback, "worker_failed", agent_id, task_id, {"error": error_msg})
             return WorkerResult(
-                status="failed",
+                status="budget_limit" if isinstance(exc, SwarmBudgetExceeded) else "failed",
                 summary=_resolve_summary(artifact_dir, last_assistant_content or ""),
                 artifact_paths=_collect_artifacts(run_dir, artifact_dir),
                 iterations=iteration,
@@ -1004,7 +1019,6 @@ def _run_worker_impl(
         # runtime._merge_token_source: one heuristic iteration contaminates the
         # cumulative total, so a partly-estimated sum never reads as billed.
         worker_context.observe(messages, tool_defs, getattr(response, "usage_metadata", None))
-        account_response(response)
 
         # Track last meaningful assistant content
         if response.content and len(response.content.strip()) > 20:

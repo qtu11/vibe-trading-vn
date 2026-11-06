@@ -1235,6 +1235,76 @@ class _EvidenceMixin:
                     )
                 )
 
+    def _ingest_council_snapshot(
+        self,
+        arguments: Mapping[str, Any],
+        payload: dict[str, Any] | None,
+        call_id: str,
+    ) -> None:
+        """Ground the chart bars of a council result, and nothing else.
+
+        A council tool result mixes observed bars with model-written entry,
+        stop and target prices.  The fence is the only place the bars are
+        guaranteed to come from the loader fetch the wrapper performed, so the
+        ledger re-projects those bars and deliberately skips the generic
+        numeric intake: a PM's target price is a claim, not an observation.
+        """
+        from src.tools.council_contract import extract_council_block
+
+        block = extract_council_block(payload)
+        if block is None:
+            self._record_tool_failure(
+                "run_research_council", call_id, "malformed council block"
+            )
+            return
+        symbol = _normalize_symbol(
+            str(block.get("symbol") or arguments.get("symbol") or "")
+        )
+        chart = block.get("chart")
+        bars = chart.get("bars") if isinstance(chart, Mapping) else None
+        if not _CANONICAL_SYMBOL_RE.fullmatch(symbol) or not isinstance(bars, list) or not bars:
+            self._record_tool_failure(
+                "run_research_council", call_id, "council block carried no chart bars"
+            )
+            return
+
+        rows: list[dict[str, Any]] = []
+        for bar in bars:
+            if not isinstance(bar, Mapping):
+                continue
+            row = {
+                "trade_date": bar.get("t"),
+                "open": bar.get("o"),
+                "high": bar.get("h"),
+                "low": bar.get("l"),
+                "close": bar.get("c"),
+            }
+            if bar.get("v") is not None:
+                row["volume"] = bar.get("v")
+            rows.append(row)
+        if not rows:
+            self._record_tool_failure(
+                "run_research_council", call_id, "council chart bars were unreadable"
+            )
+            return
+
+        self._ingest_market_data(
+            arguments,
+            {
+                symbol: rows,
+                "_provenance": {
+                    symbol: {
+                        "source": chart.get("source"),
+                        "quote_currency": chart.get("currency"),
+                        "venue": chart.get("venue"),
+                        "adjustment": chart.get("adjustment"),
+                    }
+                },
+            },
+            call_id,
+            tool_name="run_research_council",
+        )
+
     def _ingest_forex_context(self, payload: dict[str, Any] | None, call_id: str) -> None:
         """Keep native timeframes and external macro identities/units separate.
 

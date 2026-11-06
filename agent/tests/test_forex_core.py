@@ -90,4 +90,4 @@ def test_schema_one_migration_does_not_fabricate_old_binding(tmp_path):
         db.execute("PRAGMA user_version=1")
     assert Store(path).intent("old")["binding"] == {}
     with sqlite3.connect(path) as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 4

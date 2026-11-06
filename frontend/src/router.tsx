@@ -17,6 +17,7 @@ const Runtime = lazy(() =>
   import("@/pages/Runtime").then((m) => ({ default: m.Runtime })),
 );
 const Forex = lazy(() => import("@/pages/Forex").then((m) => ({ default: m.Forex })));
+const MarketResearch = lazy(() => import("@/pages/MarketResearch").then((m) => ({ default: m.MarketResearch })));
 const Scheduled = lazy(() =>
   import("@/pages/Scheduled").then((m) => ({ default: m.Scheduled })),
 );
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
       { path: "/pixel-office", element: wrap(PixelOffice) },
       { path: "/runtime", element: wrap(Runtime) },
       { path: "/forex", element: wrap(Forex) },
+      { path: "/research", element: wrap(MarketResearch) },
       { path: "/scheduled", element: wrap(Scheduled) },
       { path: "/reports", element: wrap(Reports) },
       { path: "/paper-trading", element: wrap(PaperTrading) },
