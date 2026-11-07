@@ -28,8 +28,8 @@ $ElectronDir = Join-Path $RepoRoot "desktop\electron"
 $VenvPython  = Join-Path $RepoRoot ".venv\Scripts\python.exe"
 $VibeExe     = Join-Path $RepoRoot ".venv\Scripts\vibe-trading.exe"
 $ReleaseDir  = Join-Path $ElectronDir "release"
-$InstallerExe= Join-Path $ReleaseDir "Vibe-Trading-Desktop-Unofficial-0.3.0-x64.exe"
-$UnpackedExe = Join-Path $ReleaseDir "win-unpacked\Vibe-Trading Desktop (Unofficial Community Build).exe"
+$InstallerExe= Join-Path $ReleaseDir "Vibe-Trading-0.3.1-x64.exe"
+$UnpackedExe = Join-Path $ReleaseDir "win-unpacked\Vibe-Trading.exe"
 $DesktopDir  = [Environment]::GetFolderPath("Desktop")
 $ShortcutLnk = Join-Path $DesktopDir "Vibe-Trading.lnk"
 
