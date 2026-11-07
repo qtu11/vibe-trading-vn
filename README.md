@@ -259,14 +259,18 @@ Hệ thống kết xuất báo cáo hoàn chỉnh phục vụ nhà đầu tư t�
 <p align="center">
   <img src="assets/baocaomau.png" width="800" alt="Báo cáo phân tích mẫu FPT chuẩn CFA"/>
 </p>
+
+
 * **Tệp báo cáo xuất bản kiểm chứng thực tế**: [VIBE_Research_FPT_20261107_CFA.pdf](output/pdf/VIBE_Research_FPT_20261107_CFA.pdf) (Bản PDF 30 trang đầy đủ 20 biểu đồ combo 2 trục tung, bảng định giá P/E đa kịch bản và chứng từ kiểm toán).
 * **Tóm tắt luận điểm đầu tư**: Khuyến nghị **MUA**, Giá mục tiêu **121,909 VND/CP** (+20.6% upside so với thị giá đóng cửa 101,100 VND).
 * **Bảng định giá P/E đa kịch bản**:
-  | Kịch bản | Tăng trưởng DT | LNST dự phóng | EPS pha loãng | P/E mục tiêu | Giá mục tiêu | Tiềm năng |
-  | --- | --- | --- | --- | --- | --- | --- |
-  | **Thận trọng** | 15.0% | 9,850 tỷ VND | 6,750 VND | 16.0x | 108,000 VND | +6.8% |
-  | **Cơ sở** | **18.5%** | **10,250 tỷ VND** | **7,020 VND** | **17.4x** | **121,909 VND** | **+20.6%** |
-  | **Thuận lợi** | 22.0% | 10,800 tỷ VND | 7,400 VND | 18.2x | 135,000 VND | +33.5% |
+
+| Kịch bản | Tăng trưởng DT | LNST dự phóng | EPS pha loãng | P/E mục tiêu | Giá mục tiêu | Tiềm năng |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Thận trọng** | 15.0% | 9,850 tỷ VND | 6,750 VND | 16.0x | 108,000 VND | +6.8% |
+| **Cơ sở** | **18.5%** | **10,250 tỷ VND** | **7,020 VND** | **17.4x** | **121,909 VND** | **+20.6%** |
+| **Thuận lợi** | 22.0% | 10,800 tỷ VND | 7,400 VND | 18.2x | 135,000 VND | +33.5% |
+
 * **Hệ thống 20 biểu đồ combo 2 trục tung**:
   - Doanh thu & Tăng trưởng doanh thu Khối Công nghệ thông tin nước ngoài (Nhật Bản, APAC, Châu Âu, Mỹ).
   - Biên lợi nhuận gộp & Biên lợi nhuận ròng giai đoạn 2021 - 2025 theo từng quý.
