@@ -396,10 +396,21 @@ class SwarmRuntime:
         """
         with self._lock:
             cancel_event = self._cancel_events.get(run_id)
-        if cancel_event is None:
-            return False
-        cancel_event.set()
-        return True
+        if cancel_event is not None:
+            cancel_event.set()
+            return True
+
+        # Orphaned run recovery after server restart
+        try:
+            run = self._store.get_run(run_id)
+            if run is not None and run.status in (SwarmRunStatus.running, SwarmRunStatus.pending):
+                run.status = SwarmRunStatus.cancelled
+                self._store.save_run(run)
+                return True
+        except Exception as exc:
+            logger.warning("Failed to cancel orphaned run %s: %s", run_id, exc)
+
+        return False
 
     def _emit_event(self, run_id: str, event: SwarmEvent) -> None:
         """Persist an event and forward to live callback if registered.

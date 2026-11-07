@@ -6,19 +6,22 @@ import { authHeaders } from "@/lib/apiAuth";
 interface Selection { eligible_messages?: number; recent_messages?: number; retrieved_messages?: number; omitted_messages?: number; truncated_recent_messages?: number; history_chars?: number; history_char_budget?: number }
 export interface ContextSnapshot {
   version: 1; source: string; run_id: string;
+  session_id?: string; attempt_id?: string;
   initial_selection?: Selection;
   initial_components?: { prompt_profile?: string; system_chars?: number; recalled_memories?: Array<{ title: string; type: string }> };
-  current_prompt?: { estimated_next_request_tokens?: number; last_reported_input_tokens?: number | null; model_window?: number; window_source?: string; prompt_cost_cap?: number; compact_at?: number };
+  current_prompt?: { estimated_next_request_tokens?: number; last_reported_input_tokens?: number | null; model_window?: number; window_source?: string; window_confidence?: string; model?: string; provider?: string; phase?: "pre_request" | "post_response" | "post_compaction" | "final"; observed_at?: string; prompt_cost_cap?: number; compact_at?: number };
+  compaction?: { state: "idle" | "running" | "completed" | "failed" | "skipped"; automatic?: boolean; count?: number; updated_at?: string };
 }
-interface ContextView {
+export interface ContextView {
   version: 1; session_id: string; model_calls: 0; stored_messages: number; preview: Selection;
   last_run: ContextSnapshot | null;
   last_run_usage?: { totals?: { input_tokens?: number; output_tokens?: number; calls?: number; cache_read_tokens?: number } } | null;
   last_run_council_usage_tracked?: boolean | null;
+  model_context?: { model?: string; provider?: string; window?: number; source?: string; confidence?: string; prompt_cost_cap?: number; compact_at?: number } | null;
   memory: { available_entries: number | null; error: string | null; entries: Array<{ id: string; title: string; type: string }>; recall_preview: Array<{ id: string; title: string; type: string; excerpt: string }>; automatic_fact_extraction: false };
 }
 
-export function ContextMemoryPanel({ sessionId, live }: { sessionId: string | null; live?: ContextSnapshot }) {
+export function ContextMemoryPanel({ sessionId, live, embedded = false }: { sessionId: string | null; live?: ContextSnapshot; embedded?: boolean }) {
   const { i18n } = useTranslation();
   const vi = i18n.language.startsWith("vi");
   const l = (en: string, vn: string) => vi ? vn : en;
@@ -65,18 +68,18 @@ export function ContextMemoryPanel({ sessionId, live }: { sessionId: string | nu
   const prompt = snapshot?.current_prompt;
   const usage = data?.last_run_usage?.totals;
   const n = (value?: number | null) => typeof value === "number" && Number.isFinite(value) ? value.toLocaleString(vi ? "vi-VN" : "en-US") : "—";
-  return <details open={open} onToggle={e => setOpen(e.currentTarget.open)} className="shrink-0 border-b bg-muted/10 text-xs">
-    <summary className="flex cursor-pointer flex-wrap items-center gap-2 px-4 py-2 font-medium"><Brain size={14} aria-hidden="true" />{l("Context & memory", "Context & bộ nhớ")}
+  return <details open={open} onToggle={e => setOpen(e.currentTarget.open)} className={`shrink-0 ${embedded ? "border-t" : "border-b bg-muted/10"} text-xs`}>
+    <summary className={`flex cursor-pointer flex-wrap items-center gap-2 ${embedded ? "py-2" : "px-4 py-2"} font-medium`}><Brain size={14} aria-hidden="true" />{embedded ? l("History & long-term memory", "Lịch sử & bộ nhớ dài hạn") : l("Context & memory", "Context & bộ nhớ")}
       {live?.current_prompt?.last_reported_input_tokens != null && <span className="font-normal text-muted-foreground">· {n(live.current_prompt.last_reported_input_tokens)} {l("input tokens in last main request", "token input ở request chính gần nhất")}</span>}
       <ChevronDown size={13} className={open ? "rotate-180" : ""} aria-hidden="true" />
     </summary>
-    {open && <div className="max-h-[50vh] space-y-3 overflow-auto px-4 pb-3">
+    {open && <div className={`space-y-3 pb-3 ${embedded ? "" : "max-h-[50vh] overflow-auto px-4"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-muted-foreground">{l("Inspecting this panel makes no model calls. Stored history, recalled memory and billed tokens are different quantities.", "Mở bảng này không gọi model. Lịch sử đã lưu, bộ nhớ được truy xuất và token đã dùng là các số khác nhau.")}</p><button className="inline-flex items-center gap-1 rounded border px-2 py-1" disabled={loading || !sessionId} onClick={() => setRevision(v => v + 1)}><RefreshCw size={12} />{l("Refresh", "Làm mới")}</button></div>
       {!sessionId && <p>{l("Select a conversation to inspect its context.", "Chọn một phiên chat để xem context.")}</p>}
       {loading && <p role="status">{l("Reading saved state…", "Đang đọc dữ liệu đã lưu…")}</p>}
       {error && <p role="alert" className="text-destructive">{error}</p>}
       {data && <>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className={embedded ? "space-y-3" : "grid gap-3 sm:grid-cols-2"}>
           <section className="rounded-lg border p-3"><h3 className="font-semibold">{l("Session context", "Bộ nhớ phiên chat")}</h3>
             <p className="mt-1">{l("Saved messages", "Tin nhắn đã lưu")}: {n(data.stored_messages)}</p>
             <p>{snapshot ? l("Initial selection in the recorded run", "Lịch sử nạp ở đầu lượt đã ghi nhận") : l("Preview for the next turn", "Dự kiến lịch sử cho lượt tới")}: {n(selection?.recent_messages)} {l("recent", "gần nhất")} + {n(selection?.retrieved_messages)} {l("recalled older messages", "tin cũ được truy xuất")}</p>

@@ -513,6 +513,9 @@ class ToolCallLifecycle:
             result, elapsed_ms = self._invoke_tool(tc.name, args, call_id=tc.id)
             return tc, result, elapsed_ms
 
+        # Each readonly invocation owns its deadline and discards late results.
+        # A future timeout inside this context would still wait at shutdown;
+        # it cannot safely act as a second cancellation mechanism.
         with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(runnable), 8)) as pool:
             futures = [pool.submit(copy_context().run, _run, item) for item in runnable]
             results = []
@@ -592,6 +595,15 @@ class ToolCallLifecycle:
         """
         readonly = self._is_tool_readonly(tool_name)
         timed_out = threading.Event()
+
+        def execute_registered_tool():
+            from src.agent.tool_context import current_grounding
+
+            token = current_grounding.set(getattr(self, "_grounding", None))
+            try:
+                return self.registry.execute(tool_name, args)
+            finally:
+                current_grounding.reset(token)
 
         def _on_progress(event: ProgressEvent) -> None:
             if timed_out.is_set():
@@ -681,7 +693,7 @@ class ToolCallLifecycle:
             _set_emitter(_on_progress)
             try:
                 with _heartbeat_timer():
-                    result = self.registry.execute(tool_name, args)
+                    result = execute_registered_tool()
             finally:
                 finished.set()
                 _set_emitter(None)
@@ -695,7 +707,7 @@ class ToolCallLifecycle:
         def _worker() -> None:
             _set_emitter(_on_progress)
             try:
-                result_queue.put((self.registry.execute(tool_name, args), None))
+                result_queue.put((execute_registered_tool(), None))
             except BaseException as exc:  # noqa: BLE001 - propagate through caller thread
                 result_queue.put((None, exc))
             finally:

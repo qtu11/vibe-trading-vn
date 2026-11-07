@@ -17,15 +17,61 @@ from urllib.parse import unquote, urlparse
 from urllib.request import url2pathname
 from xml.sax.saxutils import escape
 
-from .fonts import system_cjk_candidates
+from .fonts import system_cjk_candidates, system_latin_candidates
 
 logger = logging.getLogger(__name__)
 
 # reportlab's TTFont only understands TrueType-flavored fonts. The first
 # candidate that registers wins; .ttc files are tried with subfontIndex=0.
 _FONT_FAMILY = "VibeShadowCJK"
+_LATIN_FAMILY = "VibeReportLatin"
 _font_ready: bool = False  # probe ran; says nothing about what it found
 _font_family: str = _FONT_FAMILY  # family actually usable after the probe
+_latin_ready: bool = False
+_latin_family: str = _LATIN_FAMILY
+
+
+def _register_first(family: str, candidates: list[Path]) -> bool:
+    """Register the first candidate TTF that reportlab accepts."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            pdfmetrics.registerFont(TTFont(family, str(path), subfontIndex=0))
+        except Exception:
+            continue
+        return True
+    return False
+
+
+def ensure_latin_font() -> str:
+    """Register a Vietnamese-capable Latin TTF once and return its family.
+
+    The bundled CJK face omits Vietnamese precomposed characters
+    (U+1EA0–U+1EF9), so Latin-script report text must not use it. Arial / Segoe
+    UI / Calibri / Tahoma cover Vietnamese on Windows; DejaVu Sans is the
+    always-available fallback shipped with matplotlib.
+    """
+    global _latin_ready, _latin_family
+    if _latin_ready:
+        return _latin_family
+    if _register_first(_LATIN_FAMILY, system_latin_candidates()):
+        _latin_ready = True
+        _latin_family = _LATIN_FAMILY
+        return _latin_family
+
+    # Built-in Helvetica covers Latin-1 and is the last non-blank option.
+    _latin_ready = True
+    _latin_family = "Helvetica"
+    return _latin_family
+
+
+def ensure_cjk_font() -> str:
+    """Register a CJK-capable TTF once and return its family (fallback face)."""
+    return _ensure_font()
 
 
 def _ensure_font() -> str:
@@ -34,15 +80,8 @@ def _ensure_font() -> str:
     if _font_ready:
         return _font_family
 
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-
     bundled = Path(__file__).parent / "assets" / "VibeCJK-Regular.ttf"
-    for path in [bundled, *system_cjk_candidates()]:
-        try:
-            pdfmetrics.registerFont(TTFont(_FONT_FAMILY, str(path), subfontIndex=0))
-        except Exception:
-            continue
+    if _register_first(_FONT_FAMILY, [bundled, *system_cjk_candidates()]):
         _font_ready = True
         _font_family = _FONT_FAMILY
         return _font_family

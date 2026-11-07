@@ -580,10 +580,18 @@ class SessionService:
         self._active_loops[session_id] = agent
 
         # Build the message history context.
-        from src.session.context import pack_history
-        packed = pack_history(messages or [], attempt.prompt)
+        from src.config.paths import get_runtime_root
+        from src.session.compaction_memory import prepare_session_history
+        previous = (self.store.get_attempt(session_id, attempt.parent_attempt_id)
+                    if attempt.parent_attempt_id else None)
+        packed, compaction_memory = prepare_session_history(
+            messages or [], attempt.prompt, session_id=session_id,
+            runs_root=get_runtime_root() / "runs",
+            previous_run_dir=previous.run_dir if previous is not None else None,
+        )
         history = packed["history"] or None
         agent._session_context_stats = packed["stats"]
+        agent._session_compaction_memory = compaction_memory
 
         try:
             result = await loop.run_in_executor(

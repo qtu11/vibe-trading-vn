@@ -30,7 +30,7 @@ export function DistributionChart({
   const dark = useThemeDark();
 
   useEffect(() => {
-    if (!ref.current || samples.length === 0) return;
+    if (!ref.current || !samples || !Array.isArray(samples) || samples.length === 0) return;
     const t = getChartTheme();
     const chart = echarts.init(ref.current);
 

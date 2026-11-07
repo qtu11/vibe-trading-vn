@@ -279,6 +279,8 @@ register_research_routes(app)
 
 from src.api.research_artifact_routes import register_research_artifact_routes  # noqa: E402
 register_research_artifact_routes(app)
+from src.api.reports_routes import register_reports_routes  # noqa: E402
+register_reports_routes(app)
 
 from src.api.live_routes import (  # noqa: F401, E402
     CommitMandateRequest,

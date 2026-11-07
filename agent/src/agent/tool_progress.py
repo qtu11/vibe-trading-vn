@@ -96,7 +96,35 @@ class ToolProgress:
             self._new_observation = True
             return
         try:
-            result = json.dumps(json.loads(result), sort_keys=True, ensure_ascii=False)
+            observation_payload = json.loads(result)
+            if (
+                is_readonly
+                and name == "web_search"
+                and isinstance(observation_payload, dict)
+                and isinstance(observation_payload.get("results"), list)
+            ):
+                # The first-party search envelope echoes the requested query
+                # and routing backend. Rephrasing a search that returns the
+                # same hits (including no hits) is not new evidence. Restrict
+                # this projection to known envelope metadata: actual hits,
+                # snippets, warnings and other source fields remain intact.
+                # ``result`` returned to the model/grounding ledger is never
+                # modified; only this progress fingerprint uses the projection.
+                observation_payload.pop("query", None)
+                observation_payload.pop("backends", None)
+            elif (
+                is_readonly
+                and name == "read_url"
+                and isinstance(observation_payload, dict)
+                and isinstance(observation_payload.get("url"), str)
+                and isinstance(observation_payload.get("content"), str)
+            ):
+                # Local cache bookkeeping changes on each hit without changing
+                # the retrieved page. Keep the upstream ``cached`` disclosure,
+                # publication timestamps and all page/source content intact.
+                observation_payload.pop("memory_cached", None)
+                observation_payload.pop("cache_age_seconds", None)
+            result = json.dumps(observation_payload, sort_keys=True, ensure_ascii=False)
         except (ValueError, TypeError):
             pass
         observation = (

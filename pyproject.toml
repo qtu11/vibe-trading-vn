@@ -125,6 +125,8 @@ include = ["src*", "backtest*", "cli*", "evals*"]
     "shadow_account/assets/*.ttf",
     "shadow_account/assets/*.txt",
     "shadow_account/assets/*.md",
+    "reporting/assets/*.png",
+    "reporting/templates/*.json",
 ]
 "evals.harness" = ["README.md", "cases/**/*.json"]
 "backtest" = ["*.py", "loaders/*.json"]

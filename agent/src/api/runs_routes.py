@@ -753,13 +753,15 @@ def _build_response_from_run_dir(
 
     response.has_factor_artifacts = _has_factor_artifacts(run_dir)
 
+    _ARTIFACT_CSV_LIMIT = 5000
+
     equity_path = run_dir / "artifacts" / "equity.csv"
     if equity_path.exists():
-        response.artifacts_equity_csv = load_csv_records(equity_path)
+        response.artifacts_equity_csv = load_csv_records(equity_path, limit=_ARTIFACT_CSV_LIMIT)
 
     metrics_csv_path = run_dir / "artifacts" / "metrics.csv"
     if metrics_csv_path.exists():
-        response.artifacts_metrics_csv = load_csv_records(metrics_csv_path)
+        response.artifacts_metrics_csv = load_csv_records(metrics_csv_path, limit=_ARTIFACT_CSV_LIMIT)
 
     run_card_path = run_dir / "run_card.json"
     if run_card_path.exists():
@@ -784,16 +786,16 @@ def _build_response_from_run_dir(
 
     trades_path = run_dir / "artifacts" / "trades.csv"
     if trades_path.exists():
-        response.artifacts_trades_csv = load_csv_records(trades_path)
+        response.artifacts_trades_csv = load_csv_records(trades_path, limit=_ARTIFACT_CSV_LIMIT)
 
     positions_path = run_dir / "artifacts" / "positions.csv"
     if positions_path.exists():
-        response.artifacts_positions_csv = load_csv_records(positions_path)
+        response.artifacts_positions_csv = load_csv_records(positions_path, limit=_ARTIFACT_CSV_LIMIT)
 
     target_positions_path = run_dir / "artifacts" / "target_positions.csv"
     if target_positions_path.exists():
         response.artifacts_target_positions_csv = load_csv_records(
-            target_positions_path
+            target_positions_path, limit=_ARTIFACT_CSV_LIMIT
         )
 
     validation_path = run_dir / "artifacts" / "validation.json"
@@ -1034,13 +1036,8 @@ def register_runs_routes(
             _build_positions_sector_map, run_dir, run_id, refresh=bool(refresh)
         )
 
-    @app.get("/runs", response_model=List[RunInfo], dependencies=[Depends(require_auth)])
-    async def list_runs(limit: int = 20):
-        """List recent runs with summary fields."""
+    def _sync_list_runs(runs_dir: Path, limit_val: int) -> List[Any]:
         from src.ui_services import load_run_context
-
-        limit = min(max(1, limit), 100)
-        runs_dir = _host_RUNS_DIR()
 
         if not runs_dir.exists():
             return []
@@ -1052,7 +1049,7 @@ def register_runs_routes(
         )
 
         results = []
-        for d in run_dirs[:limit]:
+        for d in run_dirs[:limit_val]:
             run_id = d.name
 
             # Status from state.json or artifacts
@@ -1081,8 +1078,11 @@ def register_runs_routes(
                         created_at = f"{d_str[:4]}-{d_str[4:6]}-{d_str[6:8]} {t_str[:2]}:{t_str[2:4]}:{t_str[4:6]}"
 
             if created_at == "Unknown":
-                mtime = datetime.fromtimestamp(d.stat().st_mtime)
-                created_at = mtime.strftime("%Y-%m-%d %H:%M:%S")
+                try:
+                    mtime = datetime.fromtimestamp(d.stat().st_mtime)
+                    created_at = mtime.strftime("%Y-%m-%d %H:%M:%S")
+                except OSError:
+                    pass
 
             prompt = None
             req_file = d / "req.json"
@@ -1104,7 +1104,10 @@ def register_runs_routes(
             if not prompt:
                 prompt_file = d / "user_prompt.txt"
                 if prompt_file.exists():
-                    prompt = prompt_file.read_text(encoding="utf-8").strip()
+                    try:
+                        prompt = prompt_file.read_text(encoding="utf-8").strip()
+                    except OSError:
+                        pass
 
             total_return = None
             sharpe = None
@@ -1134,3 +1137,10 @@ def register_runs_routes(
             ))
 
         return results
+
+    @app.get("/runs", response_model=List[RunInfo], dependencies=[Depends(require_auth)])
+    async def list_runs(limit: int = 20):
+        """List recent runs with summary fields."""
+        limit_val = min(max(1, limit), 100)
+        runs_dir = _host_RUNS_DIR()
+        return await run_in_threadpool(_sync_list_runs, runs_dir, limit_val)

@@ -2441,3 +2441,89 @@ def test_keep_list_does_not_endorse_rejections_hidden_by_the_feedback_cap(tmp_pa
     assert "Every other measured figure" not in prompt
     assert "only the figures listed above need work" not in prompt
     assert f"{len(result.issues) - 24} additional" in prompt
+
+
+def test_vietnam_financial_statements_and_indicator_figures_are_observed(tmp_path: Path) -> None:
+    """Financial statements and indicator facts must not be redacted into omitted markers."""
+    symbol = "TCB.VN"
+    ledger = GroundingLedger(run_dir=tmp_path, user_message=f"Phân tích cổ phiếu {symbol}")
+    ledger.ingest_tool_result(
+        tool_name="get_market_data",
+        arguments={"codes": [symbol]},
+        result=json.dumps({
+            symbol: [
+                {"trade_date": "2026-11-06", "open": 21800, "high": 22100, "low": 21400, "close": 21950, "volume": 15000000}
+            ],
+            "_provenance": {
+                symbol: {
+                    "source": "yahoo",
+                    "quote_currency": "VND",
+                    "requested_source": "auto",
+                    "detected_source": "yahoo",
+                    "fallback_used": False,
+                    "currency_conversion": "none",
+                }
+            }
+        }),
+        call_id="market-tcb",
+        success=True,
+    )
+    ledger.ingest_tool_result(
+        tool_name="get_financial_statements",
+        arguments={"code": symbol, "statement": "income"},
+        result=json.dumps({
+            "ok": True,
+            "market": "vn",
+            "source": "local_financial_statements",
+            "statement": "income",
+            "period": "quarter",
+            "data": {
+                "records": [
+                    {
+                        "period_end": "2026-09-30",
+                        "facts": {
+                            "total_operating_income": {"value": "39859", "unit": "VND", "scale": 1000000000},
+                            "net_interest_income": {"value": "27530", "unit": "VND", "scale": 1000000000},
+                            "profit_before_tax": {"value": "10375", "unit": "VND", "scale": 1000000000},
+                        }
+                    }
+                ]
+            }
+        }),
+        call_id="financials-tcb",
+        success=True,
+    )
+    ledger.ingest_tool_result(
+        tool_name="technical_indicators",
+        arguments={"symbol": symbol},
+        result=json.dumps({
+            "ok": True,
+            "symbol": symbol,
+            "interval": "1d",
+            "latest_close": 21950,
+            "indicators": {
+                "rsi_14": 48.5,
+                "sma_20": 22125,
+                "bollinger": {"upper": 23041, "middle": 22125, "lower": 21209},
+                "volume": {"ratio_20": 0.85}
+            }
+        }),
+        call_id="indicators-tcb",
+        success=True,
+    )
+
+    draft = (
+        f"{symbol}（Yahoo，VND）giá đóng cửa 21950 VND.\n\n"
+        "### 4. Kết quả kinh doanh Q3/2026\n"
+        "| Chỉ tiêu (tỷ VND) | Q3/2026 |\n"
+        "|---|---|\n"
+        "| Tổng thu nhập hoạt động (TOI) | 39859 |\n"
+        "| Thu nhập lãi thuần (NII) | 27530 |\n"
+        "| LNTT | 10375 |\n\n"
+        "Thanh khoản đạt 0.85 lần bình quân 20 phiên."
+    )
+    validation = ledger.validate_final_answer(draft)
+    assert validation.valid is True
+    assert validation.issues == []
+    assert "(omitted" not in validation.released_text
+    assert "（略" not in validation.released_text

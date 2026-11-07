@@ -23,8 +23,12 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 from docx.enum.style import WD_STYLE_TYPE
 
-from brand import BRAND, Brand
-from schema import Claim, Metric, Recommendation, ResearchReport
+try:
+    from brand import BRAND, Brand
+    from schema import Claim, Metric, Recommendation, ResearchReport
+except ImportError:
+    from agent.vibe_report_engine.brand import BRAND, Brand
+    from agent.vibe_report_engine.schema import Claim, Metric, Recommendation, ResearchReport
 
 HERE = Path(__file__).resolve().parent
 
@@ -395,8 +399,26 @@ def make_docx(report: ResearchReport, path: Path):
     return path
 
 
-def convert_pdf(docx_path: Path, out_dir: Path):
+def find_soffice() -> str | None:
+    """Find LibreOffice or OpenOffice executable across environments."""
     exe = shutil.which("libreoffice") or shutil.which("soffice")
+    if exe:
+        return exe
+    candidates = [
+        r"C:\Program Files\LibreOffice\program\soffice.exe",
+        r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        "/usr/bin/libreoffice",
+        "/usr/bin/soffice",
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    ]
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def convert_pdf(docx_path: Path, out_dir: Path):
+    exe = find_soffice()
     if not exe:
         raise RuntimeError("Cần cài LibreOffice/soffice để xuất PDF từ DOCX")
     out_dir.mkdir(parents=True, exist_ok=True)

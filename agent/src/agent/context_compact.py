@@ -386,6 +386,38 @@ def _tail_cut_index(body: list, budget: int = TAIL_TOKEN_BUDGET) -> int:
     return cut_idx
 
 
+def _compaction_segments(
+    body: list,
+    *,
+    budget: int = TAIL_TOKEN_BUDGET,
+    preserve_tool_call_ids: Optional[set[str]] = None,
+) -> tuple[list, list]:
+    """Select a tail without splitting calls/results or folding the active ask.
+
+    A forced midpoint used to bisect a tool batch: its result was then neither
+    summarized nor retained by pair repair. Advance to the end of that batch.
+    The latest actual user request and replay leases remain verbatim, even when
+    they alone exceed the target. The caller must report that case explicitly.
+    """
+    cut = _tail_cut_index(body, budget=max(0, budget))
+    if cut == 0 and len(body) > 2:
+        cut = max(1, len(body) // 2)
+        while cut < len(body) and body[cut].get("role") == "tool":
+            cut += 1
+    head, tail = body[:cut], body[cut:]
+    pending = preserve_tool_call_ids or set()
+    latest_user = next((msg for msg in reversed(body) if msg.get("role") == "user"
+                        and not str(msg.get("content", "")).startswith("[Conversation compressed — handoff summary.")), None)
+    retained = [msg for msg in head if msg is latest_user or (
+        msg.get("role") == "tool" and msg.get("tool_call_id") in pending
+    ) or any(call.get("id") in pending for call in msg.get("tool_calls") or [])]
+    if retained:
+        retained_ids = {id(msg) for msg in retained}
+        head = [msg for msg in head if id(msg) not in retained_ids]
+        tail = retained + tail
+    return head, tail
+
+
 def _fix_tool_pairs(messages: list) -> None:
     """Repair orphaned tool_call / tool_result pairs after compression.
 

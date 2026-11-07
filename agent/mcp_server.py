@@ -2367,6 +2367,21 @@ def get_sec_filings(
 
 
 @mcp.tool
+def export_research_report(report: dict[str, Any], formats: list[str] | None = None) -> str:
+    """Render an authoritative Vibe-Trading branded research report in DOCX and PDF formats.
+
+    Receives structured research JSON complying with the ResearchReport schema, executes
+    deterministic document rendering without altering business figures, and registers
+    downloadable artifacts.
+    """
+    params = {"report": report}
+    if formats is not None:
+        # pyrefly: ignore[bad-assignment]
+        params["formats"] = formats
+    return _get_registry().execute("export_research_report", params)
+
+
+@mcp.tool
 def vietnam_research(
     code: str, as_of: str | None = None, period: str = "quarter",
     consolidation: str = "consolidated", offset: int = 0,

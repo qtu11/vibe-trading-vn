@@ -268,7 +268,7 @@ Kết quả đợt Forex/AI ngày 03/11/2026, trước khi nối thêm luồng c
 
 Tổng **315 test backend + 61 test frontend**. Không chạy toàn bộ test suite. Bản frontend vẫn có cảnh báo chunk vendor lớn; pytest có cảnh báo cấu hình loop scope từ dependency, không gây fail các bộ trên.
 
-Đợt đầu dùng runtime giả lập chỉ đọc riêng: [ảnh kiểm chứng ban đầu](verification/forex-readonly-ui.png). Đợt bổ sung đã nối phiên Exness Demo theo yêu cầu operator, lưu allowlist/giới hạn Demo trong runtime đang phục vụ cổng 8000 và phân tích nến bằng provider hiện có. Không lấy mật khẩu MT5. Không lưu danh tính/số dư tài khoản thực vào fixture công khai. Chưa gửi broker order; quyền terminal đang chặn.
+Theo biên bản lịch sử, đợt đầu dùng runtime giả lập chỉ đọc riêng; ảnh `verification/forex-readonly-ui.png` được nhắc trong bản cũ hiện không có trong checkout, nên chưa kiểm tra lại bằng chứng hình ảnh. Biên bản cũng ghi đợt bổ sung đã nối Exness Demo theo yêu cầu operator và lưu allowlist/giới hạn Demo trong runtime cổng8000 khi đó. Đây không phải xác nhận trạng thái kết nối hiện tại. Không lấy mật khẩu MT5 hoặc lưu danh tính/số dư tài khoản vào fixture công khai; chưa chạy lại broker flow trong đợt nghiên cứu này.
 
 Các bộ kiểm thử không dùng tài khoản broker:
 

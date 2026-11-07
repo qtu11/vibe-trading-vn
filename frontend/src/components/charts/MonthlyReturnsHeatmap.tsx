@@ -18,6 +18,7 @@ export function MonthlyReturnsHeatmap({ data, annual, height = 300 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useChartLifecycle(ref, () => {
+    if (!data || !Array.isArray(data) || data.length === 0) return {};
     const t = getChartTheme();
 
     const monthFmt = new Intl.DateTimeFormat(i18n.language || "en", { month: "short" });

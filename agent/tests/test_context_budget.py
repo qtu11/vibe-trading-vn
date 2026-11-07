@@ -113,9 +113,11 @@ def test_cost_cap_bounds_a_huge_window() -> None:
     assert budget.compact_at == 200_000
 
 
-def test_a_window_smaller_than_the_static_prompt_still_has_a_floor() -> None:
+def test_static_prompt_cannot_raise_compaction_threshold_above_physical_window() -> None:
     budget = CompactionBudget(window=32_000, source="t", max_tokens=200_000, static_tokens=STATIC_TOKENS)
-    assert budget.conversation == cb.MIN_CONVERSATION_TOKENS
+    assert budget.conversation == 0
+    assert budget.static_over_budget
+    assert budget.micro_at == budget.collapse_at == budget.compact_at == budget.total == 25_600
 
 
 # --------------------------------------------------------------------------

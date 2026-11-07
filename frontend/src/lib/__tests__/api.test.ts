@@ -22,6 +22,41 @@ describe("generated report download", () => {
     expect(fetch).toHaveBeenCalledWith(`/api/reports/${"a".repeat(32)}`, expect.objectContaining({ headers: { Authorization: "Bearer report-test-key" } }));
     expect(click).toHaveBeenCalledOnce();
   });
+  it("rejects invalid handles, unexpected MIME, oversized files and non-PDF bodies", async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response("<html>login</html>", { headers: { "content-type": "text/html" } }))
+      .mockResolvedValueOnce(new Response("%PDF-test", { headers: { "content-type": "application/pdf", "content-length": String(33 * 1024 * 1024) } }))
+      .mockResolvedValueOnce(new Response("not a PDF", { headers: { "content-type": "application/pdf" } }));
+    vi.stubGlobal("fetch", fetch);
+    const { downloadGeneratedReport } = await loadApiModule();
+    await expect(downloadGeneratedReport("../private", "report.pdf")).rejects.toThrow("Mã tài liệu");
+    await expect(downloadGeneratedReport("a".repeat(32), "../report.pdf")).rejects.toThrow("Tên tài liệu");
+    for (let index = 0; index < 3; index++) await expect(downloadGeneratedReport("a".repeat(32), "report.pdf")).rejects.toThrow(/tài liệu/);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+  it("checks preview bytes against receipt size and supports aborting authenticated reads", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response("%PDF-test", { headers: { "content-type": "application/pdf" } }));
+    vi.stubGlobal("fetch", fetch);
+    const { fetchGeneratedReport } = await loadApiModule();
+    const controller = new AbortController();
+    await expect(fetchGeneratedReport({ report_id: "a".repeat(32), download_url: `/api/reports/${"a".repeat(32)}`,
+      media_type: "application/pdf", filename: "report.pdf", sha256: "c".repeat(64), size_bytes: 20 }, controller.signal)).rejects.toThrow("không khớp");
+    expect(fetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+  it("looks up the owning job by fixed artifact route and rejects another job's receipt", async () => {
+    const artifactId = "b".repeat(32);
+    const job = { job_id: "a".repeat(32), status: "succeeded", formats: ["pdf"], error: null,
+      artifacts: [{ report_id: artifactId, download_url: `/api/reports/${artifactId}`, filename: "research.pdf", media_type: "application/pdf", sha256: "c".repeat(64), size_bytes: 1000 }],
+      publication_status: "draft_unverified", created_at: "2026-11-07", updated_at: "2026-11-07" };
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(job), { headers: { "content-type": "application/json" } })));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await loadApiModule();
+    await expect(api.getReportJobForArtifact(artifactId)).resolves.toEqual(job);
+    expect(fetch.mock.calls[0][0]).toBe(`/api/reports/artifacts/${artifactId}/job`);
+    await expect(api.getReportJobForArtifact("d".repeat(32))).rejects.toThrow("Dữ liệu báo cáo");
+    await expect(api.getReportJobForArtifact("bad/id")).rejects.toThrow("Mã tài liệu");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("api request helper", () => {

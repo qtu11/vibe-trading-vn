@@ -1,0 +1,69 @@
+{
+  "validation_at": "2026-11-07T05:30:12.369555+00:00",
+  "tool": "get_market_data",
+  "fixture_used": false,
+  "loader_cache_enabled": false,
+  "model_calls": 0,
+  "orders": 0,
+  "requests": [
+    {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/FPT.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:10.827970+00:00",
+      "path": "D:\\Vibe-Trading\\artifacts\\market-data-audit-20261107\\yahoo_FPT.VN.json",
+      "canonical_json_sha256": "f20efd1f883941cbf34c9d29b657857f79a50c03c479f97b8b2244bc80ca0d9c"
+    },
+    {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/VCB.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:11.540516+00:00",
+      "path": "D:\\Vibe-Trading\\artifacts\\market-data-audit-20261107\\yahoo_VCB.VN.json",
+      "canonical_json_sha256": "86562dd1cf4c6208e965769db9a96dcddfbb81be935416026eda45f484890f7b"
+    },
+    {
+      "url": "https://query1.finance.yahoo.com/v8/finance/chart/HPG.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:12.359444+00:00",
+      "path": "D:\\Vibe-Trading\\artifacts\\market-data-audit-20261107\\yahoo_HPG.VN.json",
+      "canonical_json_sha256": "70e846f788967e8e14b185ab572b3d609db201c38cd2936a33290150b83e3988"
+    }
+  ],
+  "quotes": {
+    "FPT.VN": {
+      "symbol": "FPT.VN",
+      "exchange": "HOSE",
+      "value": 50800.0,
+      "unit": "VND",
+      "scale": 1,
+      "observed_at": "2026-11-06T07:45:09+00:00",
+      "price_basis": "raw",
+      "data_role": "last_trade",
+      "provider": "yahoo",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/FPT.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:10.827970+00:00"
+    },
+    "VCB.VN": {
+      "symbol": "VCB.VN",
+      "exchange": "HOSE",
+      "value": 53600.0,
+      "unit": "VND",
+      "scale": 1,
+      "observed_at": "2026-11-06T07:45:19+00:00",
+      "price_basis": "raw",
+      "data_role": "last_trade",
+      "provider": "yahoo",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/VCB.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:11.541516+00:00"
+    },
+    "HPG.VN": {
+      "symbol": "HPG.VN",
+      "exchange": "HOSE",
+      "value": 21200.0,
+      "unit": "VND",
+      "scale": 1,
+      "observed_at": "2026-11-06T07:45:11+00:00",
+      "price_basis": "raw",
+      "data_role": "last_trade",
+      "provider": "yahoo",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/HPG.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:12.359444+00:00"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "analysis_completed": [],
+  "analysis_evidence": [],
+  "evidence": [],
+  "identity": {
+    "authorized_symbols": [
+      "FPT.VN"
+    ],
+    "records": [
+      {
+        "candidates": [],
+        "currency": "VND",
+        "instrument_type": "listed_security",
+        "query": "FPT.VN",
+        "resolution_constraints": [],
+        "source": [
+          "user_message"
+        ],
+        "source_tool_call_id": "user_message",
+        "status": "locked",
+        "symbol": "FPT.VN",
+        "updated_at": "2026-11-07T05:11:13.493163Z",
+        "venue": "hose",
+        "version": 1
+      }
+    ],
+    "recovery": {
+      "max_price_evidence_attempts": 3,
+      "max_rounds": 6,
+      "max_symbol_resolution_attempts": 2,
+      "price_evidence_attempts": 0,
+      "rounds": 0,
+      "symbol_resolution_attempts": 0
+    },
+    "status": "locked"
+  },
+  "released": null,
+  "schema_version": 1,
+  "session_symbol_roots": [],
+  "session_symbols": [
+    "FPT.VN"
+  ],
+  "sources": [],
+  "tool_failures": [],
+  "updated_at": "2026-11-07T05:11:13.493163Z",
+  "validations": []
+}

@@ -36,13 +36,19 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-function pctFmt(v: number): string {
+function fmtNum(v: unknown, decimals = 2, fallback = "N/A"): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return fallback;
+  return v.toFixed(decimals);
+}
+
+function pctFmt(v: unknown): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "N/A";
   return (v * 100).toFixed(2) + "%";
 }
 
 function MonteCarloSection({ mc }: { mc: NonNullable<ValidationData["monte_carlo"]> }) {
   if (mc.error) return <p className="text-sm text-muted-foreground">{mc.error}</p>;
-  const sig = mc.p_value_sharpe < 0.05;
+  const sig = typeof mc.p_value_sharpe === "number" && mc.p_value_sharpe < 0.05;
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
@@ -53,10 +59,10 @@ function MonteCarloSection({ mc }: { mc: NonNullable<ValidationData["monte_carlo
         {i18n.t("validation.monteCarloDesc", { n: mc.n_simulations.toLocaleString() })}
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
-        <Stat label={i18n.t("validation.actualSharpe")} value={mc.actual_sharpe.toFixed(2)} />
-        <Stat label={i18n.t("validation.pValueSharpe")} value={mc.p_value_sharpe.toFixed(4)} sub={sig ? "< 0.05" : ">= 0.05"} />
-        <Stat label={i18n.t("validation.simulatedMean")} value={mc.simulated_sharpe_mean.toFixed(2)} sub={`std ${mc.simulated_sharpe_std.toFixed(2)}`} />
-        <Stat label={i18n.t("validation.simulatedRange")} value={`[${mc.simulated_sharpe_p5.toFixed(2)}, ${mc.simulated_sharpe_p95.toFixed(2)}]`} />
+        <Stat label={i18n.t("validation.actualSharpe")} value={fmtNum(mc.actual_sharpe)} />
+        <Stat label={i18n.t("validation.pValueSharpe")} value={fmtNum(mc.p_value_sharpe, 4)} sub={sig ? "< 0.05" : ">= 0.05"} />
+        <Stat label={i18n.t("validation.simulatedMean")} value={fmtNum(mc.simulated_sharpe_mean)} sub={`std ${fmtNum(mc.simulated_sharpe_std)}`} />
+        <Stat label={i18n.t("validation.simulatedRange")} value={`[${fmtNum(mc.simulated_sharpe_p5)}, ${fmtNum(mc.simulated_sharpe_p95)}]`} />
       </div>
       {/* Fan chart: full simulated path envelope over trade order */}
       {mc.equity_paths && mc.equity_paths.steps.length > 0 && (
@@ -109,9 +115,9 @@ function BootstrapSection({ bs }: { bs: NonNullable<ValidationData["bootstrap"]>
         {i18n.t("validation.bootstrapDesc", { n: bs.n_bootstrap.toLocaleString(), pct: (bs.confidence * 100).toFixed(0) + "%" })}
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
-        <Stat label={i18n.t("validation.observedSharpe")} value={bs.observed_sharpe.toFixed(2)} />
-        <Stat label={i18n.t("validation.ci", { pct: (bs.confidence * 100).toFixed(0) + "%" })} value={`[${bs.ci_lower.toFixed(2)}, ${bs.ci_upper.toFixed(2)}]`} />
-        <Stat label={i18n.t("validation.medianSharpe")} value={bs.median_sharpe.toFixed(2)} />
+        <Stat label={i18n.t("validation.observedSharpe")} value={fmtNum(bs.observed_sharpe)} />
+        <Stat label={i18n.t("validation.ci", { pct: fmtNum(bs.confidence * 100, 0) + "%" })} value={`[${fmtNum(bs.ci_lower)}, ${fmtNum(bs.ci_upper)}]`} />
+        <Stat label={i18n.t("validation.medianSharpe")} value={fmtNum(bs.median_sharpe)} />
         <Stat label={i18n.t("validation.probSharpePositive")} value={pctFmt(bs.prob_positive)} />
       </div>
       {/* Distribution of bootstrap Sharpes, or the compact CI bar fallback */}
@@ -159,7 +165,7 @@ function WalkForwardSection({ wf }: { wf: NonNullable<ValidationData["walk_forwa
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 rounded-xl border border-border/60 bg-muted/20 p-3">
         <Stat label={i18n.t("validation.consistency")} value={pctFmt(wf.consistency_rate)} />
         <Stat label={i18n.t("validation.avgReturn")} value={pctFmt(wf.return_mean)} sub={`std ${pctFmt(wf.return_std)}`} />
-        <Stat label={i18n.t("validation.avgSharpe")} value={wf.sharpe_mean.toFixed(2)} sub={`std ${wf.sharpe_std.toFixed(2)}`} />
+        <Stat label={i18n.t("validation.avgSharpe")} value={fmtNum(wf.sharpe_mean)} sub={`std ${fmtNum(wf.sharpe_std)}`} />
         <Stat label={i18n.t("validation.windows")} value={String(wf.n_windows)} />
       </div>
       {/* Per-window OOS returns over time */}
@@ -189,7 +195,7 @@ function WalkForwardSection({ wf }: { wf: NonNullable<ValidationData["walk_forwa
               <td className="py-1.5 pr-3 font-mono">{w.window}</td>
               <td className="py-1.5 pr-3 font-mono text-muted-foreground">{w.start} ~ {w.end}</td>
               <td className={cn("py-1.5 pr-3 text-right font-mono tabular-nums", w.return > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>{pctFmt(w.return)}</td>
-              <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{w.sharpe.toFixed(2)}</td>
+              <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{fmtNum(w.sharpe)}</td>
               <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{pctFmt(w.max_dd)}</td>
               <td className="py-1.5 pr-3 text-right font-mono tabular-nums">{w.trades}</td>
               <td className="py-1.5 text-right font-mono tabular-nums">{pctFmt(w.win_rate)}</td>

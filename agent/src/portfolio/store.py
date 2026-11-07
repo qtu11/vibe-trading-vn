@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from src.config.paths import get_runtime_root
 
@@ -46,10 +47,15 @@ class PortfolioStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._init_schema()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextlib.contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path)
         connection.row_factory = sqlite3.Row
-        return connection
+        try:
+            with connection:
+                yield connection
+        finally:
+            connection.close()
 
     def _init_schema(self) -> None:
         with self._connect() as db:

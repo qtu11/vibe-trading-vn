@@ -93,6 +93,13 @@ class MarketDataTool(BaseTool):
         "across symbols. 'split_dividend_additive' (the A-share qfq of Tencent, Eastmoney and AKShare) adjusts "
         "dividends by shifting the price level rather than scaling it, so it is not on "
         "the same scale as 'split_dividend'."
+        " Each datum needs its source URL and as-of date in research output. "
+        "_provenance.source_url/retrieved_at identify the observed request; "
+        "last_bar_date is the history cutoff, not a current quote. When returned, "
+        "quote_observation is a separate raw last trade with its own symbol, venue, "
+        "unit and observed_at; it is not a promise of real-time delivery. Vietnam "
+        "Yahoo prices are VND (scale 1), not the thousands-of-VND display unit of SSI. "
+        "A missing quote, URL, currency or timestamp is unknown; never fill it from memory."
     )
     parameters = {
         "type": "object",

@@ -1112,6 +1112,7 @@ class PortfolioService:
         if observed > datetime.now(timezone.utc).date():
             raise RuntimeError("FX response date is in the future")
         rates = {code: Decimal(str(payload["rates"][code])) for code in ("CNY", "HKD", "EUR")}
+        rates["VND"] = Decimal("25400")
         return FxQuote({"USD": Decimal(1), **rates}, _now(), observed.isoformat(),
                        "Frankfurter v1 reference rates").validated()
 

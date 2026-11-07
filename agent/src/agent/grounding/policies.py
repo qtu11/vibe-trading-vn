@@ -29,6 +29,7 @@ from src.agent.grounding.evidence import (
     _is_metadata_count_leaf,
     _is_number,
     _is_price_kind,
+    _FINANCIAL_EVIDENCE_TOOLS,
     _keyed_metric_map_kind,
     _metric_kind_for_path,
     _price_field_for_path,
@@ -492,7 +493,10 @@ class _PolicyMixin:
         # mention a secondary instrument only for fundamentals; that should make
         # explicit claims about the secondary resolvable without making otherwise
         # unattributed primary-listing figures ambiguous.
-        document_symbol = self._symbol_for_claim(content, records)
+        document_symbol = (
+            self._symbol_for_claim(content, records)
+            or self._symbol_for_claim(content, symbol_records)
+        )
         positions = _lines_with_offsets(content)
         line_symbols = [
             self._symbol_for_claim(line, symbol_records) for line, _ in positions
@@ -572,7 +576,10 @@ class _PolicyMixin:
                     else []
                 )
                 if auto_sources:
-                    if not any(value_in_source(source, figure.value) for source in auto_sources):
+                    if not any(
+                        value_in_source(source, figure.value, scale=figure.scale)
+                        for source in auto_sources
+                    ):
                         issues.append(
                             self._figure_issue(
                                 "numeric_claim_conflict",
@@ -675,10 +682,6 @@ class _PolicyMixin:
     def _check_undeclared_figure(self, figure, symbol, records, block):
         found = self._check_observed(figure, None, symbol, records)
         if block.present and found:
-            # Declared, but as a fraction where the answer writes a
-            # percent (or the reverse): still undeclared, since the
-            # two are different assertions — but say so, or the model
-            # reads "not declared" as a lie and repeats the draft.
             other_unit = _declared_in_other_unit(block, figure)
             return [
                 self._figure_issue(
@@ -903,6 +906,7 @@ class _PolicyMixin:
                 record
                 for record in records
                 if not _is_price_kind(record) and not _is_metadata_count_leaf(record.field)
+                and (record.tool not in _FINANCIAL_EVIDENCE_TOOLS or record.unit == "ratio")
             ]
         elif figure is not None and figure.currency:
             records = [record for record in records if _is_price_kind(record)]
@@ -1312,7 +1316,8 @@ class _PolicyMixin:
         if figure.column and record.field != figure.column:
             return False
         if figure.percent:
-            return not _is_price_kind(record) and not _is_metadata_count_leaf(record.field)
+            return (not _is_price_kind(record) and not _is_metadata_count_leaf(record.field)
+                    and (record.tool not in _FINANCIAL_EVIDENCE_TOOLS or record.unit == "ratio"))
         if figure.currency:
             return _is_price_kind(record)
         return True
@@ -1458,17 +1463,30 @@ class _PolicyMixin:
     ) -> list[float]:
         """Numbers a market-data row carried (volume, amount, turnover, …).
 
-        Only ``get_market_data`` and run-dir CSV rows count, so a generic tool's
-        numeric leaves never widen the check. ``money_only`` keeps the
-        money-denominated fields a currency-marked figure may quote.
+        Includes typed financial facts and registered technical tool results;
+        arbitrary tool names and article text never widen observed authority.
         """
+        allowed_tools = {
+            "get_market_data",
+            "get_forex_market_snapshot",
+            "bash",
+        }
+        if not money_only:
+            allowed_tools.update({
+                "technical_indicators",
+            })
         return [
             float(record.value)
             for record in self._evidence
             if record.status == "observed"
             and record.value is not None
-            and record.tool in {"get_market_data", "get_forex_market_snapshot", "bash"}
+            and record.tool in allowed_tools
+            and record.unit != "ratio"
             and (not symbol or record.symbol == symbol)
+            and (
+                record.tool != "technical_indicators"
+                or (symbol is not None and record.symbol == symbol)
+            )
             and (not money_only or _is_price_kind(record))
             and (currency_code is None or record.currency == currency_code)
         ]
@@ -1647,6 +1665,31 @@ class _PolicyMixin:
             band = min(band, _written_half_unit(written) * unit * (1 + 1e-9))
         return abs(candidate - target) <= max(band, 1e-9)
 
+    def _typed_value_matches(self, figure: Figure, record: EvidenceRecord) -> bool:
+        """Compare normalized financial amounts/ratios in exactly one unit.
+
+        Never accept an unscaled amount as billions, or a ratio as both its raw
+        value and that value percent. Dates from explicit table headers narrow
+        financial observations; exact call/field refs retain revision identity.
+        """
+        if figure.column or record.value is None:
+            return False
+        if figure.date and record.tool in _FINANCIAL_EVIDENCE_TOOLS:
+            if not record.timestamp or not _timestamp_matches_claim_date(record.timestamp, figure.date):
+                return False
+        if figure.percent:
+            if record.unit != "ratio":
+                return False
+            value, target, unit = figure.value, float(record.value) * 100, 1.0
+        else:
+            if figure.currency and (not _is_price_kind(record) or
+                    figure.currency_code is not None and figure.currency_code != record.currency):
+                return False
+            if figure.scale != 1.0 and record.unit not in (record.currency, "shares"):
+                return False
+            value, target, unit = figure.value * figure.scale, float(record.value), figure.scale
+        return self._within_written_precision(figure, value, target, unit)
+
     @grounding_check(name="figure-observed", code="numeric_claim_conflict",
                      additional_codes=("numeric_claim_unavailable",),
                      description="Validate the observed figure contract against evidence.")
@@ -1711,7 +1754,14 @@ class _PolicyMixin:
                     for record in scoped_records
                     if record.currency == figure.currency_code
                 ]
-            values = [float(record.value) for record in scoped_records] + metric_values
+            typed_records = [record for record in scoped_records
+                             if record.tool in _FINANCIAL_EVIDENCE_TOOLS or record.unit == "ratio"]
+            if any(self._typed_value_matches(figure, record) for record in typed_records):
+                return []
+            untyped_records = [record for record in scoped_records if record not in typed_records]
+            values = [float(record.value) for record in untyped_records] + metric_values
+            scalable_values = [float(record.value) for record in scoped_records
+                               if record.tool not in _FINANCIAL_EVIDENCE_TOOLS and record.unit != "ratio"] + metric_values
             money = figure.currency and not figure.percent
             # A call- or tool-scoped ref pools every field that call returned,
             # so it cannot choose between the tail-risk identities in it (#1425).
@@ -1732,7 +1782,8 @@ class _PolicyMixin:
                     value for identity, value in scoped_sources if identity in tail_risk
                 }
                 values = [value for value in values if value not in blocked]
-            if self._matches_evidence(figure, values, [] if money else values):
+                scalable_values = [value for value in scalable_values if value not in blocked]
+            if self._matches_evidence(figure, values, [] if money else scalable_values):
                 return []
             if tail_risk:
                 return [
@@ -1800,6 +1851,12 @@ class _PolicyMixin:
                 if record.currency == figure.currency_code
             ]
         prices = [float(record.value) for record in candidates]
+        typed_records = [record for record in self._evidence
+                         if record.status == "observed" and record.value is not None
+                         and symbol is not None and record.symbol == symbol
+                         and (record.tool in _FINANCIAL_EVIDENCE_TOOLS or record.unit == "ratio")]
+        if not figure.column and any(self._typed_value_matches(figure, record) for record in typed_records):
+            return []
         if figure.percent:
             # A percent is a ratio; no price or volume may answer it.
             # DFII10 is explicitly published in percentage units, unlike a
@@ -2405,7 +2462,11 @@ class _PolicyMixin:
                 ]
             sources = [self.source_by_id(source_id) for source_id in cited_ids]
             sources = [source for source in sources if source is not None]
-            if not any(value_in_source(source, figure.value) for source in sources):
+            matching_sources = [
+                source for source in sources
+                if value_in_source(source, figure.value, scale=figure.scale)
+            ]
+            if not matching_sources:
                 return [
                     self._figure_issue(
                         "numeric_claim_conflict",
@@ -2419,7 +2480,7 @@ class _PolicyMixin:
                         source_ids=list(cited_ids),
                     )
                 ]
-            bracketed = [f"[{source_id.casefold()}]" for source_id in cited_ids]
+            bracketed = [f"[{source.source_id.casefold()}]" for source in matching_sources]
             folded_visible = visible_text.casefold()
             if not any(marker in folded_visible for marker in bracketed):
                 return [

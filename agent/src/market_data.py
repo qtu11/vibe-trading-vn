@@ -447,6 +447,22 @@ def fetch_market_data(
             quote_currency = frame_attrs.get("quote_currency")
             if isinstance(quote_currency, str) and quote_currency:
                 entry["quote_currency"] = quote_currency
+                entry["price_unit"] = quote_currency
+            for key in ("source_url", "retrieved_at"):
+                if isinstance(frame_attrs.get(key), str) and frame_attrs[key]:
+                    entry[key] = frame_attrs[key]
+            if isinstance(frame_attrs.get("quote_observation"), str):
+                try:
+                    observation = json.loads(frame_attrs["quote_observation"])
+                    if isinstance(observation, dict):
+                        entry["quote_observation"] = observation
+                except (ValueError, TypeError):
+                    logger.warning("invalid quote observation metadata for %s", symbol)
+            if hasattr(df.index, "min") and len(df.index):
+                entry["first_bar_date"] = _json_safe(df.index.min())
+                entry["last_bar_date"] = _json_safe(df.index.max())
+            entry["data_kind"] = "historical_bars"
+            entry["price_warning"] = "OHLC bars may be adjusted and are not live quotes; use the dated raw quote_observation when available."
             if extra_provenance:
                 entry.update(extra_provenance)
             provenance[symbol] = entry

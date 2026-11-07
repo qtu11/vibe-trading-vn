@@ -41,6 +41,7 @@ _SINGLE_CURRENCY_VENUES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"^[A-Z0-9&.\-]+\.BA$", re.I), "ARS"),
     (re.compile(r"^[A-Z0-9]+\.SA$", re.I), "BRL"),
     (re.compile(r"^[A-Z0-9&.\-]+\.(?:TO|V)$", re.I), "CAD"),
+    (re.compile(r"^[A-Z0-9]+\.VN$", re.I), "VND"),
 )
 
 
@@ -481,7 +482,10 @@ _LOADER_CACHE_TRUE_VALUES = {"1", "true", "yes", "on"}
 # v9: SEC successor/predecessor facts extend historical coverage. Old cached
 # panels may omit the predecessor's filings and must be rebuilt.
 _LOADER_CACHE_VERSION = 9
-_LOADER_FRAME_METADATA_ATTRS = ("quote_currency", "currency_conversion", "adjustment")
+_LOADER_FRAME_METADATA_ATTRS = (
+    "quote_currency", "currency_conversion", "adjustment", "source_url",
+    "retrieved_at", "quote_observation",
+)
 
 
 def loader_cache_enabled() -> bool:

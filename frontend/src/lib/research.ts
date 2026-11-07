@@ -8,10 +8,12 @@ export interface VietnamRequest {
   consolidation: "consolidated" | "separate";
   offset: number;
 }
+export type CryptoPeriod = "5m" | "15m" | "30m" | "1h" | "2h" | "4h" | "6h" | "12h" | "1d";
+
 export interface CryptoRequest {
   symbol: string;
   metric: "open_interest" | "funding";
-  period: string;
+  period: CryptoPeriod;
   limit: number;
   mode?: "live" | "archive";
   as_of?: string;

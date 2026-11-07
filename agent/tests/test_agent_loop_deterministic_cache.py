@@ -20,6 +20,9 @@ from src.agent.loop import AgentLoop
 from src.agent.tools import BaseTool, ToolRegistry
 from src.agent.trace import TraceWriter
 from src.tools.financial_rigor_tool import FinancialRigorTool
+from src.tools.market_data_tool import MarketDataTool
+from src.tools.technical_indicator_tool import TechnicalIndicatorTool
+from src.tools.vietnam_research_tool import VietnamResearchTool
 
 
 class _CountingTool(BaseTool):
@@ -164,6 +167,25 @@ def test_non_deterministic_tool_is_never_cached(agent_factory) -> None:
     assert len(tool.calls) == 2
     assert len(messages) == 2
     assert not any(r["type"] == "tool_result_cached" for r in records)
+
+
+@pytest.mark.parametrize("tool_class", [MarketDataTool, TechnicalIndicatorTool, VietnamResearchTool])
+def test_repeatable_financial_reads_can_observe_updated_provider_data(agent_factory, tool_class):
+    """The same request may return a new snapshot; data reads are not pure math."""
+    tool = tool_class()
+    calls = []
+
+    def execute(**kwargs):
+        calls.append(kwargs)
+        return json.dumps({"ok": True, "fixture_snapshot": len(calls)})
+
+    tool.execute = execute
+    agent, run_dir, _ = agent_factory(tool)
+    messages, records = _drive(agent, tool.name, run_dir, [{}, {}])
+    assert len(calls) == 2
+    assert json.loads(messages[0]["content"])["fixture_snapshot"] == 1
+    assert json.loads(messages[1]["content"])["fixture_snapshot"] == 2
+    assert not any(record["type"] == "tool_result_cached" for record in records)
 
 
 def test_failed_deterministic_call_is_not_cached(agent_factory) -> None:

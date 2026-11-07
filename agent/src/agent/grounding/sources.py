@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from typing import Any, Iterable, Mapping
@@ -385,9 +386,14 @@ def _numeric_variants(token: str) -> set[float]:
             return set()
     if "." in body:
         parts = body.split(".")
-        if len(parts) == 2 and len(parts[1]) == 3 and parts[0] not in {"", "0"}:
+        if len(parts) >= 2 and all(len(part) == 3 for part in parts[1:]) and parts[0] not in {"", "0"}:
             try:
-                return {sign * float("".join(parts)), sign * float(body)}
+                # A dot-only run of three-digit groups is Vietnamese thousands
+                # ("1.318.000"); a two-part run is also a plausible decimal.
+                readings = {sign * float("".join(parts))}
+                if len(parts) == 2:
+                    readings.add(sign * float(body))
+                return readings
             except ValueError:
                 return set()
         try:
@@ -428,7 +434,7 @@ def numeric_candidates(text: str) -> tuple[float, ...]:
                 continue
             variants = {value} | _scaled_variants(text, match.end(), value)
             for item in variants:
-                if item in seen:
+                if not math.isfinite(item) or item in seen:
                     continue
                 seen.add(item)
                 found.append(item)
@@ -909,16 +915,29 @@ def source_ids_in(text: str) -> tuple[str, ...]:
     return tuple(found)
 
 
-def value_in_source(record: SourceRecord, value: float, *, tolerance: float = 0.005) -> bool:
+def value_in_source(
+    record: SourceRecord,
+    value: float,
+    *,
+    tolerance: float = 0.005,
+    scale: float = 1.0,
+) -> bool:
     """Whether ``value`` appears among a source's numeric candidates.
 
     The band is the gate's own 0.5% relative tolerance, so a rounded
     presentation of a source number is accepted and an unrelated number is not.
+    A figure carrying a magnitude mark ("28,9 nghìn tỷ") is compared only at
+    that scale: source prose scales its own numbers to absolute units, so the
+    declaration's 28.9 would otherwise never meet the source's 28,900,000,000,000.
     """
+    target = value * scale
+    if not math.isfinite(target):
+        return False
     for candidate in record.numbers:
-        gap = abs(candidate - value)
-        if gap <= max(abs(candidate), abs(value), 1.0) * tolerance:
-            return True
+        if math.isfinite(candidate):
+            gap = abs(candidate - target)
+            if gap <= max(abs(candidate), abs(target)) * tolerance:
+                return True
     return False
 
 

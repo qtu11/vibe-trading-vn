@@ -2,7 +2,7 @@
 
 Ngày **06/11/2026**, checkout **D:/Vibe-Trading**. Yêu cầu tiếp tục code từ master
 được bổ sung bằng yêu cầu học cách phân tích/khuyến nghị từ `docs/mau-baocao`.
-Các thay đổi là local; chưa commit/publish, không gọi model/feed/broker thật và
+Các thay đổi được làm local; lượt làm việc này không tạo commit/publish, không gọi model/feed/broker thật và
 không đặt/hủy lệnh. Acceptance cấp chương trình vẫn mở.
 
 ## Phạm vi đã nối
@@ -37,7 +37,11 @@ Frontend: **260 passed /21 files**; `npm run build` qua TypeScript và Vite.
 Cảnh báo hiện hữu: test Layout có React act warning, Vite config dùng `__dirname`,
 chunk vendor-charts742,71kB vượt500kB. Chưa có browser visual acceptance.
 
-Backend: kết quả hồi quy cuối được ghi tại
+Backend: **3194 passed /11 skipped /115 files**. Kết quả gồm lượt115 file và lượt
+chạy lại201 case trong6 module dùng store sau sửa clock; không đếm trùng. Xem
+[provenance của JUnit tổng hợp](../.codex-backups/2026-11-06-implementation-8/regression-provenance.json).
+Đã sửa thêm clock lùi lúc append revision để không có revision trước admission;
+lỗi rollback revision/outcome và giữ attempt unknown. Kết quả cuối được ghi tại
 [verification.json](../.codex-backups/2026-11-06-implementation-8/verification.json)
 và [JUnit](../.codex-backups/2026-11-06-implementation-8/final-regression.xml).
 Danh sách phạm vi: [115 file backend](../.codex-backups/2026-11-06-implementation-8/regression-tests.json),
@@ -75,7 +79,13 @@ decisions hoặc `implementation_approved:false`.
 Snapshot các file sửa nằm dưới `.codex-backups/2026-11-06-implementation-8/`
 và `.codex-backups/2026-11-06-report-methodology/before/`; manifest cuối ghi
 hash và nguồn trước sửa nếu có. Một số file mới ở baseline có snapshot theo đợt
-trước hoặc được đối chiếu HEAD, không tự nhận là backup đầy đủ runtime.
+trước hoặc được đối chiếu baseline, không tự nhận là backup đầy đủ runtime.
+
+HEAD checkout đã thay đổi trong lúc làm việc; manifest đối chiếu baseline
+`f072a046a6ad047835fd1cc2bfc5ebee52c9af6b` và ghi riêng HEAD hiện tại để không
+bỏ sót file vừa được đưa vào commit bởi thao tác khác. Không reset/ghi đè commit đó.
+Scripts đóng gói `build`, `build.ps1`, `build.bat` trong thay đổi song song được giữ nguyên và chỉ
+kiểm UTF-8/hash, chưa audit định dạng hoặc hành vi trong phạm vi nghiên cứu này.
 
 Research DB: binary mới đọc schema1/2, write nâng schema1→2 giữ revision/review.
 Binary schema1 cũ từ chối schema2. Khi downgrade, giữ nguyên DB mới và khôi phục

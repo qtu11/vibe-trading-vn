@@ -20,10 +20,12 @@ import json
 import logging
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, field
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Optional
+
+from src.providers.model_metadata import cached_model_metadata, endpoint_scope, normalize_endpoint, token_limit
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +69,8 @@ def resolve_window(
     *,
     env_window: Optional[int] = None,
     learned_window: Optional[int] = None,
+    base_url: str = "",
+    provider_metadata: dict | None = None,
 ) -> tuple[int, str]:
     """Return the model's context window and where the number came from.
 
@@ -79,20 +83,89 @@ def resolve_window(
     Returns:
         ``(window_tokens, source)``.
     """
+    resolution = resolve_context(provider, model, env_window=env_window, learned_window=learned_window,
+                                 base_url=base_url, provider_metadata=provider_metadata)
+    return resolution.window, resolution.source
+
+
+@dataclass(frozen=True)
+class ModelContextResolution:
+    """A context budget declaration, including the limits of its evidence.
+
+    ``fallback`` is a safety budget and must never be displayed as a detected
+    model specification. Provider metadata is a provider claim, not proof that
+    every deployment or account can use the model's nominal maximum.
+    """
+
+    window: int
+    source: str
+    confidence: str
+    model_id: str
+    provider: str
+    endpoint_scope: str = ""
+    max_input_tokens: int | None = None
+    max_output_tokens: int | None = None
+    reported_fields: dict = field(default_factory=dict)
+    reference: str | None = None
+
+    def as_dict(self) -> dict:
+        return asdict(self)
+
+
+def resolve_context(provider: str, model: str, *, base_url: str = "",
+                    provider_metadata: dict | None = None, env_window: int | None = None,
+                    learned_window: int | None = None) -> ModelContextResolution:
+    """Resolve override > learned limit > exact provider metadata > catalog.
+
+    Lookup never performs network or reads user credentials. Routed IDs and
+    dated suffixes are exact IDs in metadata; catalog aliases must be explicit.
+    Endpoint changes cannot reuse a different gateway's reported model limits.
+    """
     _warn_deprecated_token_threshold()
-    if env_window:
-        return int(env_window), "env:VIBE_TRADING_CONTEXT_WINDOW"
-    if learned_window:
-        return int(learned_window), "learned:context_length_error"
-    catalog = _catalog()
-    provider = (provider or "").strip().lower()
+    provider = (provider or "").strip().lower().replace("_", "-")
     model = (model or "").strip()
+    metadata = provider_metadata if isinstance(provider_metadata, dict) else cached_model_metadata(provider, base_url, model)
+    scope = endpoint_scope(base_url)
+    if (not isinstance(metadata, dict) or metadata.get("model_id") != model or
+            metadata.get("provider") != provider or not scope or metadata.get("endpoint_scope") != scope):
+        metadata = {}
+    metadata_window = token_limit(metadata.get("context_window"), minimum=1000)
+    values = {"model_id": model, "provider": provider, "endpoint_scope": endpoint_scope(base_url),
+              "max_input_tokens": token_limit(metadata.get("max_input_tokens")),
+              "max_output_tokens": token_limit(metadata.get("max_output_tokens")),
+              "reported_fields": metadata.get("reported_fields", {}) if isinstance(metadata.get("reported_fields"), dict) else {}}
+    override = token_limit(env_window, minimum=1000)
+    learned = token_limit(learned_window, minimum=1000)
+    if override is not None:
+        return ModelContextResolution(override, "env:VIBE_TRADING_CONTEXT_WINDOW", "operator_override", **values)
+    if learned is not None:
+        return ModelContextResolution(learned, "learned:context_length_error", "provider_error", **values)
+    if metadata_window is not None:
+        return ModelContextResolution(metadata_window, "provider:/models", "provider_reported", **values)
+    catalog = _catalog()
+    endpoint = normalize_endpoint(base_url)
     for entry in catalog["models"]:
-        if entry.get("provider") and entry["provider"] != provider:
+        providers = entry.get("providers", [entry["provider"]] if entry.get("provider") else [])
+        # A model-vendor number must not silently apply to an arbitrary custom
+        # proxy. Every catalog record now declares its provider scope.
+        if not providers or provider not in providers:
+            continue
+        if base_url and (not endpoint or endpoint not in entry.get("base_urls", [])):
             continue
         if re.search(entry["pattern"], model, re.IGNORECASE):
-            return int(entry["window"]), f"catalog:{entry['pattern']}"
-    return int(catalog["default_window"]), "default"
+            return ModelContextResolution(int(entry["window"]), f"catalog:{entry['pattern']}", "catalog", reference=entry["source"], **values)
+    return ModelContextResolution(int(catalog["default_window"]), "default", "fallback", **values)
+
+
+def resolve_configured_context(config=None) -> ModelContextResolution:
+    """Read current settings/cache before a run, without network or a model."""
+    from src.config.accessor import get_env_config
+    from src.providers.model_metadata import configured_model_identity
+
+    config = config if config is not None else get_env_config()
+    identity = configured_model_identity(config)
+    return resolve_context(identity["provider"], identity["model"], base_url=identity["base_url"],
+                           env_window=config.agent_tuning.vibe_trading_context_window)
 
 
 def _warn_deprecated_token_threshold() -> None:
@@ -138,28 +211,41 @@ class CompactionBudget:
     source: str
     max_tokens: int
     static_tokens: int
+    output_reserve: int = 0
+    prompt_limit: int | None = None
+
+    @property
+    def hard_limit(self) -> int:
+        """Physical prompt bound after explicit output and provider input caps."""
+        physical = max(0, self.window - max(0, self.output_reserve))
+        return min(physical, max(0, self.prompt_limit)) if self.prompt_limit is not None else physical
 
     @property
     def total(self) -> int:
         """Largest prompt, in real tokens, the loop lets a run grow to."""
-        return min(int(self.window * USABLE_FRACTION), self.max_tokens)
+        return max(0, min(int(self.window * USABLE_FRACTION), self.max_tokens, self.hard_limit))
 
     @property
     def conversation(self) -> int:
         """Tokens left for the conversation after the static prompt."""
-        return max(self.total - self.static_tokens, MIN_CONVERSATION_TOKENS)
+        return max(0, self.total - self.static_tokens)
+
+    @property
+    def static_over_budget(self) -> bool:
+        """Whether compaction of history alone cannot make the request fit."""
+        return self.static_tokens >= self.total
 
     @property
     def micro_at(self) -> int:
-        return self.static_tokens + int(self.conversation * MICRO_FRACTION)
+        return min(self.total, self.static_tokens + int(self.conversation * MICRO_FRACTION))
 
     @property
     def collapse_at(self) -> int:
-        return self.static_tokens + int(self.conversation * COLLAPSE_FRACTION)
+        return min(self.total, self.static_tokens + int(self.conversation * COLLAPSE_FRACTION))
 
     @property
     def compact_at(self) -> int:
-        return self.static_tokens + self.conversation
+        return self.total
 
 
 class ContextMeter:

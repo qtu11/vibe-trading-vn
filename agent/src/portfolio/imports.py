@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import sqlite3
@@ -9,7 +10,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from src.config.paths import get_runtime_root
 from src.portfolio.extraetf import parse_export
@@ -35,13 +36,18 @@ class PortfolioImportStore:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or get_runtime_root() / "portfolio" / "imports.sqlite3"
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextlib.contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.parent.chmod(0o700)
         db = sqlite3.connect(self.path)
         self.path.chmod(0o600)
-        db.execute("CREATE TABLE IF NOT EXISTS imports (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
-        return db
+        try:
+            with db:
+                db.execute("CREATE TABLE IF NOT EXISTS imports (id TEXT PRIMARY KEY, payload TEXT NOT NULL)")
+                yield db
+        finally:
+            db.close()
 
     def create(
         self, *, csv_text: str, label: str, source_mtime: str,

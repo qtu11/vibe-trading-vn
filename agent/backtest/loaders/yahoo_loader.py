@@ -18,6 +18,7 @@ the ascending series to the requested inclusive date window.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 from typing import Dict, List, Optional
 
@@ -246,6 +247,7 @@ class DataLoader:
                     start_date=start_date,
                     end_date=end_date,
                     fields=None,
+                    source_revision="dated-quote-provenance-v1",
                     fetch=lambda code=code: self._fetch_one(
                         code, start_date, end_date, interval
                     ),
@@ -279,12 +281,19 @@ class DataLoader:
         period1 = _epoch_seconds(start_date)
         period2 = _epoch_seconds(end_date) + 86400
 
+        metadata: dict = {}
         rows, currency = yahoo_client.get_chart(
             code,
             interval=_to_yahoo_interval(interval),
             period1=period1,
             period2=period2,
+            metadata=metadata,
         )
         frame = _rows_to_frame(rows, start_date, end_date, interval)
         frame = normalize_declared_quote_currency(frame, code, currency)
+        for key in ("source_url", "retrieved_at"):
+            if key in metadata:
+                frame.attrs[key] = metadata[key]
+        if "quote_observation" in metadata:
+            frame.attrs["quote_observation"] = json.dumps(metadata["quote_observation"], allow_nan=False)
         return frame if not frame.empty else None

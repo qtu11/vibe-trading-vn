@@ -95,6 +95,10 @@ def test_market_data_json_can_include_actual_source_provenance():
         "currency_conversion": "none",
         "volume_unit": None,
         "adjustment": "split_dividend",
+        "first_bar_date": "2026-01-01T00:00:00",
+        "last_bar_date": "2026-01-01T00:00:00",
+        "data_kind": "historical_bars",
+        "price_warning": "OHLC bars may be adjusted and are not live quotes; use the dated raw quote_observation when available.",
     }
 
 

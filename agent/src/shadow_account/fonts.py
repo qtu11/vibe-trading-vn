@@ -60,6 +60,48 @@ def system_cjk_candidates() -> list[Path]:
     return _system_cjk_candidates()
 
 
+#: Latin faces with full Vietnamese precomposed coverage, in preference order.
+#: Arial, Segoe UI, Calibri and Tahoma cover U+1EA0–U+1EF9 on Windows; DejaVu
+#: Sans ships with matplotlib and covers them everywhere.
+_LATIN_FONT_NAMES = (
+    "arial.ttf", "segoeui.ttf", "calibri.ttf", "tahoma.ttf",
+    "Arial.ttf", "SegoeUI.ttf", "DejaVuSans.ttf", "NotoSans-Regular.ttf",
+)
+
+
+def _system_latin_candidates() -> list[Path]:
+    """Enumerate locally-installed Vietnamese-capable Latin fonts."""
+    candidates: list[Path] = []
+    env = os.environ
+    windir = env.get("WINDIR") or env.get("SystemRoot")
+    if windir:
+        win_fonts = Path(windir) / "Fonts"
+        candidates.extend(win_fonts / name for name in _LATIN_FONT_NAMES)
+    for p in (
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",
+        "/usr/share/fonts/opentype/noto/NotoSans-Regular.ttf",
+    ):
+        candidates.append(Path(p))
+    try:
+        import matplotlib
+
+        candidates.append(
+            Path(matplotlib.get_data_path()) / "fonts" / "ttf" / "DejaVuSans.ttf"
+        )
+    except Exception:  # pragma: no cover — matplotlib optional
+        pass
+    return candidates
+
+
+def system_latin_candidates() -> list[Path]:
+    """Public alias: reportlab needs this list but not the download path."""
+    return _system_latin_candidates()
+
+
 def cjk_font_path(*, allow_download: bool = True, timeout: float = 10.0) -> Optional[Path]:
     """Resolve a CJK font file path.
 

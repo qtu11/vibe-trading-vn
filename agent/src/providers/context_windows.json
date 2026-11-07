@@ -4,14 +4,31 @@
   "models": [
     {
       "provider": "openai-codex",
+      "base_urls": ["https://chatgpt.com/backend-api/codex"],
       "pattern": "^(openai[-_]codex/)?(gpt-6-(astra|sol|luna)|gpt-5\\.6-(sol|terra|luna)|gpt-5\\.5)$",
       "window": 272000,
       "source": "Codex backend model metadata: context_window=272000 for every listed model (Codex CLI models cache fetched 2026-09-29T03:26Z)"
     },
     {
+      "providers": ["deepseek", "openrouter"],
+      "base_urls": ["https://api.deepseek.com", "https://api.deepseek.com/v1", "https://openrouter.ai/api/v1"],
       "pattern": "^(deepseek/)?deepseek-(v4-pro|flash)$",
       "window": 1000000,
       "source": "https://api-docs.deepseek.com/quick_start/pricing — deepseek-v4-pro and deepseek-flash: context length 1M (read 2026-09-29)"
+    },
+    {
+      "provider": "deepseek",
+      "base_urls": ["https://api.deepseek.com", "https://api.deepseek.com/v1"],
+      "pattern": "^deepseek-v4\\.1-flash(-1017)?$",
+      "window": 1000000,
+      "source": "https://api-docs.deepseek.com/quick_start/ identifies deepseek-flash as DeepSeek-V4.1-Flash-1017; https://docs.api.nvidia.com/nim/reference/nvidia-deepseek-v4_1-flash documents 1M combined context. Conservative decimal 1M for the direct DeepSeek endpoint, checked 2026-11-07; no arbitrary gateway attestation."
+    },
+    {
+      "provider": "nvidia",
+      "base_urls": ["https://integrate.api.nvidia.com/v1"],
+      "pattern": "^(deepseek-ai/|nvidia/)?deepseek-v4\\.1-flash$",
+      "window": 1048576,
+      "source": "https://docs.api.nvidia.com/nim/reference/nvidia-deepseek-v4_1-flash — combined input and output context 1,048,576 tokens, checked 2026-11-07. Does not establish limits of another custom gateway."
     }
   ],
   "overflow_error_patterns": [

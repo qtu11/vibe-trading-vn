@@ -106,6 +106,8 @@ class LLMRuntimeSnapshot:
     provider: str
     configured_model: str
     reasoning_effort: str
+    base_url: str = ""
+    output_reserve: int = 0
 
 
 @dataclass
@@ -347,12 +349,34 @@ class ChatLLM:
         configured_model = (
             model_name or runtime_cfg.langchain_model_name
         ).strip()
+        from src.providers.model_metadata import cached_model_metadata, configured_model_identity, normalize_endpoint, token_limit
+
+        identity = configured_model_identity(get_env_config())
+        # Capture the constructed adapter's actual model/endpoint, especially
+        # custom profiles which may differ from stale ambient settings.
+        for attribute in ("model_name", "model"):
+            actual_model = getattr(self._llm, attribute, None)
+            if isinstance(actual_model, str) and actual_model.strip():
+                configured_model = actual_model.strip()
+                break
+        base_url = identity["base_url"]
+        for attribute in ("openai_api_base", "base_url", "anthropic_api_url", "codex_url"):
+            actual_url = getattr(self._llm, attribute, None)
+            if actual_url is not None and (normalized := normalize_endpoint(str(actual_url))):
+                base_url = normalized
+                break
+        output_reserve = token_limit(getattr(self._llm, "max_tokens", None)) or token_limit(runtime_cfg.langchain_max_tokens) or 0
+        if identity["provider"] == "anthropic":
+            output_reserve = token_limit(runtime_cfg.anthropic_max_tokens) or output_reserve
         self.model_name = configured_model
         self.runtime_snapshot = LLMRuntimeSnapshot(
             provider=runtime_cfg.langchain_provider.strip().lower() or "openai",
             configured_model=configured_model,
             reasoning_effort=runtime_cfg.langchain_reasoning_effort.strip().lower(),
+            base_url=base_url,
+            output_reserve=output_reserve,
         )
+        self.context_metadata = cached_model_metadata(self.runtime_snapshot.provider, base_url, configured_model)
 
     def close(self) -> None:
         """Best-effort release of HTTP clients owned by this adapter.

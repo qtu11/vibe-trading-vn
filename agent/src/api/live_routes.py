@@ -36,6 +36,15 @@ from src.live.runtime.decision_budget import DecisionBudget, DecisionSettings
 
 logger = logging.getLogger(__name__)
 
+_runner_start_lock: Optional[asyncio.Lock] = None
+
+
+def _get_runner_start_lock() -> asyncio.Lock:
+    global _runner_start_lock
+    if _runner_start_lock is None:
+        _runner_start_lock = asyncio.Lock()
+    return _runner_start_lock
+
 
 # ============================================================================
 # Pydantic Models (live-exclusive; defined locally, monkeypatch-safe via re-export)
@@ -1396,30 +1405,31 @@ def register_live_routes(
         h = _host()
         tasks = h._runner_tasks
 
-        existing = tasks.get(broker)
-        if existing is not None and not existing.done():
-            return {"broker": broker, "started": False, "already_running": True}
+        async with _get_runner_start_lock():
+            existing = tasks.get(broker)
+            if existing is not None and not existing.done():
+                return {"broker": broker, "started": False, "already_running": True}
 
-        mandate = h._active_mandate_state(broker)
-        if mandate is None:
-            raise HTTPException(status_code=409, detail=f"no committed mandate for {broker}")
-        if mandate.expired:
-            raise HTTPException(status_code=409, detail=f"mandate for {broker} has expired; re-authorize first")
-        if halt_flag_set(broker=broker) or halt_flag_set(broker=None):
-            raise HTTPException(status_code=409, detail="kill switch is tripped; resume before starting the runner")
+            mandate = h._active_mandate_state(broker)
+            if mandate is None:
+                raise HTTPException(status_code=409, detail=f"no committed mandate for {broker}")
+            if mandate.expired:
+                raise HTTPException(status_code=409, detail=f"mandate for {broker} has expired; re-authorize first")
+            if halt_flag_set(broker=broker) or halt_flag_set(broker=None):
+                raise HTTPException(status_code=409, detail="kill switch is tripped; resume before starting the runner")
 
-        try:
-            runner = h._build_live_runner(broker)
-        except LiveRunnerUnavailable as exc:
-            raise HTTPException(status_code=503, detail=str(exc)) from exc
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"could not construct runner: {exc}") from exc
+            try:
+                runner = h._build_live_runner(broker)
+            except LiveRunnerUnavailable as exc:
+                raise HTTPException(status_code=503, detail=str(exc)) from exc
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"could not construct runner: {exc}") from exc
 
-        task = asyncio.ensure_future(h._drive_runner(runner))
-        tasks[broker] = task
-        task.add_done_callback(
-            lambda t, b=broker: tasks.pop(b, None) if tasks.get(b) is t else None
-        )
+            task = asyncio.ensure_future(h._drive_runner(runner))
+            tasks[broker] = task
+            task.add_done_callback(
+                lambda t, b=broker: tasks.pop(b, None) if tasks.get(b) is t else None
+            )
 
         h._emit_live_event(
             payload.session_id,

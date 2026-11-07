@@ -18,6 +18,7 @@ import json
 import logging
 import threading
 import time as _time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional
 
@@ -50,6 +51,7 @@ from src.agent.context_budget import (
     ContextMeter,
     is_context_overflow,
     parse_context_limit,
+    resolve_context,
     resolve_window,
 )
 from src.agent.context_compact import (  # noqa: F401  (re-exported so loop imports keep working)
@@ -68,6 +70,7 @@ from src.agent.context_compact import (  # noqa: F401  (re-exported so loop impo
     _attach_tool_call_thought_signatures,
     _cleared_text,
     _context_collapse,
+    _compaction_segments,
     _fix_tool_pairs,
     _is_cleared,
     _microcompact,
@@ -267,6 +270,8 @@ class AgentLoop(ToolCallLifecycle):
         self._learned_context_window: int | None = None
         self._compacted_to_tokens: int | None = None
         self._tool_schema_tokens = 0
+        self._last_compaction_status = {"state": "idle", "automatic": True, "count": 0,
+                                        "updated_at": datetime.now(timezone.utc).isoformat()}
         self._llm_usage_summary = _new_llm_usage_summary(self.llm)
         self._goal_usage_callback = None
         self._llm_usage_lock = threading.RLock()
@@ -397,6 +402,9 @@ class AgentLoop(ToolCallLifecycle):
         self._context_meter = ContextMeter()
         self._learned_context_window: int | None = None
         self._compacted_to_tokens: int | None = None
+        self._last_compaction_status = {"state": "idle", "automatic": True, "count": 0,
+                                        "updated_at": datetime.now(timezone.utc).isoformat()}
+        self._context_session_id = session_id
         self.registry = prepare_registry(self.registry)
         self._forex_trade_plan = None
         forex_tool = self.registry.get("get_forex_market_snapshot")
@@ -438,6 +446,9 @@ class AgentLoop(ToolCallLifecycle):
         goal_store = None
         goal_turn_accounted = False
         messages = context.build_messages(llm_user_message, history)
+        session_compaction = getattr(self, "_session_compaction_memory", None)
+        if session_compaction is not None and messages:
+            session_compaction.bind_current(messages[-1])
         self._initial_context_stats = context.context_stats
         self._last_context_input_tokens = None
         self._publish_context_status(run_dir, messages)
@@ -560,7 +571,10 @@ class AgentLoop(ToolCallLifecycle):
         stream_failure_streak = 0
         try:
             while iteration < self.max_iterations:
-                self._tool_schema_tokens = estimate_tokens(request_definitions(self.registry))
+                self._tool_schema_tokens = (
+                    0 if iteration + 1 >= self.max_iterations or grounding_correction_text_only
+                    else estimate_tokens(request_definitions(self.registry))
+                )
                 if self._budget_stop_reason is not None:
                     break
                 if self._cancel_event.is_set():
@@ -673,6 +687,14 @@ class AgentLoop(ToolCallLifecycle):
                     if is_last_iteration or correction_text_only
                     else request_definitions(self.registry)
                 )
+                self._tool_schema_tokens = estimate_tokens(tool_defs) if tool_defs else 0
+                # Nudges and recovery instructions added above are part of the
+                # actual request too. Recheck after assembling it, not only at
+                # the beginning of the iteration.
+                if _override("TOKEN_THRESHOLD") is None:
+                    self._compact_to_budget(messages, run_dir, trace, iteration, current_iter)
+                self._assert_context_fits(messages)
+                self._publish_context_status(run_dir, messages, phase="pre_request")
                 if is_last_iteration:
                     trace.write({"type": "forced_text_only", "iter": current_iter})
                 elif correction_text_only:
@@ -771,6 +793,9 @@ class AgentLoop(ToolCallLifecycle):
 
                 usage = getattr(response, "usage_metadata", None)
                 current_response_model = getattr(response, "response_model", None)
+                if current_response_model:
+                    self._active_model_id = current_response_model
+                    self._active_model_source = "provider_response"
                 # `messages` is still exactly what this request sent.
                 self._context_meter.observe(
                     usage.get("input_tokens") if isinstance(usage, dict) else None,
@@ -780,7 +805,7 @@ class AgentLoop(ToolCallLifecycle):
                 normalized_usage = _normalize_llm_usage(usage)
                 if normalized_usage:
                     self._last_context_input_tokens = normalized_usage["input_tokens"]
-                self._publish_context_status(run_dir, messages)
+                self._publish_context_status(run_dir, messages, phase="post_response")
                 if current_response_model:
                     last_response_model = current_response_model
                 self._account_llm_usage(run_dir, usage, current_iter)
@@ -1088,6 +1113,7 @@ class AgentLoop(ToolCallLifecycle):
                 compact_requested, focus_topic = self._process_tool_calls(
                     response.tool_calls, context, messages, trace, react_trace, current_iter,
                 )
+                self._publish_context_status(run_dir, messages, phase="post_response")
 
                 if (self._forex_trade_plan is not None and not self._cancel_event.is_set()
                         and not active_goal_id
@@ -1137,15 +1163,18 @@ class AgentLoop(ToolCallLifecycle):
                 # Layer 3: compress after all tools have executed
                 if compact_requested:
                     logger.info("Manual compact triggered by model")
-                    self._auto_compact(messages, run_dir, trace, focus_topic=focus_topic, iteration=current_iter)
+                    self._auto_compact(messages, run_dir, trace, focus_topic=focus_topic,
+                                       iteration=current_iter, automatic=False)
 
         except Exception as exc:
             logger.exception(f"AgentLoop error: {exc}")
             error_code = (
                 "provider_stream_error"
                 if isinstance(exc, ProviderStreamError)
+                else "context_budget_exceeded" if str(exc).startswith("context_budget_exceeded:")
                 else "agent_loop_error"
             )
+            self._publish_context_status(run_dir, messages, phase="final")
             trace.write({"type": "end", "iter": self._run_iteration, "status": "error", "reason": str(exc), "iterations": iteration})
             trace.close()
             state_store.mark_failure(run_dir, str(exc))
@@ -1161,6 +1190,11 @@ class AgentLoop(ToolCallLifecycle):
                 "iterations": iteration,
                 "max_iterations": self.max_iterations,
             }
+
+        final_messages = messages
+        if final_content and (not messages or messages[-1].get("content") != final_content):
+            final_messages = [*messages, {"role": "assistant", "content": final_content}]
+        self._publish_context_status(run_dir, final_messages, phase="final")
 
         # Determine final status. The reason is also propagated into the
         # returned dict so SessionService can surface a meaningful UI
@@ -1318,20 +1352,33 @@ class AgentLoop(ToolCallLifecycle):
             user_message, run_started_wall, written_files=self._written_files,
         )
 
-    def _publish_context_status(self, run_dir: Path, messages: list) -> None:
+    def _publish_context_status(self, run_dir: Path, messages: list, *, phase: str = "pre_request") -> None:
         """Persist counts only, never raw prompts, keys or memory bodies."""
         budget = self._context_budget(messages)
+        resolution = getattr(self, "_context_resolution", None)
+        observed_at = datetime.now(timezone.utc).isoformat()
+        estimated = self._prompt_tokens(messages)
         data = {
             "version": 1, "source": "agent_run", "run_id": run_dir.name,
+            "session_id": getattr(self, "_context_session_id", None),
+            "attempt_id": getattr(self, "_attempt_id", None),
             "initial_selection": getattr(self, "_session_context_stats", {}),
-            "initial_components": self._initial_context_stats,
-            "current_prompt": {"estimated_next_request_tokens": self._prompt_tokens(messages),
-                "last_reported_input_tokens": self._last_context_input_tokens,
+            "initial_components": getattr(self, "_initial_context_stats", {}),
+            "current_prompt": {"estimated_next_request_tokens": estimated,
+                "last_reported_input_tokens": getattr(self, "_last_context_input_tokens", None),
+                "model": getattr(self, "_active_model_id", self._llm_runtime.configured_model),
+                "provider": self._llm_runtime.provider,
                 "model_window": budget.window, "window_source": budget.source,
+                "window_confidence": getattr(resolution, "confidence", "fallback"),
+                "phase": phase, "observed_at": observed_at,
                 "prompt_cost_cap": budget.max_tokens,
                 "micro_at": budget.micro_at, "compact_at": budget.compact_at,
+                "hard_input_limit": budget.hard_limit,
+                "output_reserve": budget.output_reserve,
+                "estimated_remaining_input_tokens": max(0, budget.hard_limit - estimated),
                 "tool_schema_estimated_tokens": self._tool_schema_tokens,
                 "estimator": "chars_div4_anchored_to_provider_when_available"},
+            "compaction": dict(self._last_compaction_status),
         }
         try:
             path = run_dir / "request_context.json"
@@ -1345,24 +1392,46 @@ class AgentLoop(ToolCallLifecycle):
     def _context_budget(self, messages: list) -> CompactionBudget:
         """Compaction thresholds for the active model's real context window."""
         cfg = get_env_config()
-        provider = (cfg.llm.langchain_provider or "").strip().lower().replace("_", "-")
-        model = getattr(self.llm, "model_name", "") or cfg.llm.langchain_model_name
-        window, source = resolve_window(
+        provider = self._llm_runtime.provider
+        model = getattr(self, "_active_model_id", "") or getattr(self.llm, "model_name", "") or self._llm_runtime.configured_model
+        resolution = resolve_context(
             provider,
             str(model or ""),
+            base_url=getattr(self._llm_runtime, "base_url", ""),
+            provider_metadata=getattr(self.llm, "context_metadata", None),
             env_window=cfg.agent_tuning.vibe_trading_context_window,
             learned_window=self._learned_context_window,
         )
+        self._context_resolution = resolution
+        output_reserve = getattr(self._llm_runtime, "output_reserve", 0)
+        prompt_limit = resolution.max_input_tokens
+        if self._learned_context_window is not None:
+            learned_limit = max(0, self._learned_context_window - output_reserve)
+            prompt_limit = min(prompt_limit, learned_limit) if prompt_limit is not None else learned_limit
         return CompactionBudget(
-            window=window,
-            source=source,
+            window=resolution.window,
+            source=resolution.source,
             max_tokens=cfg.agent_tuning.vibe_trading_context_max_tokens,
             static_tokens=self._context_meter.static(messages, self._tool_schema_tokens),
+            output_reserve=output_reserve,
+            prompt_limit=prompt_limit,
         )
 
     def _prompt_tokens(self, messages: list) -> int:
         """Real-token size the next request would have."""
         return self._context_meter.tokens(messages, self._tool_schema_tokens)
+
+    def _assert_context_fits(self, messages: list) -> None:
+        """Never retry an unchanged request known to exceed the physical cap."""
+        budget = self._context_budget(messages)
+        tokens = self._prompt_tokens(messages)
+        if tokens > budget.hard_limit:
+            raise RuntimeError(
+                f"context_budget_exceeded: Estimated request size {tokens} exceeds "
+                f"the available input limit {budget.hard_limit} after compaction. "
+                "Conversation history was retained. Use a model with a larger "
+                "context window or reduce the current request/tool definitions."
+            )
 
     def _compact_to_budget(
         self,
@@ -1414,8 +1483,8 @@ class AgentLoop(ToolCallLifecycle):
                 "Auto compact triggered: %s real tokens > %s (window %s from %s)",
                 tokens, budget.compact_at, budget.window, budget.source,
             )
-            self._auto_compact(messages, run_dir, trace, iteration=current_iter)
-            self._compacted_to_tokens = self._prompt_tokens(messages)
+            if self._auto_compact(messages, run_dir, trace, iteration=current_iter):
+                self._compacted_to_tokens = self._prompt_tokens(messages)
 
     def _recover_context_overflow(
         self,
@@ -1444,7 +1513,8 @@ class AgentLoop(ToolCallLifecycle):
         stated = parse_context_limit(str(exc))
         # The provider's own number when it gives one; otherwise the prompt
         # that did not fit, with a margin for our estimate of it.
-        self._learned_context_window = stated or int(sent * 0.9)
+        learned = stated or int(sent * 0.9)
+        self._learned_context_window = min(self._learned_context_window, learned) if self._learned_context_window else learned
         trace.write({
             "type": "context_overflow",
             "iter": current_iter,
@@ -1453,6 +1523,7 @@ class AgentLoop(ToolCallLifecycle):
             "learned_window": self._learned_context_window,
         })
         self._compact_to_budget(messages, run_dir, trace, iteration, current_iter, force=True)
+        self._assert_context_fits(messages)
 
     def _microcompact_and_unblock(
         self,
@@ -1542,206 +1613,196 @@ class AgentLoop(ToolCallLifecycle):
         trace: TraceWriter,
         focus_topic: str = "",
         iteration: int = 0,
-    ) -> None:
-        """Layer 3/4/5: structured LLM summary with token-budget tail protection.
+        *,
+        automatic: bool = True,
+    ) -> bool:
+        """Summarize transactionally; a failed fold never removes its input.
 
-        Upgrades over the original:
-          - Token-budget tail: keeps ~20K tokens of recent messages (not a fixed count).
-          - Structured summary template: preserves goal, progress, decisions, files, etc.
-          - Iterative update: Nth compression updates previous summary, zero info decay.
-          - Tool pair fix: repairs orphaned tool_call/tool_result after compression.
-          - Focus-topic: optionally prioritize specific topic in summary.
-
-        Args:
-            messages: Message list (replaced in place).
-            run_dir: Run directory.
-            trace: TraceWriter.
-            focus_topic: Optional topic to prioritize in the summary.
-            iteration: Current trace iteration.
+        The full transcript and a summary checkpoint remain private to this run.
+        Every head fragment must return nonempty text before replacing context.
+        The active user request and outstanding replay pairs remain verbatim.
         """
         if self._cancel_event.is_set() or self._budget_stop_reason is not None:
-            return
-        # Save full transcript before compressing next to the active trace.
-        transcript_path = trace.dir_path / f"transcript_{int(_time.time())}.jsonl"
-        with open(transcript_path, "w", encoding="utf-8") as f:
-            for msg in messages:
-                f.write(json.dumps(msg, default=str, ensure_ascii=False) + "\n")
+            return False
+        budget = self._context_budget(messages)
+        before = self._prompt_tokens(messages)
+        count = int(self._last_compaction_status.get("count", 0))
+        transcript_saved = False
+
+        def status(state: str, reason: str | None = None) -> None:
+            self._last_compaction_status = {
+                "state": state, "automatic": automatic, "count": count,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }
+            if reason:
+                self._last_compaction_status["reason"] = reason
+            self._publish_context_status(run_dir, messages, phase="post_compaction")
+
+        def failed(reason: str) -> bool:
+            status("failed", reason)
+            event = {"iter": iteration, "reason": reason,
+                     "transcript_saved": transcript_saved, "preserved_context": True}
+            trace.write({"type": "compact_failed", **event})
+            self._emit("compact_failed", event)
+            return False
+
+        if not messages or messages[0].get("role") != "system":
+            status("skipped", "missing_system_message")
+            return False
+        available = max(0, budget.total - budget.static_tokens)
+        summary_target = max(256, min(8000, available // 3))
+        tail_budget = min(TAIL_TOKEN_BUDGET, max(0, available - summary_target - 512))
+        head, tail = _compaction_segments(
+            messages[1:], budget=tail_budget,
+            preserve_tool_call_ids=self._readonly_replay_visibility_pending,
+        )
+        if not head:
+            status("skipped", "nothing_to_summarize")
+            return False
+
+        # Unique names avoid overwriting two compactions in the same second.
+        transcript_path = trace.dir_path / f"transcript_{_time.time_ns()}.jsonl"
+        try:
+            temporary = transcript_path.with_suffix(".jsonl.tmp")
+            with temporary.open("w", encoding="utf-8") as stream:
+                for message in messages:
+                    stream.write(json.dumps(message, default=str, ensure_ascii=False) + "\n")
+            temporary.replace(transcript_path)
+            transcript_saved = True
+        except OSError:
+            return failed("transcript_write_failed")
 
         readable_before = self._readable_success_keys(messages)
-        system_msg = messages[0]
-        body = messages[1:]
-
-        # Token-budget tail: size messages with their tool-call arguments so
-        # oversized tool calls are folded instead of hiding in the tail.
-        cut_idx = _tail_cut_index(body)
-
-        head = body[:cut_idx]
-        tail = body[cut_idx:]
-
-        if not head:
-            # All body fits in tail budget — force a split to avoid infinite loop
-            if len(body) > 2:
-                cut_idx = max(1, len(body) // 2)
-                head = body[:cut_idx]
-                tail = body[cut_idx:]
-            else:
-                logger.warning("Auto compact: nothing to compress (body too small)")
-                return
-
-        # Replayed results are owed one successful writing request. Keep the
-        # entire assistant-call/result pair out of summaries until then.
-        pending = self._readonly_replay_visibility_pending
-        leased = [msg for msg in head if (
-            msg.get("role") == "tool" and msg.get("tool_call_id") in pending
-        ) or any(call.get("id") in pending for call in msg.get("tool_calls") or [])]
-        if leased:
-            head = [msg for msg in head if all(msg is not kept for kept in leased)]
-            tail = leased + tail
-
-        # Build focus section
+        status("running")
+        self._emit("compact_started", {"iter": iteration, "tokens_before": before,
+                                      "automatic": automatic})
         focus_section = _FOCUS_SECTION.format(topic=focus_topic) if focus_topic else ""
-
-        # Fold every head chunk so no message falls between the summary prompt
-        # and the preserved tail. The first fresh chunk gets the full
-        # structured handoff; subsequent chunks incrementally update it.
-        # Encrypted provider items are opaque to the summariser and only
-        # cost tokens there; the messages they belong to are being folded.
-        chunks = _summary_chunks(
-            [{k: v for k, v in m.items() if k != "provider_items"} for m in head]
+        instruction = (
+            f"\nKeep the handoff concise, targeting at most {summary_target} tokens. "
+            "Retain source identifiers and distinguish observations from assumptions.\n"
         )
-        logger.info("Auto compact: folding %d summary chunks", len(chunks))
         summary = self._previous_summary or ""
-        degraded_compact = False
-        _compact_timeout = _llm_timeout_seconds()
+        summary_limit = max(0, budget.total)
+        overhead = estimate_tokens(_ITERATIVE_UPDATE_PROMPT.format(
+            previous_summary=summary, new_turns="", focus_section=focus_section
+        ) + instruction)
+        chunk_limit = min(SUMMARY_CHUNK_CHARS, max(256, (summary_limit - overhead - 256) * 3))
+        if summary_limit <= overhead + 128:
+            return failed("summary_prompt_over_budget")
+        chunks = _summary_chunks(
+            [{key: value for key, value in message.items() if key != "provider_items"} for message in head],
+            limit=chunk_limit,
+        )
+        if len(chunks) > 128:
+            return failed("too_many_summary_chunks")
+        timeout = _llm_timeout_seconds()
         for conv_text in chunks:
             if self._cancel_event.is_set() or self._budget_stop_reason is not None:
-                return
-            # Structured template while there is still nothing to update — that
-            # covers a fresh session's first chunk and the corner case where
-            # every fold so far returned empty content.
-            if not summary:
-                prompt = _STRUCTURED_SUMMARY_PROMPT.format(focus_section=focus_section) + conv_text
-            else:
-                prompt = _ITERATIVE_UPDATE_PROMPT.format(
-                    previous_summary=summary,
-                    new_turns=conv_text,
-                    focus_section=focus_section,
-                )
+                return failed("cancelled" if self._cancel_event.is_set() else "budget_stopped")
+            prompt = (
+                _STRUCTURED_SUMMARY_PROMPT.format(focus_section=focus_section) + instruction + conv_text
+                if not summary else _ITERATIVE_UPDATE_PROMPT.format(
+                    previous_summary=summary, new_turns=conv_text, focus_section=focus_section
+                ) + instruction
+            )
+            if estimate_tokens([{"role": "user", "content": prompt}]) > summary_limit:
+                return failed("summary_prompt_over_budget")
+            result: list = []
+            errors: list = []
 
-            # A silent provider stall on the summary call used to freeze the
-            # whole run (no chunk arrives, so nothing aborts it). The provider
-            # httpx timeout only bounds time-between-bytes, not total time, and
-            # LangChain does not honor a per-call config "timeout", so a slow
-            # but alive server can run for many minutes. Enforce a hard
-            # wall-clock deadline via a daemon thread; on expiry fall back to
-            # hard truncation so the loop continues.
-            _compact_result: list = []
-            _compact_error: list = []
-
-            def _run_compact_summary() -> None:
+            def summarize(prompt_text=prompt, response_box=result, error_box=errors) -> None:
                 try:
-                    resp = self.llm.chat(
-                        [{"role": "user", "content": prompt}],
-                        timeout=_compact_timeout if _compact_timeout > 0 else None,
-                    )
-                    _compact_result.append(resp)
-                except BaseException as exc:  # noqa: BLE001 - compaction must not crash the run
-                    _compact_error.append(exc)
+                    response_box.append(self.llm.chat(
+                        [{"role": "user", "content": prompt_text}],
+                        timeout=timeout if timeout > 0 else None,
+                    ))
+                except BaseException as exc:
+                    error_box.append(exc)
 
-            if _compact_timeout > 0:
-                # A new thread starts with an empty context, so the session
-                # bound by run() (x-opencode-session, #1416) would not reach
-                # this call: run it inside a copy of the caller's context.
+            if timeout > 0:
                 worker = threading.Thread(
-                    target=contextvars.copy_context().run,
-                    args=(_run_compact_summary,),
-                    name="compact-summary",
-                    daemon=True,
+                    target=contextvars.copy_context().run, args=(summarize,),
+                    name="compact-summary", daemon=True,
                 )
                 worker.start()
-                worker.join(timeout=_compact_timeout)
+                deadline = _time.monotonic() + timeout
+                while worker.is_alive() and _time.monotonic() < deadline:
+                    if self._cancel_event.is_set() or self._budget_stop_reason is not None:
+                        self._account_llm_usage(run_dir, None, iteration, purpose="compaction")
+                        return failed("cancelled" if self._cancel_event.is_set() else "budget_stopped")
+                    worker.join(timeout=min(0.05, max(0, deadline - _time.monotonic())))
                 if worker.is_alive():
-                    logger.warning(
-                        "Auto compact summary call exceeded %.1fs; degrading compaction",
-                        _compact_timeout,
-                    )
-                    degraded_compact = True
                     self._account_llm_usage(run_dir, None, iteration, purpose="compaction")
-                    break
-                if _compact_error:
-                    logger.warning(
-                        "Auto compact LLM call failed (%s); degrading compaction",
-                        _compact_error[0],
-                    )
-                    degraded_compact = True
-                    self._account_llm_usage(run_dir, None, iteration, purpose="compaction")
-                    break
-                summary_resp = _compact_result[0]
+                    return failed("summary_timeout")
             else:
-                try:
-                    summary_resp = self.llm.chat([{"role": "user", "content": prompt}])
-                except Exception:
-                    self._account_llm_usage(run_dir, None, iteration, purpose="compaction")
-                    raise
+                summarize()
+            if errors or not result:
+                self._account_llm_usage(run_dir, None, iteration, purpose="compaction")
+                return failed("summary_provider_error")
+            response = result[0]
             self._account_llm_usage(
-                run_dir, getattr(summary_resp, "usage_metadata", None), iteration,
-                purpose="compaction",
+                run_dir, getattr(response, "usage_metadata", None), iteration, purpose="compaction",
             )
             if self._cancel_event.is_set() or self._budget_stop_reason is not None:
-                return
-            if summary_resp.content:
-                summary = summary_resp.content
-        if degraded_compact and not summary:
-            summary = (
-                "[compaction degraded: LLM summarization timed out or failed; "
-                "earlier tool results were truncated. "
-                f"Full transcript: {transcript_path}]"
-            )
-        self._previous_summary = summary
+                return failed("cancelled" if self._cancel_event.is_set() else "budget_stopped")
+            content = getattr(response, "content", None)
+            if not isinstance(content, str) or not content.strip():
+                return failed("empty_summary")
+            summary = content.strip()
 
-        # Preserve deterministic verification records across the compaction.
-        # The LLM summary does not reliably retain exact calc results, so the
-        # model used to re-run the same financial_rigor expressions after a
-        # compact to "re-verify" numbers it could no longer see (2026-08-20
-        # INTC run: identical calcs re-ran 5-9x each). Re-attach a terse
-        # ledger of already-verified values so the model does not re-run them.
-        verification_ledger = _verification_ledger(head)
-
-        tokens_before = estimate_tokens(messages)
-        trace.write_text_entry(
-            {
-                "type": "compact",
-                "iter": iteration,
-                "tokens_before": tokens_before,
-                "focus_topic": focus_topic or "(none)",
-                "summary_chunks": len(chunks),
-            },
-            field="summary",
-            value=summary,
-            offload_kind=f"compact-summary-{iteration}",
+        verification = _verification_ledger(head)
+        compressed = (
+            f"[Conversation compressed — handoff summary. Transcript: {transcript_path}]\n\n{summary}"
         )
-        self._emit("compact", {"tokens_before": tokens_before, "summary": summary[:200]})
-
-        # Reconstruct: system + summary + acknowledge + preserved tail
-        state_summary = self.memory.to_summary()
-        compressed = f"[Conversation compressed — handoff summary. Transcript: {transcript_path}]\n\n{summary}"
-        if verification_ledger:
+        if verification:
             compressed += (
                 "\n\n[Verified tool results from the compressed turns - do NOT "
-                "re-run these tools, they are already verified]:\n"
-                + verification_ledger
+                "re-run these tools, they are already verified]:\n" + verification
             )
+        state_summary = self.memory.to_summary()
         if state_summary and state_summary != "(empty state)":
             compressed += f"\n\nCurrent agent state:\n{state_summary}"
-
-        messages.clear()
-        messages.append(system_msg)
-        messages.append({"role": "user", "content": f"{compressed}\n\n<system>Continue from the summary above.</system>"})
-        messages.extend(tail)
-
-        # Fix orphaned tool pairs in the reconstructed message list
-        _fix_tool_pairs(messages)
+        replacement = [
+            messages[0],
+            {"role": "user", "content": compressed + "\n\n<system>Continue from the summary above.</system>"},
+            *tail,
+        ]
+        _fix_tool_pairs(replacement)
+        # Checkpoint before committing the in-memory replacement. Failed writes
+        # retain the original messages and the previous successful summary.
+        checkpoint = {
+            "version": 1, "summary": summary, "iteration": iteration,
+            "transcript": transcript_path.name, "summary_chunks": len(chunks),
+            "preserved_tail_messages": len(tail), "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        try:
+            checkpoint_path = trace.dir_path / "compaction_state.json"
+            temporary = checkpoint_path.with_suffix(".json.tmp")
+            temporary.write_text(json.dumps(checkpoint, ensure_ascii=False), encoding="utf-8")
+            temporary.replace(checkpoint_path)
+        except OSError:
+            return failed("checkpoint_write_failed")
+        session_memory = getattr(self, "_session_compaction_memory", None)
+        if session_memory is not None:
+            try:
+                session_memory.commit(head, summary, run_dir)
+            except Exception:
+                logger.debug("Could not persist session compaction checkpoint", exc_info=True)
+        messages[:] = replacement
+        self._previous_summary = summary
         self._unblock_lost_readonly_results(messages, readable_before)
+        after = self._prompt_tokens(messages)
+        count += 1
+        status("completed")
+        event = {"iter": iteration, "tokens_before": before, "tokens_after": after,
+                 "automatic": automatic, "summary_chunks": len(chunks),
+                 "transcript_saved": transcript_saved}
+        trace.write_text_entry(
+            {"type": "compact", **event, "focus_topic": focus_topic or "(none)"},
+            field="summary", value=summary, offload_kind=f"compact-summary-{iteration}",
+        )
+        self._emit("compact", {**event, "summary": summary[:200]})
+        return True
 
     def _emit(self, event_type: str, data: Dict[str, Any]) -> None:
         """Fire an event via the callback."""

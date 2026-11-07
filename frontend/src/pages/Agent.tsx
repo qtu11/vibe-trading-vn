@@ -28,7 +28,8 @@ import { ThinkingTimeline } from "@/components/chat/ThinkingTimeline";
 import { ConversationTimeline } from "@/components/chat/ConversationTimeline";
 import { ActivityLine } from "@/components/chat/ActivityLine";
 import { LlmUsageCounter } from "@/components/chat/LlmUsageCounter";
-import { ContextMemoryPanel, type ContextSnapshot } from "@/components/chat/ContextMemoryPanel";
+import type { ContextSnapshot } from "@/components/chat/ContextMemoryPanel";
+import { ContextUsageIndicator } from "@/components/chat/ContextUsageIndicator";
 import { MandateProposalCard } from "@/components/chat/MandateProposalCard";
 import { ScheduledResearchProposalCard } from "@/components/chat/ScheduledResearchProposalCard";
 import { SwarmStatusCard } from "@/components/chat/SwarmStatusCard";
@@ -38,6 +39,8 @@ import {
   type ComposerHandle,
 } from "@/components/chat/Composer";
 import { GoalPanel } from "@/components/chat/GoalPanel";
+import { ReportPreviewPanel } from "@/components/chat/ReportPreviewPanel";
+import { useReportPreviewStore } from "@/stores/reportPreview";
 import {
   LiveActionChip,
   LiveRuntimePanel,
@@ -281,12 +284,17 @@ export function Agent() {
   const streamingText = useAgentStore(s => s.streamingText);
   const status = useAgentStore(s => s.status);
   const sessionId = useAgentStore(s => s.sessionId);
+  useEffect(() => {
+    useReportPreviewStore.getState().close();
+    return () => useReportPreviewStore.getState().close();
+  }, [sessionId]);
   const activity = useAgentStore(s => s.activity);
   const reasoningTail = useAgentStore(s => s.reasoningTail);
   const swarmRuns = useAgentStore(s => s.swarmRuns);
   const sessionLoading = useAgentStore(s => s.sessionLoading);
   const previousStatusRef = useRef(status);
   const [contextSnapshot, setContextSnapshot] = useState<{ sessionId: string; snapshot: ContextSnapshot }>();
+  const contextRunBindingRef = useRef<{ sessionId: string; attemptId: string; runId: string } | null>(null);
 
   const { connect, disconnect, onStatusChange } = useSSE();
 
@@ -795,7 +803,15 @@ export function Agent() {
       },
       context_snapshot: (d) => {
         touch();
-        if (d.version === 1 && sessionId) setContextSnapshot({ sessionId, snapshot: d as unknown as ContextSnapshot });
+        if (d.version !== 1 || act().sessionId !== sid || (d.session_id && d.session_id !== sid)
+          || typeof d.run_id !== "string" || !d.run_id) return;
+        const eventAttempt = typeof d.attempt_id === "string" ? d.attempt_id : "";
+        const currentAttempt = act().activity?.attemptId || "";
+        if (eventAttempt && currentAttempt && !currentAttempt.startsWith("pending-") && eventAttempt !== currentAttempt) return;
+        const binding = contextRunBindingRef.current;
+        if (binding?.sessionId === sid && binding.attemptId === (eventAttempt || currentAttempt) && binding.runId && binding.runId !== d.run_id) return;
+        contextRunBindingRef.current = { sessionId: sid, attemptId: eventAttempt || currentAttempt, runId: d.run_id };
+        setContextSnapshot({ sessionId: sid, snapshot: d as unknown as ContextSnapshot });
       },
 
       reasoning_delta: (d) => {
@@ -960,6 +976,12 @@ export function Agent() {
         touch();
         replayAttemptSeenRef.current = true;
         if (!identifyActivity(d, "thinking")) return;
+        const attemptId = String(d.attempt_id || "");
+        const binding = contextRunBindingRef.current;
+        if (act().sessionId === sid && (binding?.sessionId !== sid || binding.attemptId !== attemptId)) {
+          contextRunBindingRef.current = { sessionId: sid, attemptId, runId: typeof d.run_id === "string" ? d.run_id : "" };
+          setContextSnapshot(undefined);
+        }
         // Backend has begun executing the attempt. Re-affirm streaming state
         // so the UI shows a working indicator for reconnects and fresh loads.
         if (act().status !== "streaming") act().setStatus("streaming");
@@ -1603,7 +1625,7 @@ export function Agent() {
   useEffect(() => {
     if (status !== "streaming") return;
     const cancelOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.repeat) return;
+      if (event.key !== "Escape" || event.repeat || event.defaultPrevented) return;
       event.preventDefault();
       void handleCancel();
     };
@@ -1815,6 +1837,7 @@ export function Agent() {
     : null;
 
   return (
+    <div className="relative flex h-full min-w-0 overflow-hidden">
     <div className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
       <ModelRuntimeBar
         settings={llmSettings}
@@ -1822,7 +1845,6 @@ export function Agent() {
         runtimeModel={visibleRuntimeIdentity.model}
         runtimeReasoningEffort={visibleRuntimeIdentity.reasoningEffort}
       />
-      <ContextMemoryPanel key={sessionId || "draft"} sessionId={sessionId} live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined} />
       {historyError && (
         <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs">
           <span>{t("layout.sessionsLoadFailed")} {historyError}</span>
@@ -1991,7 +2013,7 @@ export function Agent() {
 
       <div
         data-agent-composer
-        className="border-t border-border/40 px-4 pt-3 pb-5 bg-gradient-to-t from-background via-background/95 to-background/60 backdrop-blur-md"
+        className="border-t border-white/[0.06] dark:border-white/[0.04] px-4 pt-3 pb-5 bg-gradient-to-t from-background/95 via-background/90 to-background/50 backdrop-blur-xl"
       >
         <div className="max-w-3xl mx-auto">
           <LiveRuntimePanel
@@ -2030,8 +2052,16 @@ export function Agent() {
               onCancelSwarm={handleCancelSwarm}
             />
           </LiveRuntimePanel>
+          <ContextUsageIndicator
+            key={`${sessionId || "draft"}:${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
+            sessionId={sessionId}
+            live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined}
+            modelKey={`${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
+          />
         </div>
       </div>
+    </div>
+    <ReportPreviewPanel />
     </div>
   );
 }

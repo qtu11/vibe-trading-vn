@@ -1,0 +1,24 @@
+{
+  "pdf_pages": 30,
+  "pdf_bookmarks": 33,
+  "job_id": "4dbf9b7f8dfa41219819071a272e5443",
+  "publication_status": "draft_unverified",
+  "files": [
+    {
+      "path": "D:\\Vibe-Trading\\output\\pdf\\VIBE_Research_FPT_20261107.pdf",
+      "size_bytes": 1185678,
+      "sha256": "96cd9caaebdeeff96339e73c4e678ae4b3787e97f85585c7ec22003f3a2a0b4d"
+    },
+    {
+      "path": "D:\\Vibe-Trading\\output\\pdf\\VIBE_Research_FPT_20261107.docx",
+      "size_bytes": 1174918,
+      "sha256": "e84e5dadb8e1345d66b2472b2df9e5564b67608454a90f2fec7472e6839ef264"
+    }
+  ],
+  "checks": {
+    "pdf_text_clean": true,
+    "docx_zip_valid": true,
+    "exact_shrimp_logo_embedded": true,
+    "registered_artifact_hashes_match": true
+  }
+}

@@ -33,7 +33,16 @@ export function ForexTradeCards({ plan }: { plan: ForexTradePlan }) {
     FINAL_QUOTE_OR_CONSTRAINTS_INVALID: l("A fresh final broker quote could not be validated.", "Chưa xác thực được báo giá broker mới nhất."),
     ENTRY_TIMING_NOT_APPROVED: l("Requested MARKET/LIMIT timing did not pass the risk review.", "Thời điểm MARKET/LIMIT chưa được vòng rủi ro chấp thuận."),
   };
-  const utc = (value: string) => new Date(value).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+  const utc = (value: string | undefined | null) => {
+    if (!value) return "—";
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return String(value);
+      return d.toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+    } catch {
+      return String(value);
+    }
+  };
   const manager = plan.reports.find(r => r.role === "manager");
   return <section aria-label={l("Forex trade scenarios", "Kịch bản giao dịch Forex")} className="my-3 space-y-3">
     <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -90,9 +99,9 @@ export function ForexTradeCards({ plan }: { plan: ForexTradePlan }) {
       <ol className="mt-3 space-y-3">{plan.reports.map(r => <li key={r.role} className="border-t pt-2">
         <div className="flex flex-wrap justify-between gap-1"><strong>{roles[r.role]}</strong><span className="text-xs">{r.stance.toUpperCase()}{r.veto ? ` · ${r.role === "risk" || r.role === "manager" ? l("VETO", "PHỦ QUYẾT") : l("ADVISES WAIT", "ĐỀ NGHỊ CHỜ")}` : ""}</span></div>
         <p className="mt-1 text-sm">{r.summary}</p><p className="mt-1 text-xs text-muted-foreground">{l("Counterpoint / invalidation", "Phản biện / điều kiện vô hiệu")}: {r.counterargument}</p>
-        <p className="mt-1 break-words text-xs text-muted-foreground">{r.provider} / {r.model} · {r.evidence_refs.join(", ")}</p>
+        <p className="mt-1 break-words text-xs text-muted-foreground">{r.provider} / {r.model} · {Array.isArray(r.evidence_refs) ? r.evidence_refs.join(", ") : "—"}</p>
       </li>)}</ol>
-      <p className="mt-3 break-all text-xs text-muted-foreground">{l("Evidence snapshot", "Bản chụp bằng chứng")}: {plan.evidence_hash.slice(0, 16)}</p>
+      <p className="mt-3 break-all text-xs text-muted-foreground">{l("Evidence snapshot", "Bản chụp bằng chứng")}: {plan.evidence_hash ? plan.evidence_hash.slice(0, 16) : "—"}</p>
     </details>
     <p className="text-xs text-muted-foreground">{l("Calculated research scenarios · no order has been sent. The separate automated trading runner is not started by these cards.", "Kịch bản phân tích có giá tính toán · chưa gửi lệnh. Hai ô này không khởi động runner giao dịch tự động.")}</p>
   </section>;

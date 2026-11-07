@@ -1,6 +1,7 @@
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { MarkdownContent, MessageBubble } from "../MessageBubble";
 import type { AgentMessage } from "@/types/agent";
+import { useReportPreviewStore } from "@/stores/reportPreview";
 
 // Unlike MessageBubble.test.tsx, react-markdown is NOT mocked here: these tests
 // exercise the real remark-math/rehype-katex pipeline end to end.
@@ -74,5 +75,13 @@ describe("MessageBubble LaTeX rendering", () => {
     const link = container.querySelector("a");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("opens authenticated report links in the document sidebar", () => {
+    const reportId = "a".repeat(32);
+    const { container } = render(<MarkdownContent content={`[research.docx](/api/reports/${reportId})`} streaming />);
+    fireEvent.click(container.querySelector("a")!);
+    expect(useReportPreviewStore.getState().selection).toEqual({ reportId });
+    useReportPreviewStore.getState().close();
   });
 });

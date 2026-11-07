@@ -1,0 +1,220 @@
+{
+  "FPT.VN": [
+    {
+      "trade_date": "2026-11-02T00:00:00",
+      "open": 52400.0,
+      "high": 52500.0,
+      "low": 50100.0,
+      "close": 50200.0,
+      "volume": 12293400.0
+    },
+    {
+      "trade_date": "2026-11-03T00:00:00",
+      "open": 50300.0,
+      "high": 51700.0,
+      "low": 49550.0,
+      "close": 50400.0,
+      "volume": 9249300.0
+    },
+    {
+      "trade_date": "2026-11-04T00:00:00",
+      "open": 50600.0,
+      "high": 53900.0,
+      "low": 50400.0,
+      "close": 53900.0,
+      "volume": 12822500.0
+    },
+    {
+      "trade_date": "2026-11-05T00:00:00",
+      "open": 54500.0,
+      "high": 54600.0,
+      "low": 52800.0,
+      "close": 52900.0,
+      "volume": 8006200.0
+    },
+    {
+      "trade_date": "2026-11-06T00:00:00",
+      "open": 51400.0,
+      "high": 51800.0,
+      "low": 50800.0,
+      "close": 50800.0,
+      "volume": 12162200.0
+    }
+  ],
+  "VCB.VN": [
+    {
+      "trade_date": "2026-11-02T00:00:00",
+      "open": 56100.0,
+      "high": 56200.0,
+      "low": 53300.0,
+      "close": 53600.0,
+      "volume": 14009100.0
+    },
+    {
+      "trade_date": "2026-11-03T00:00:00",
+      "open": 54200.0,
+      "high": 54500.0,
+      "low": 53100.0,
+      "close": 53500.0,
+      "volume": 8910500.0
+    },
+    {
+      "trade_date": "2026-11-04T00:00:00",
+      "open": 53800.0,
+      "high": 54900.0,
+      "low": 53700.0,
+      "close": 54800.0,
+      "volume": 4883500.0
+    },
+    {
+      "trade_date": "2026-11-05T00:00:00",
+      "open": 55000.0,
+      "high": 55400.0,
+      "low": 54000.0,
+      "close": 54200.0,
+      "volume": 5003300.0
+    },
+    {
+      "trade_date": "2026-11-06T00:00:00",
+      "open": 53500.0,
+      "high": 53900.0,
+      "low": 53300.0,
+      "close": 53600.0,
+      "volume": 5202300.0
+    }
+  ],
+  "HPG.VN": [
+    {
+      "trade_date": "2026-11-02T00:00:00",
+      "open": 21000.0,
+      "high": 21100.0,
+      "low": 20350.0,
+      "close": 20400.0,
+      "volume": 25465100.0
+    },
+    {
+      "trade_date": "2026-11-03T00:00:00",
+      "open": 20600.0,
+      "high": 21400.0,
+      "low": 20400.0,
+      "close": 21250.0,
+      "volume": 32472700.0
+    },
+    {
+      "trade_date": "2026-11-04T00:00:00",
+      "open": 21150.0,
+      "high": 21700.0,
+      "low": 21100.0,
+      "close": 21700.0,
+      "volume": 38465700.0
+    },
+    {
+      "trade_date": "2026-11-05T00:00:00",
+      "open": 21750.0,
+      "high": 21900.0,
+      "low": 21450.0,
+      "close": 21500.0,
+      "volume": 18613700.0
+    },
+    {
+      "trade_date": "2026-11-06T00:00:00",
+      "open": 21150.0,
+      "high": 21400.0,
+      "low": 21050.0,
+      "close": 21200.0,
+      "volume": 22105200.0
+    }
+  ],
+  "_provenance": {
+    "FPT.VN": {
+      "source": "yahoo",
+      "requested_source": "auto",
+      "detected_source": "yahoo",
+      "fallback_used": false,
+      "currency_conversion": "none",
+      "volume_unit": null,
+      "adjustment": "split_dividend",
+      "quote_currency": "VND",
+      "price_unit": "VND",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/FPT.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:10.827970+00:00",
+      "quote_observation": {
+        "symbol": "FPT.VN",
+        "exchange": "HOSE",
+        "value": 50800.0,
+        "unit": "VND",
+        "scale": 1,
+        "observed_at": "2026-11-06T07:45:09+00:00",
+        "price_basis": "raw",
+        "data_role": "last_trade",
+        "provider": "yahoo",
+        "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/FPT.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+        "retrieved_at": "2026-11-07T05:30:10.827970+00:00"
+      },
+      "first_bar_date": "2026-11-02T00:00:00",
+      "last_bar_date": "2026-11-06T00:00:00",
+      "data_kind": "historical_bars",
+      "price_warning": "OHLC bars may be adjusted and are not live quotes; use the dated raw quote_observation when available."
+    },
+    "VCB.VN": {
+      "source": "yahoo",
+      "requested_source": "auto",
+      "detected_source": "yahoo",
+      "fallback_used": false,
+      "currency_conversion": "none",
+      "volume_unit": null,
+      "adjustment": "split_dividend",
+      "quote_currency": "VND",
+      "price_unit": "VND",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/VCB.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:11.541516+00:00",
+      "quote_observation": {
+        "symbol": "VCB.VN",
+        "exchange": "HOSE",
+        "value": 53600.0,
+        "unit": "VND",
+        "scale": 1,
+        "observed_at": "2026-11-06T07:45:19+00:00",
+        "price_basis": "raw",
+        "data_role": "last_trade",
+        "provider": "yahoo",
+        "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/VCB.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+        "retrieved_at": "2026-11-07T05:30:11.541516+00:00"
+      },
+      "first_bar_date": "2026-11-02T00:00:00",
+      "last_bar_date": "2026-11-06T00:00:00",
+      "data_kind": "historical_bars",
+      "price_warning": "OHLC bars may be adjusted and are not live quotes; use the dated raw quote_observation when available."
+    },
+    "HPG.VN": {
+      "source": "yahoo",
+      "requested_source": "auto",
+      "detected_source": "yahoo",
+      "fallback_used": false,
+      "currency_conversion": "none",
+      "volume_unit": null,
+      "adjustment": "split_dividend",
+      "quote_currency": "VND",
+      "price_unit": "VND",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/HPG.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "retrieved_at": "2026-11-07T05:30:12.359444+00:00",
+      "quote_observation": {
+        "symbol": "HPG.VN",
+        "exchange": "HOSE",
+        "value": 21200.0,
+        "unit": "VND",
+        "scale": 1,
+        "observed_at": "2026-11-06T07:45:11+00:00",
+        "price_basis": "raw",
+        "data_role": "last_trade",
+        "provider": "yahoo",
+        "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/HPG.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+        "retrieved_at": "2026-11-07T05:30:12.359444+00:00"
+      },
+      "first_bar_date": "2026-11-02T00:00:00",
+      "last_bar_date": "2026-11-06T00:00:00",
+      "data_kind": "historical_bars",
+      "price_warning": "OHLC bars may be adjusted and are not live quotes; use the dated raw quote_observation when available."
+    }
+  }
+}

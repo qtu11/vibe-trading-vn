@@ -52,6 +52,7 @@ const INT_KEYS = ["trade_count", "max_consecutive_loss"];
 const NEUTRAL_KEYS = new Set(["trade_count", "avg_holding_days", "final_value"]);
 
 export function formatMetricVal(k: string, v: number): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "--";
   if (PCT_KEYS.includes(k)) {
     const sign = v > 0 ? "+" : "";
     return `${sign}${(v * 100).toFixed(2)}%`;
@@ -67,7 +68,7 @@ export function formatMetricVal(k: string, v: number): string {
 }
 
 export function metricSentiment(k: string, v: number): "positive" | "neutral" | "negative" {
-  if (NEUTRAL_KEYS.has(k)) return "neutral";
+  if (v === null || v === undefined || !Number.isFinite(v) || NEUTRAL_KEYS.has(k)) return "neutral";
   if (k === "max_drawdown") return v > -0.05 ? "positive" : v > -0.2 ? "neutral" : "negative";
   if (k === "max_consecutive_loss") return v <= 3 ? "positive" : v <= 6 ? "neutral" : "negative";
   if (k === "win_rate") return v >= 0.5 ? "positive" : v >= 0.35 ? "neutral" : "negative";
@@ -88,6 +89,7 @@ export function formatTimestamp(ts: number): string {
 }
 
 export function abbreviateNum(v: number): string {
+  if (v === null || v === undefined || !Number.isFinite(v)) return "--";
   const abs = Math.abs(v);
   if (abs >= 1e9) return (v / 1e9).toFixed(1) + "B";
   if (abs >= 1e6) return (v / 1e6).toFixed(1) + "M";

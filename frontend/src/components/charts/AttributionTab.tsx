@@ -165,7 +165,7 @@ function FactorStatCards({ factor, metrics }: { factor: AttributionFactor | null
           <AttrStat label={i18n.t("runDetail.attrRSquared")} value={factor.r_squared.toFixed(2)} />
         </>
       )}
-      {informationRatio !== undefined && (
+      {typeof informationRatio === "number" && Number.isFinite(informationRatio) && (
         <AttrStat
           label={i18n.t("runDetail.attrInformationRatio")}
           value={`${informationRatio > 0 ? "+" : ""}${informationRatio.toFixed(2)}`}

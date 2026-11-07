@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { toast } from "sonner";
 import { normalizeMathDelimiters } from "@/lib/markdown";
-import { downloadGeneratedReport } from "@/lib/api";
+import { useReportPreviewStore } from "@/stores/reportPreview";
 import type { AgentMessage } from "@/types/agent";
 import type { StoredAgentMessage } from "@/stores/agent";
 import { AgentAvatar } from "./AgentAvatar";
@@ -27,6 +27,7 @@ const EnhancedMarkdown = lazy(() => import("./EnhancedMarkdown"));
 // chart holds observed bars, and the council block's prose stays self-labelled.
 const ChartBlock = lazy(() => import("@/components/charts/ChartBlock"));
 const CouncilReport = lazy(() => import("@/components/charts/CouncilReport"));
+const ReportArtifactCard = lazy(() => import("@/components/chat/ReportArtifactCard"));
 
 interface FenceSource {
   language: string;
@@ -70,6 +71,13 @@ const markdownComponents: ReactMarkdownOptions["components"] = {
         </Suspense>
       );
     }
+    if (fence?.language === "report_artifact") {
+      return (
+        <Suspense fallback={<pre {...props}>{children}</pre>}>
+          <ReportArtifactCard code={fence.text} />
+        </Suspense>
+      );
+    }
     return <pre {...props}>{children}</pre>;
   },
   table: ({ node, ...props }) => {
@@ -82,14 +90,11 @@ const markdownComponents: ReactMarkdownOptions["components"] = {
   },
   a: ({ node, ...props }) => {
     void node;
-    const report = props.href?.match(/^\/api\/reports\/([0-9a-f]{32})$/);
+    const report = props.href?.match(/^\/api\/reports\/([0-9a-f]{32})(?:\?.*)?$/);
     if (report) {
       return <a {...props} onClick={(event) => {
         event.preventDefault();
-        const filename = event.currentTarget.textContent || "report.pdf";
-        void downloadGeneratedReport(report[1], filename).catch(() => {
-          toast.error(i18n.t("settings.unknownError"));
-        });
+        useReportPreviewStore.getState().openArtifact(report[1]);
       }} />;
     }
     return <a {...props} target="_blank" rel="noopener noreferrer" />;

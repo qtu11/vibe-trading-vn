@@ -37,13 +37,15 @@ function formatLeverage(leverage: MandateProfile["leverage"]): string {
       ? i18n.t("mandate.noLeverage")
       : i18n.t("mandate.leverageValue", { value: leverage });
   }
+  if (typeof leverage !== "string") return i18n.t("mandate.noLeverage");
   const lowered = leverage.toLowerCase();
   return lowered === "none" || lowered === "" ? i18n.t("mandate.noLeverage") : leverage;
 }
 
 function formatUniverse(universe: MandateProfile["universe"]): string {
   if (Array.isArray(universe)) return universe.join(" / ");
-  return universe.replace(/_/g, " ");
+  if (typeof universe === "string") return universe.replace(/_/g, " ");
+  return "—";
 }
 
 function ProfileTile({

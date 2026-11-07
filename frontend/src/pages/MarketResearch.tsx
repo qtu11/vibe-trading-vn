@@ -217,7 +217,7 @@ export function MarketResearch() {
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Field label={t("marketResearch.symbol")}><input className={control} disabled={capturing} required maxLength={40} placeholder="BTC-USDT-PERP" value={crypto.symbol} onChange={(event) => changeCrypto({ symbol: event.target.value })} /></Field>
           <Field label={t("marketResearch.metric")}><select className={control} disabled={capturing} value={crypto.metric} onChange={(event) => changeCrypto({ metric: event.target.value as CryptoRequest["metric"] })}><option value="open_interest">Open Interest</option><option value="funding">Funding</option></select></Field>
-          <Field label={t("marketResearch.sampling")}><select className={control} disabled={capturing || crypto.metric === "funding"} value={crypto.period} onChange={(event) => changeCrypto({ period: event.target.value })}>{["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"].map((period) => <option key={period}>{period}</option>)}</select></Field>
+          <Field label={t("marketResearch.sampling")}><select className={control} disabled={capturing || crypto.metric === "funding"} value={crypto.period} onChange={(event) => changeCrypto({ period: event.target.value as CryptoRequest["period"] })}>{["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"].map((period) => <option key={period}>{period}</option>)}</select></Field>
           <Field label={t("marketResearch.limit")}><input className={control} disabled={capturing} required type="number" min={2} max={100} step={1} value={crypto.limit} onChange={(event) => changeCrypto({ limit: event.target.valueAsNumber })} /></Field>
         </div>
       </>}

@@ -273,23 +273,33 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
         </div>
       )}
       {swarmPreset && (
-        <div className="flex items-center gap-1">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">
-            <Users className="h-3 w-3" />
-            {swarmPreset.title}
-            <button type="button" onClick={onCancelSwarm} className="hover:text-destructive transition-colors">
-              <X className="h-3 w-3" />
+        <div className="flex items-center gap-1.5 px-1 animate-in fade-in">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 text-xs font-semibold shadow-xs backdrop-blur-md">
+            <Users className="h-3.5 w-3.5 text-cyan-400" />
+            <span>Chuyên gia Swarm: {swarmPreset.title}</span>
+            <button
+              type="button"
+              onClick={onCancelSwarm}
+              className="rounded-md p-0.5 hover:bg-destructive/20 hover:text-destructive text-muted-foreground transition-colors"
+              title="Hủy preset"
+            >
+              <X className="h-3.5 w-3.5" />
             </button>
           </span>
         </div>
       )}
       {goalComposerActive && (
-        <div className="flex items-center gap-1">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">
-            <Target className="h-3 w-3" />
-            {t("agent.newResearchGoal")}
-            <button type="button" onClick={onCancelGoal} className="hover:text-destructive transition-colors">
-              <X className="h-3 w-3" />
+        <div className="flex items-center gap-1.5 px-1 animate-in fade-in">
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/25 text-orange-400 text-xs font-semibold shadow-xs backdrop-blur-md">
+            <Target className="h-3.5 w-3.5 text-orange-400" />
+            <span>{t("agent.newResearchGoal")}</span>
+            <button
+              type="button"
+              onClick={onCancelGoal}
+              className="rounded-md p-0.5 hover:bg-destructive/20 hover:text-destructive text-muted-foreground transition-colors"
+              title="Hủy mục tiêu"
+            >
+              <X className="h-3.5 w-3.5" />
             </button>
           </span>
         </div>
@@ -297,209 +307,288 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
       {panels}
       <LiveRuntimeStatus />
       {attachments.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1">
-          {attachments.map((attachment, index) => (
-            <span key={attachment.filePath} className="inline-flex max-w-full items-center gap-1.5 px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-xs font-medium">
-              <Paperclip className="h-3 w-3 shrink-0" />
-              <span className="truncate">{attachment.filename}</span>
-              <button
-                type="button"
-                aria-label={t("agent.removeAttachment", { filename: attachment.filename })}
-                onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
-                className="hover:text-destructive transition-colors"
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          {attachments.map((attachment, index) => {
+            const ext = attachment.filename.split('.').pop()?.toUpperCase() || "FILE";
+            return (
+              <span
+                key={attachment.filePath}
+                className="group inline-flex max-w-full items-center gap-2 px-3 py-1.5 rounded-xl border border-primary/25 bg-[#0B1524]/80 text-foreground text-xs font-medium shadow-sm backdrop-blur-md transition-all hover:border-primary/40"
               >
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
+                <span className="px-1.5 py-0.5 rounded bg-primary/20 text-primary text-[9px] font-mono font-bold tracking-wider">
+                  {ext}
+                </span>
+                <span className="truncate max-w-[220px] text-foreground/90 font-medium">{attachment.filename}</span>
+                <button
+                  type="button"
+                  aria-label={t("agent.removeAttachment", { filename: attachment.filename })}
+                  onClick={() => setAttachments((current) => current.filter((_, itemIndex) => itemIndex !== index))}
+                  className="rounded-md p-0.5 hover:bg-destructive/20 hover:text-destructive text-muted-foreground/60 transition-colors"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
       {uploading && (
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin" />
-          {t("agent.uploading")}
+        <div className="flex items-center gap-2 px-2 text-xs text-primary animate-pulse">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>{t("agent.uploading")}</span>
         </div>
       )}
       <LiveRuntimeControl />
-      <div className="group relative flex items-end gap-2 rounded-2xl border border-border/80 bg-card/80 dark:bg-card/90 p-2 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.15),0_0_0_1px_rgba(255,255,255,0.05)] backdrop-blur-xl transition-all duration-200 focus-within:border-primary/60 focus-within:shadow-[0_4px_24px_-4px_rgba(234,88,12,0.22),0_0_0_1px_rgba(234,88,12,0.35)]">
-        <div className="relative" ref={uploadMenuRef}>
-          <button
-            ref={uploadMenuTriggerRef}
-            type="button"
-            onClick={() => setShowUploadMenu((previous) => !previous)}
-            disabled={streaming || uploading}
-            aria-haspopup="menu"
-            aria-expanded={showUploadMenu}
-            aria-controls="agent-more-options-menu"
-            className="w-9 h-9 rounded-xl border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95 transition-all disabled:opacity-40 shrink-0"
-            title={t("agent.moreOptions")}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          {showUploadMenu && (
-            <div
-              id="agent-more-options-menu"
-              role="menu"
-              className="absolute bottom-full left-0 mb-2 w-56 rounded-2xl border border-border/60 bg-popover/95 backdrop-blur-md shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150"
+
+      {/* Main Composer Box with Dual-layer Glow & Glassmorphism */}
+      <div className="relative group rounded-2xl transition-all duration-300">
+        {/* Ambient glow backdrop on focus / streaming */}
+        <div
+          className={`absolute -inset-[1px] rounded-2xl transition-all duration-500 pointer-events-none ${
+            streaming
+              ? "bg-gradient-to-r from-rose-500/30 via-red-500/20 to-orange-500/30 blur-sm opacity-90 animate-pulse"
+              : "bg-gradient-to-r from-primary/30 via-[#13C6B0]/25 to-primary/30 opacity-40 blur-[2px] group-focus-within:opacity-100 group-focus-within:blur-md"
+          }`}
+          aria-hidden="true"
+        />
+
+        {/* Inner Interactive Card */}
+        <div
+          className={`relative flex items-end gap-2.5 rounded-2xl p-2.5 backdrop-blur-2xl transition-all duration-300 ${
+            streaming
+              ? "bg-[#0A101D]/95 border border-rose-500/35 shadow-[0_8px_32px_-8px_rgba(244,63,94,0.3)]"
+              : "bg-[#0B1422]/90 dark:bg-[#070D18]/95 border border-white/[0.12] dark:border-white/[0.08] group-focus-within:border-primary/50 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5),inset_0_1px_1px_0_rgba(255,255,255,0.08)] group-focus-within:shadow-[0_12px_40px_-10px_rgba(234,88,12,0.22),inset_0_1px_1px_0_rgba(255,255,255,0.12)]"
+          }`}
+        >
+          {/* Options / Upload Menu Button */}
+          <div className="relative shrink-0" ref={uploadMenuRef}>
+            <button
+              ref={uploadMenuTriggerRef}
+              type="button"
+              onClick={() => setShowUploadMenu((previous) => !previous)}
+              disabled={streaming || uploading}
+              aria-haspopup="menu"
+              aria-expanded={showUploadMenu}
+              aria-controls="agent-more-options-menu"
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 disabled:opacity-40 shrink-0 ${
+                showUploadMenu
+                  ? "bg-primary text-white shadow-[0_0_14px_rgba(234,88,12,0.5)] rotate-45"
+                  : "bg-white/[0.04] hover:bg-white/[0.09] text-muted-foreground hover:text-foreground border border-white/[0.08] hover:border-white/20 active:scale-95 shadow-sm"
+              }`}
+              title={t("agent.moreOptions")}
             >
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  fileInputRef.current?.click();
-                  setShowUploadMenu(false);
-                }}
-                className="w-full px-3 py-2 text-left text-sm rounded-xl hover:bg-muted/80 transition-colors flex items-center gap-2.5 font-medium"
+              <Plus className="h-4 w-4 transition-transform duration-200" />
+            </button>
+
+            {showUploadMenu && (
+              <div
+                id="agent-more-options-menu"
+                role="menu"
+                className="absolute bottom-full left-0 mb-3 w-64 rounded-2xl border border-white/10 bg-[#0E1724]/95 backdrop-blur-xl shadow-[0_16px_50px_-10px_rgba(0,0,0,0.7),inset_0_1px_1px_0_rgba(255,255,255,0.08)] p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1 text-xs"
               >
-                <Paperclip className="h-4 w-4 text-primary" />
-                {t("agent.uploadFile")}
-              </button>
-              <div className="border-t border-border/40 my-1" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setShowUploadMenu(false);
-                  onStartGoal();
-                  inputRef.current?.focus();
-                }}
-                className="w-full px-3 py-2 text-left text-sm rounded-xl hover:bg-muted/80 transition-colors flex items-center gap-2.5 font-medium"
-              >
-                <Target className="h-4 w-4 text-orange-500" />
-                {t("agent.researchGoal")}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setShowUploadMenu(false);
-                  onStartSwarm();
-                  inputRef.current?.focus();
-                }}
-                className="w-full px-3 py-2 text-left text-sm rounded-xl hover:bg-muted/80 transition-colors flex items-center gap-2.5 font-medium"
-              >
-                <Users className="h-4 w-4 text-blue-500" />
-                {t("agent.agentSwarm")}
-              </button>
-              <div className="border-t border-border/40 my-1" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setShowUploadMenu(false);
-                  submitPrompt(CONNECTOR_CHECK_PROMPT);
-                }}
-                className="w-full px-3 py-2 text-left text-sm rounded-xl hover:bg-muted/80 transition-colors flex items-center gap-2.5 font-medium"
-              >
-                <Landmark className="h-4 w-4 text-emerald-500" />
-                {t("agent.checkConnector")}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setShowUploadMenu(false);
-                  submitPrompt(CONNECTOR_PORTFOLIO_PROMPT);
-                }}
-                className="w-full px-3 py-2 text-left text-sm rounded-xl hover:bg-muted/80 transition-colors flex items-center gap-2.5 font-medium"
-              >
-                <Landmark className="h-4 w-4 text-emerald-500" />
-                {t("agent.analyzePortfolio")}
-              </button>
-            </div>
+                <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+                  {t("agent.moreOptions")}
+                </div>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    fileInputRef.current?.click();
+                    setShowUploadMenu(false);
+                  }}
+                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-white/[0.08] transition-colors flex items-center gap-3 font-medium text-foreground group"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary group-hover:scale-105 transition-transform">
+                    <Paperclip className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-xs">{t("agent.uploadFile")}</div>
+                    <div className="text-[10px] text-muted-foreground/70">Tài liệu, ảnh, bảng tính BCTC</div>
+                  </div>
+                </button>
+
+                <div className="border-t border-white/[0.06] my-1" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowUploadMenu(false);
+                    onStartGoal();
+                    inputRef.current?.focus();
+                  }}
+                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-white/[0.08] transition-colors flex items-center gap-3 font-medium text-foreground group"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500/15 text-orange-400 group-hover:scale-105 transition-transform">
+                    <Target className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-xs">{t("agent.researchGoal")}</div>
+                    <div className="text-[10px] text-muted-foreground/70">Mục tiêu nghiên cứu đa bước</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowUploadMenu(false);
+                    onStartSwarm();
+                    inputRef.current?.focus();
+                  }}
+                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-white/[0.08] transition-colors flex items-center gap-3 font-medium text-foreground group"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-cyan-500/15 text-cyan-400 group-hover:scale-105 transition-transform">
+                    <Users className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-xs">{t("agent.agentSwarm")}</div>
+                    <div className="text-[10px] text-muted-foreground/70">Phối hợp đội ngũ chuyên gia AI</div>
+                  </div>
+                </button>
+
+                <div className="border-t border-white/[0.06] my-1" />
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowUploadMenu(false);
+                    submitPrompt(CONNECTOR_CHECK_PROMPT);
+                  }}
+                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-white/[0.08] transition-colors flex items-center gap-3 font-medium text-foreground group"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 group-hover:scale-105 transition-transform">
+                    <Landmark className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-xs">{t("agent.checkConnector")}</div>
+                    <div className="text-[10px] text-muted-foreground/70">Kiểm tra kết nối broker & sàn</div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowUploadMenu(false);
+                    submitPrompt(CONNECTOR_PORTFOLIO_PROMPT);
+                  }}
+                  className="w-full px-3 py-2 text-left rounded-xl hover:bg-white/[0.08] transition-colors flex items-center gap-3 font-medium text-foreground group"
+                >
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-400 group-hover:scale-105 transition-transform">
+                    <Landmark className="h-3.5 w-3.5" />
+                  </span>
+                  <div>
+                    <div className="font-semibold text-xs">{t("agent.analyzePortfolio")}</div>
+                    <div className="text-[10px] text-muted-foreground/70">Đánh giá rủi ro danh mục</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={ACCEPTED_FILE_TYPES}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Prompt Textarea */}
+          <textarea
+            ref={inputRef}
+            dir="auto"
+            value={input}
+            rows={1}
+            onChange={(e) => setInput(e.target.value)}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+              lastCompositionEndRef.current = Date.now();
+            }}
+            onInput={(e) => {
+              const el = e.target as HTMLTextAreaElement;
+              el.style.height = "auto";
+              el.style.height = Math.min(el.scrollHeight, 180) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
+                const justFinishedComposing = Date.now() - lastCompositionEndRef.current < 80;
+                if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+                  return;
+                }
+                if (justFinishedComposing) {
+                  e.preventDefault();
+                  return;
+                }
+                e.preventDefault();
+                submitPrompt(input);
+              }
+            }}
+            placeholder={
+              streaming
+                ? t(`agent.activity.verbs.${activityVerb ?? "working"}` as never)
+                : goalComposerActive
+                ? t("agent.describeGoal")
+                : hasCompletedTurn
+                ? t("agent.followUpPlaceholder" as never)
+                : t("agent.placeholder")
+            }
+            aria-label={t("agent.messageInputLabel")}
+            aria-readonly={streaming}
+            className={[
+              "min-h-[44px] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none max-h-44",
+              "placeholder:text-muted-foreground/45 focus:outline-none selection:bg-primary/20",
+              streaming ? "cursor-not-allowed text-muted-foreground/70" : "text-foreground",
+            ].join(" ")}
+            readOnly={streaming}
+          />
+
+          {/* Export Button */}
+          {showExport && (
+            <button
+              type="button"
+              onClick={onExport}
+              disabled={!canExport}
+              className="h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-95 transition-all disabled:opacity-20 disabled:pointer-events-none shrink-0"
+              title={t("agent.exportChat")}
+            >
+              <Download className="h-4 w-4" />
+            </button>
+          )}
+
+          {/* Send / Stop Action Button */}
+          {streaming ? (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="group relative h-9 w-9 rounded-xl bg-gradient-to-r from-rose-500/20 via-red-500/25 to-rose-500/20 border border-rose-500/40 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.25)] hover:bg-rose-500/30 hover:border-rose-500/60 hover:shadow-[0_0_20px_rgba(244,63,94,0.45)] active:scale-95 transition-all flex items-center justify-center shrink-0"
+              title={t("agent.stopGeneration")}
+              aria-label={t("agent.stopGeneration")}
+            >
+              <Square className="h-3.5 w-3.5 fill-current" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={uploading || (goalComposerActive ? !input.trim() : (!input.trim() && attachments.length === 0))}
+              className="h-9 px-3.5 sm:px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-500 hover:to-amber-500 text-white text-xs font-semibold shadow-[0_2px_14px_rgba(234,88,12,0.35)] hover:shadow-[0_4px_22px_rgba(234,88,12,0.55)] active:scale-95 transition-all duration-200 disabled:opacity-25 disabled:pointer-events-none disabled:shadow-none flex items-center justify-center gap-1.5 shrink-0"
+              title={t("agent.send")}
+              aria-label={t("agent.send")}
+            >
+              <Send className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Gửi</span>
+            </button>
           )}
         </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept={ACCEPTED_FILE_TYPES}
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-        <textarea
-          ref={inputRef}
-          dir="auto"
-          value={input}
-          rows={1}
-          onChange={(e) => setInput(e.target.value)}
-          onCompositionStart={() => {
-            isComposingRef.current = true;
-          }}
-          onCompositionEnd={() => {
-            isComposingRef.current = false;
-            lastCompositionEndRef.current = Date.now();
-          }}
-          onInput={(e) => {
-            const el = e.target as HTMLTextAreaElement;
-            el.style.height = "auto";
-            el.style.height = el.scrollHeight + "px";
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
-              const justFinishedComposing = Date.now() - lastCompositionEndRef.current < 80;
-              if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
-                return;
-              }
-              if (justFinishedComposing) {
-                e.preventDefault();
-                return;
-              }
-              e.preventDefault();
-              submitPrompt(input);
-            }
-          }}
-          placeholder={
-            streaming
-              ? t(`agent.activity.verbs.${activityVerb ?? "working"}` as never)
-              : goalComposerActive
-              ? t("agent.describeGoal")
-              : hasCompletedTurn
-              ? t("agent.followUpPlaceholder" as never)
-              : t("agent.placeholder")
-          }
-          aria-label={t("agent.messageInputLabel")}
-          aria-readonly={streaming}
-          className={[
-            "min-h-[46px] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none max-h-36 placeholder:text-muted-foreground/60 focus:outline-none",
-            streaming ? "cursor-not-allowed text-muted-foreground/70" : "text-foreground",
-          ].join(" ")}
-          readOnly={streaming}
-        />
-        {showExport && (
-          <button
-            type="button"
-            onClick={onExport}
-            disabled={!canExport}
-            className="h-9 w-9 rounded-xl border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 active:scale-95 transition-all disabled:opacity-30 disabled:pointer-events-none shrink-0"
-            title={t("agent.exportChat")}
-          >
-            <Download className="h-4 w-4" />
-          </button>
-        )}
-        {streaming ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="h-9 px-3.5 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 text-white text-sm font-medium shadow-[0_2px_10px_rgba(239,68,68,0.3)] hover:brightness-110 active:scale-95 transition-all flex items-center justify-center shrink-0"
-            title={t("agent.stopGeneration")}
-          >
-            <Square className="h-3.5 w-3.5 fill-current" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={uploading || (goalComposerActive ? !input.trim() : (!input.trim() && attachments.length === 0))}
-            className="h-9 px-4 rounded-xl bg-gradient-to-tr from-amber-600 via-orange-500 to-amber-500 text-white text-sm font-medium shadow-[0_2px_12px_rgba(234,88,12,0.3)] hover:shadow-[0_4px_16px_rgba(234,88,12,0.45)] hover:brightness-105 active:scale-95 transition-all disabled:opacity-35 disabled:pointer-events-none disabled:shadow-none flex items-center justify-center gap-1.5 shrink-0"
-            title={t("agent.send")}
-            aria-label={t("agent.send")}
-          >
-            <Send className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
-      <p className="px-2 pt-1 text-[11px] text-muted-foreground/60 text-center tracking-wide font-normal">{t("agent.inputHint")}</p>
     </form>
   );
 }));

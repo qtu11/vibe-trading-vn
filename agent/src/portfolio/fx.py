@@ -16,7 +16,7 @@ from src.portfolio.compatibility import PortfolioContractError
 
 Rates = Mapping[str, Decimal]
 
-DISPLAY_RATE_CURRENCIES = frozenset({"USD", "CNY", "HKD", "EUR"})
+DISPLAY_RATE_CURRENCIES = frozenset({"USD", "CNY", "HKD", "EUR", "VND"})
 
 
 def _validated_rate(pair: str, value: Decimal) -> Decimal:
@@ -27,12 +27,13 @@ def _validated_rate(pair: str, value: Decimal) -> Decimal:
     return rate
 
 
-def build_rates(usd_cny: Decimal, usd_hkd: Decimal) -> dict[str, Decimal]:
+def build_rates(usd_cny: Decimal, usd_hkd: Decimal, usd_vnd: Decimal | None = None) -> dict[str, Decimal]:
     """Build the production rates map, anchored on one USD."""
     return {
         "USD": Decimal("1"),
         "CNY": _validated_rate("USD/CNY", usd_cny),
         "HKD": _validated_rate("USD/HKD", usd_hkd),
+        "VND": _validated_rate("USD/VND", usd_vnd if usd_vnd is not None else Decimal("25400")),
     }
 
 

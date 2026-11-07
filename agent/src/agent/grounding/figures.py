@@ -17,7 +17,8 @@ import html
 import re
 import string
 import unicodedata
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Iterable, Sequence
 
@@ -33,6 +34,30 @@ _FRACTION_RE = re.compile(r"([1-9]\d{0,2})\s*/\s*([1-9]\d{0,2})")
 
 #: Marks of a multiple a declared value may carry ("5.5x", "3 倍").
 _MULTIPLE_MARKS = frozenset({"x", "X", "×", "倍"})
+
+#: Vietnamese approximation words a declaration may prefix to its value
+#: ("khoảng 80%", "hơn 3,54 tỷ"). The word is an approximation, not part of the
+#: number; the figure is still declared at the value written beside it.
+_APPROX_PREFIX_RE = re.compile(
+    r"^(?:khoảng(?:\s+chừng)?|hơn|dưới|trên|gần|xấp\s+xỉ|ước\s+tính|"
+    r"vào\s+khoảng|~|≈|∼)\s*",
+    re.IGNORECASE,
+)
+
+#: Vietnamese count and measure units a declaration may name after its value
+#: ("3,54 tỷ cổ phiếu", "1,10 lần"). A unit tail carries no value of its own.
+_UNIT_TAIL_RE = re.compile(
+    r"[ \t]*(?:cổ\s+phiếu|mã|lần|điểm|người|chi\s+nhánh|khách\s+hàng|tài\s+khoản|"
+    r"sản\s+phẩm|dự\s+án|quỹ|phiên|tháng|năm|ngày|tuần|quý|hợp\s+đồng|"
+    r"trái\s+phiếu|chứng\s+chỉ)(?!\w)",
+    re.IGNORECASE,
+)
+
+#: A pair with a unit tail ("24/28 mã") declares both counts; a bare fraction
+#: ("1/3") stays one ratio. The unit has to name what the pair counts.
+_PAIR_VALUE_RE = re.compile(
+    r"^\s*(?P<left>[+-]?\d[\d.,]*)\s*/\s*(?P<right>[+-]?\d[\d.,]*)\s+(?P<unit>\S(?:.*\S)?)\s*$"
+)
 
 #: The five roles a declaration may carry (spec §2).
 ROLES = ("observed", "derived", "proposed", "cited", "count")
@@ -79,7 +104,7 @@ _FENCE_RE = re.compile(r"(?m)^ {0,3}(`{3,}|~{3,})(.*)$")
 
 # Currency is a symbol set, not a vocabulary: a money character or ISO code
 # touching a bare integer ("$100", "820 CNY") makes it measurement-shaped.
-_CURRENCY_CHARS = frozenset("$¥￥€£₩₹元币圆镑円원")
+_CURRENCY_CHARS = frozenset("$¥￥€£₩₹₫元币圆镑円원")
 
 _CURRENCY_CODES = frozenset(
     {
@@ -97,6 +122,21 @@ _POINT_MARKS = (("bps", 0.01), ("pp", 1.0), ("bp", 0.01))
 # Magnitude marks glued to a figure ("24.6M", "2.4万"): a symbol set like the
 # currency marks. They scale the comparison with evidence and never decide shape.
 _MAGNITUDES = {"K": 1e3, "M": 1e6, "B": 1e9, "千": 1e3, "万": 1e4, "亿": 1e8}
+_VN_MAGNITUDES = {"tỷ": 1e9, "tỉ": 1e9, "triệu": 1e6, "nghìn": 1e3, "ngàn": 1e3}
+
+#: Compound Vietnamese magnitudes are one scale word ("nghìn tỷ" = 1e3 × 1e9).
+_VN_COMPOUND_MAGNITUDES = {
+    ("nghìn", "tỷ"): 1e12,
+    ("nghìn", "tỉ"): 1e12,
+    ("ngàn", "tỷ"): 1e12,
+    ("ngàn", "tỉ"): 1e12,
+    ("triệu", "tỷ"): 1e15,
+    ("triệu", "tỉ"): 1e15,
+}
+_VN_MAGNITUDE_RE = re.compile(
+    r"[ \t]*(nghìn|ngàn|triệu|tỷ|tỉ)(?:[ \t]+(tỷ|tỉ))?(?!\w)", re.IGNORECASE
+)
+_VN_CURRENCY_RE = re.compile(r"(?:đồng|₫)(?!\w)", re.IGNORECASE)
 
 # A CJK currency word is at most three characters (人民币); bounding the run
 # keeps 元宵/元件, inside longer CJK runs, from reading as money.
@@ -232,6 +272,8 @@ class TableRow:
     symbol_column: int | None
     # Which table of the document the row belongs to, in document order.
     table: int = 0
+    money_units: dict[int, tuple[float, str]] = field(default_factory=dict)
+    periods: dict[int, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -406,6 +448,13 @@ _DOTTED_GROUPING_RE = re.compile(
     r"(?<![\d.,])[+-]?[1-9]\d{0,2}(?:\.\d{3})+(?![\d.,])"
 )
 
+# Beside a Vietnamese magnitude the dot is unambiguously a group separator:
+# "1.318 nghìn tỷ" is 1,318 thousand billion, never 1.318 thousand billion.
+_DOTTED_GROUPING_VN_RE = re.compile(
+    r"(?<![\d.,])[+-]?[1-9]\d{0,2}(?:\.\d{3})+(?=[ \t]*(?:nghìn|ngàn|triệu|tỷ|tỉ)(?!\w))",
+    re.IGNORECASE,
+)
+
 
 def _numbers(text: str, *, decimal_commas: bool | None = None) -> list[_Token]:
     """Every number in normalized text, with a decimal comma read as one (#1418).
@@ -450,7 +499,24 @@ def _numbers(text: str, *, decimal_commas: bool | None = None) -> list[_Token]:
         )
         for match in _DOTTED_GROUPING_RE.finditer(text)
     ] if comma_decimals else []
-    protected = dotted + dotted_grouped
+    vietnamese_grouped = [
+        _Token(
+            match.start(),
+            match.end(),
+            match.group(0)[0] if match.group(0)[0] in "+-" else "",
+            match.group(0).lstrip("+-").replace(".", ""),
+            True,
+        )
+        for match in _DOTTED_GROUPING_VN_RE.finditer(text)
+    ]
+    protected: list[_Token] = []
+    protected_spans: set[tuple[int, int]] = set()
+    for token in dotted + dotted_grouped + vietnamese_grouped:
+        span = (token.start, token.end)
+        if span in protected_spans:
+            continue
+        protected_spans.add(span)
+        protected.append(token)
     tokens: list[_Token] = []
     cursor = 0
     for match in _NUMBER_RE.finditer(text):
@@ -470,6 +536,8 @@ def _numbers(text: str, *, decimal_commas: bool | None = None) -> list[_Token]:
                 body == "0"
                 or comma_decimals
                 or _percent_mark(text, stop)[0] > 0
+                or bool(_VN_MAGNITUDE_RE.match(text, stop))
+                or bool(_UNIT_TAIL_RE.match(text, stop))
                 or (
                     len(fraction) <= 2
                     and (
@@ -542,6 +610,8 @@ def _writes_decimal_commas(text: str) -> bool:
             if (
                 (body == "0" and len(fraction) >= 2)
                 or (bool(fraction) and _percent_mark(text, stop)[0] > 0)
+                or bool(_VN_MAGNITUDE_RE.match(text, stop))
+                or bool(_UNIT_TAIL_RE.match(text, stop))
                 or (
                     1 <= len(fraction) <= 2
                     and (
@@ -638,7 +708,7 @@ def _is_currency_mark(word: str) -> bool:
     Accepts an ISO code ("USD"), a CJK currency word ("港元"), or money
     characters behind at most three letters ("$", "HK$", "NT$").
     """
-    if not word or word.upper() in _CURRENCY_CODES:
+    if not word or word.upper() in _CURRENCY_CODES or _VN_CURRENCY_RE.fullmatch(word):
         return True
     if all(_is_cjk(char) for char in word):
         return _is_currency_word(word)
@@ -655,11 +725,14 @@ def _parse_value(
 ) -> tuple[float, bool, str] | None:
     """Read a declared value: one number with its currency, magnitude and percent marks.
 
+    A Vietnamese approximation prefix ("khoảng", "hơn") and a count/measure
+    unit tail ("cổ phiếu", "lần") decorate the value without changing it.
+
     Returns:
         ``(value, percent, canonical spelling)``, or None when the field is not
         exactly one number and its marks.
     """
-    field = _normalize(text).text.strip()
+    field = _APPROX_PREFIX_RE.sub("", _normalize(text).text.strip())
     fraction = _FRACTION_RE.fullmatch(field)
     if fraction is not None:
         # "1/3" for an equal weight: a value, not two numbers.
@@ -668,9 +741,8 @@ def _parse_value(
     if len(tokens) != 1:
         return None
     token = tokens[0]
-    rest = field[token.end :].strip()
-    if rest[:1] in _MAGNITUDES and not _is_currency_mark(rest):
-        rest = rest[1:].lstrip()
+    _, magnitude_end = magnitude_suffix(field, token.end)
+    rest = field[magnitude_end:].strip()
     unit, consumed = _percent_mark(rest, 0)
     tail = rest[consumed:].strip()
     if not unit and tail in _MULTIPLE_MARKS:
@@ -681,13 +753,40 @@ def _parse_value(
     if lead is not None and not field[:lead].strip():
         # "−$1,847.78": the sign stands outside the mark and is the number's.
         head = field[lead + 1 : token.start].strip()
-    if not (_is_currency_mark(tail) and _is_currency_mark(head)):
+    decorated = _is_currency_mark(tail) or bool(_UNIT_TAIL_RE.fullmatch(tail))
+    if not (_is_currency_mark(head) and decorated):
         return None
     reading = _reading(token.sign, token.digits, unit)
     if reading is None:
         return None
     value, canonical = reading
     return value, unit > 0, canonical + ("%" if unit > 0 else "")
+
+
+def _parse_value_pair(
+    text: str, decimal_commas: bool | None = None
+) -> list[tuple[float, bool, str]]:
+    """Read a fraction-of-two-counts declaration ("24/28 mã") as both counts.
+
+    The prose writes the pair as two figures, so one declaration line has to
+    declare both or the second reads as undeclared. A fraction with no unit
+    ("1/3") is still one ratio and is handled by :func:`_parse_value`.
+
+    Returns:
+        One parsed value per side, or an empty list when the field is not a
+        unit-tagged pair.
+    """
+    field = _normalize(text).text.strip()
+    match = _PAIR_VALUE_RE.fullmatch(field)
+    if match is None or not _UNIT_TAIL_RE.fullmatch(match["unit"].strip()):
+        return []
+    parsed: list[tuple[float, bool, str]] = []
+    for part in (match["left"], match["right"]):
+        item = _parse_value(part, decimal_commas)
+        if item is None:
+            return []
+        parsed.append(item)
+    return parsed
 
 
 def _is_header_or_rule(parts: Sequence[str]) -> bool:
@@ -735,22 +834,25 @@ def parse_figures_block(content: str) -> FiguresBlock:
         if _is_header_or_rule(parts):
             continue
         parsed = _parse_value(parts[0], document_reading) if parts else None
+        values = [parsed] if parsed is not None else (
+            _parse_value_pair(parts[0], document_reading) if parts else []
+        )
         role = parts[1].casefold() if len(parts) > 1 else ""
-        if parsed is None or role not in ROLES:
+        if not values or role not in ROLES:
             malformed.append((number, line.strip()[:120]))
             continue
-        value, percent, canonical = parsed
-        declarations.append(
-            Declaration(
-                index=number,
-                value_text=canonical,
-                value=value,
-                percent=percent,
-                role=role,
-                note=parts[2] if len(parts) > 2 else "",
-                ref=parts[3] if len(parts) > 3 else "",
+        for value, percent, canonical in values:
+            declarations.append(
+                Declaration(
+                    index=number,
+                    value_text=canonical,
+                    value=value,
+                    percent=percent,
+                    role=role,
+                    note=parts[2] if len(parts) > 2 else "",
+                    ref=parts[3] if len(parts) > 3 else "",
+                )
             )
-        )
     return FiguresBlock(
         True,
         (blocks[0][0], blocks[0][1]),
@@ -860,15 +962,57 @@ def table_rows(content: str) -> list[TableRow]:
                 and set(axis) == set(row_axis)
             ):
                 symbol_column = 0
+        money_units = {position: unit for position, name in enumerate(headers)
+                       if (unit := _header_money_unit(name)) is not None}
+        # A unit in the label column describes the table's amounts. Explicit
+        # per-column units and percentages take precedence over this default.
+        if 0 in money_units:
+            for position, name in enumerate(headers[1:], 1):
+                if position not in (date_column, symbol_column) and "%" not in name:
+                    money_units.setdefault(position, money_units[0])
+        periods = {position: period for position, name in enumerate(headers)
+                   if (period := _header_period(name)) is not None}
         for line_index in range(block_start + 1, index):
             cells = _table_cells(positions[line_index][0], positions[line_index][1])
             if not cells or _is_separator_row(cells):
                 continue
             rows.append(
-                TableRow(line_index, tuple(cells), columns, date_column, symbol_column, table)
+                TableRow(line_index, tuple(cells), columns, date_column, symbol_column,
+                         table, money_units, periods)
             )
         table += 1
     return rows
+
+
+def _header_money_unit(text: str) -> tuple[float, str] | None:
+    """Read explicit money units, never infer them from metric labels."""
+    clean = text.replace("**", "").replace("__", "").strip()
+    for candidate in [clean, *re.findall(r"\(([^()]*)\)", clean)]:
+        candidate = candidate.strip()
+        scale, end = magnitude_suffix(candidate, 0)
+        unit = candidate[end:].strip()
+        code = unit.upper()
+        if code in _CURRENCY_CODES:
+            return scale, {"CNH": "CNY", "RMB": "CNY"}.get(code, code)
+        if _VN_CURRENCY_RE.fullmatch(unit):
+            return scale, "VND"
+    return None
+
+
+def _header_period(text: str) -> str | None:
+    """Only explicit years, ISO dates or calendar quarter labels scope a column."""
+    clean = text.replace("**", "").replace("__", "").strip()
+    clean = re.sub(r"\([^()]*\)", "", clean).strip()
+    if re.fullmatch(r"(?:19|20)\d{2}", clean):
+        return clean
+    quarter = re.fullmatch(r"Q([1-4])\s*[/ -]\s*((?:19|20)\d{2})", clean, re.IGNORECASE)
+    if quarter:
+        month, day = ((3, 31), (6, 30), (9, 30), (12, 31))[int(quarter[1]) - 1]
+        return date(int(quarter[2]), month, day).isoformat()
+    try:
+        return date.fromisoformat(clean).isoformat() if re.fullmatch(r"\d{4}-\d{2}-\d{2}", clean) else None
+    except ValueError:
+        return None
 
 
 def table_block(content: str, line_index: int) -> tuple[int, int] | None:
@@ -947,6 +1091,8 @@ def _currency_after(text: str, end: int) -> bool:
     tail = text[end:].lstrip()
     if not tail:
         return False
+    if _VN_CURRENCY_RE.match(tail):
+        return True
     if tail[0] in _CURRENCY_CHARS and not _is_cjk(tail[0]):
         return True
     if _is_cjk(tail[0]):
@@ -963,6 +1109,8 @@ def _currency_code_for_figure(text: str, start: int, end: int) -> str | None:
     """Identify an unambiguous currency immediately adjacent to a number."""
     head = text[:start].rstrip()
     tail = text[end:].lstrip()
+    if head.endswith("₫") or _VN_CURRENCY_RE.match(tail):
+        return "VND"
 
     # Explicit ISO currency codes take precedence.
     prefix = _code_before(head)
@@ -1011,6 +1159,16 @@ def magnitude_suffix(text: str, end: int) -> tuple[float, int]:
     Returns:
         ``(multiplier, end past the mark)``, or ``(1.0, end)`` without one.
     """
+    vietnamese = _VN_MAGNITUDE_RE.match(text, end)
+    if vietnamese:
+        first = vietnamese[1].casefold()
+        second = (vietnamese[2] or "").casefold()
+        if second:
+            scale = _VN_COMPOUND_MAGNITUDES.get(
+                (first, second), _VN_MAGNITUDES[first] * _VN_MAGNITUDES[second]
+            )
+            return scale, vietnamese.end()
+        return _VN_MAGNITUDES[first], vietnamese.end()
     mark = text[end : end + 1]
     if not mark or mark not in _MAGNITUDES:
         return 1.0, end
@@ -1040,6 +1198,9 @@ def _currency_suffix_end(text: str, end: int) -> int:
     lead = len(text) - end - len(body)
     if not body:
         return end
+    vietnamese = _VN_CURRENCY_RE.match(body)
+    if vietnamese:
+        return end + lead + vietnamese.end()
     if _is_cjk(body[0]):
         run = _cjk_run(body)
         if not _is_currency_word(run):
@@ -1219,10 +1380,17 @@ def scan_figures(content: str, block: FiguresBlock) -> list[Figure]:
         cell = next((entry for entry in cells if entry[0] <= start and end <= entry[1]), None)
         row, position = (cell[2], cell[3]) if cell else (None, None)
         structural = row is not None and position in (row.date_column, row.symbol_column)
-        currency_end = magnitude_suffix(text, token.end)[1]
+        scale, currency_end = magnitude_suffix(text, token.end)
         currency = _currency_before(text, token.start) or _currency_after(text, currency_end)
         currency_code = _currency_code_for_figure(text, token.start, currency_end)
-        marked = percent or currency or "." in token.digits or token.grouped
+        if row is not None and not structural and not percent and not currency:
+            header_unit = row.money_units.get(position)
+            if header_unit is not None:
+                currency = True
+                currency_code = header_unit[1]
+                if scale == 1.0:
+                    scale = header_unit[0]
+        marked = percent or currency or bool(_VN_MAGNITUDE_RE.match(text, token.end)) or "." in token.digits or token.grouped
         # A cell that also holds a word is prose set in a table: its plain
         # integer is a count or a horizon, as it would be in a sentence (#1471).
         worded = (
@@ -1242,6 +1410,7 @@ def scan_figures(content: str, block: FiguresBlock) -> list[Figure]:
         column = date_value = symbol_value = None
         if row is not None and not structural:
             column = row.columns.get(position)
+            date_value = row.periods.get(position)
             if row.date_column is not None and row.date_column < len(row.cells):
                 date_value = row.cells[row.date_column][0] or None
             if row.symbol_column is not None and row.symbol_column < len(row.cells):
@@ -1266,7 +1435,7 @@ def scan_figures(content: str, block: FiguresBlock) -> list[Figure]:
                 column=column,
                 date=date_value,
                 symbol=symbol_value,
-                scale=1.0 if percent else magnitude_suffix(text, token.end)[0],
+                scale=1.0 if percent else scale,
                 currency=currency,
                 currency_code=currency_code,
                 digits=token.digits,

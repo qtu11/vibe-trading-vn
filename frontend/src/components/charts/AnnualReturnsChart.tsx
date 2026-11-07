@@ -13,6 +13,7 @@ export function AnnualReturnsChart({ data, height = 260 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
   useChartLifecycle(ref, () => {
+    if (!data || !Array.isArray(data) || data.length === 0) return {};
     const t = getChartTheme();
 
     const seriesName = i18n.t("runDetail.annualReturns");

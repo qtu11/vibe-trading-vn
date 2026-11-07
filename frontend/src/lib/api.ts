@@ -1,4 +1,5 @@
 import i18n from "@/i18n";
+import { artifactFormat, isReportHandle, MAX_REPORT_ARTIFACT_BYTES, REPORT_MEDIA_TYPES, safeReportFilename, validReportArtifact, validReportJob, type ReportArtifact, type ReportEngineJob, type ReportFormat } from "@/lib/reportEngine";
 import type { CryptoRequest, ResearchResult, VietnamRequest } from "@/lib/research";
 import type { ForexCostStressRequest, ForexTradePathsRequest, ForexExperimentDetail, ForexExperimentList, ForexExperimentRun, ForexResearchRequest, ForexResearchResult } from "@/lib/forexResearch";
 import type { ResearchObject } from "@/lib/research";
@@ -52,8 +53,32 @@ async function performRequest<T>(
   }
 }
 
+async function readGeneratedReport(reportId: string, format: ReportFormat, signal?: AbortSignal): Promise<Blob> {
+  if (!isReportHandle(reportId)) throw new Error("Mã tài liệu không hợp lệ");
+  return performRequest(`/api/reports/${reportId}`, { headers: authHeaders(), signal }, async (response) => {
+    const mediaType = response.headers.get("content-type")?.split(";")[0].trim().toLowerCase();
+    if (mediaType !== REPORT_MEDIA_TYPES[format] || Number(response.headers.get("content-length")) > MAX_REPORT_ARTIFACT_BYTES) {
+      throw new Error("Định dạng hoặc dung lượng tài liệu không hợp lệ");
+    }
+    const blob = await response.blob();
+    if (!blob.size || blob.size > MAX_REPORT_ARTIFACT_BYTES || (format === "pdf" && await blob.slice(0, 5).text() !== "%PDF-")) {
+      throw new Error("Nội dung tài liệu không hợp lệ");
+    }
+    return blob;
+  });
+}
+
+export async function fetchGeneratedReport(artifact: ReportArtifact, signal?: AbortSignal): Promise<Blob> {
+  if (!validReportArtifact(artifact)) throw new Error("Thông tin tài liệu không hợp lệ");
+  const blob = await readGeneratedReport(artifact.report_id, artifactFormat(artifact)!, signal);
+  if (blob.size !== artifact.size_bytes) throw new Error("Dung lượng tài liệu không khớp bản xuất");
+  return blob;
+}
+
 export async function downloadGeneratedReport(reportId: string, filename: string): Promise<void> {
-  const blob = await performRequest(`/api/reports/${encodeURIComponent(reportId)}`, { headers: authHeaders() }, (response) => response.blob());
+  const format = (Object.keys(REPORT_MEDIA_TYPES) as ReportFormat[]).find((candidate) => safeReportFilename(filename, candidate));
+  if (!format) throw new Error("Tên tài liệu không hợp lệ");
+  const blob = await readGeneratedReport(reportId, format);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -527,6 +552,26 @@ export const api = {
     request<ResearchResult>("/api/research/crypto", { method: "POST", body: JSON.stringify(payload), signal }),
   captureCrypto: (payload: Omit<CryptoRequest, "mode" | "as_of">) =>
     request<ResearchResult>("/api/research/crypto/captures", { method: "POST", body: JSON.stringify(payload) }),
+  getReportJob: (jobId: string, signal?: AbortSignal) =>
+    request<ReportEngineJob>(`/api/reports/jobs/${encodeURIComponent(jobId)}`, { signal }).then((job) => {
+      if (!validReportJob(job)) throw new Error("Dữ liệu báo cáo không hợp lệ");
+      return job;
+    }),
+  getReportJobForArtifact: (reportId: string, signal?: AbortSignal) => {
+    if (!isReportHandle(reportId)) return Promise.reject(new Error("Mã tài liệu không hợp lệ"));
+    return request<ReportEngineJob>(`/api/reports/artifacts/${reportId}/job`, { signal }).then((job) => {
+      if (!validReportJob(job) || !job.artifacts.some((artifact) => artifact.report_id === reportId)) throw new Error("Dữ liệu báo cáo không hợp lệ");
+      return job;
+    });
+  },
+  exportReportJob: (report: Record<string, unknown>, formats: ReportFormat[] = ["docx", "pdf", "pptx"], runId?: string) =>
+    request<ReportEngineJob>("/api/reports/jobs", {
+      method: "POST",
+      body: JSON.stringify({ report, formats, run_id: runId }),
+    }).then((job) => {
+      if (!validReportJob(job)) throw new Error("Dữ liệu báo cáo không hợp lệ");
+      return job;
+    }),
   getPixelOffice: () => request<OfficeSnapshot>("/api/pixel-office"),
   updatePixelOffice: (action: "create" | "assign" | "complete" | "rank", arguments_: Record<string, unknown>) =>
     request<OfficeSnapshot>("/api/pixel-office/actions", { method: "POST", body: JSON.stringify({ action, arguments: arguments_ }) }),
@@ -637,6 +682,17 @@ export const api = {
       `/scheduled-runs/proposals/${encodeURIComponent(proposalId)}/discard`,
       { method: "POST" },
     ),
+  getScheduledRunsStatus: (signal?: AbortSignal) =>
+    request<ScheduledRunsStatus>("/scheduled-runs/status", { signal }),
+  getResearchPlaybooks: (signal?: AbortSignal) =>
+    request<PlaybookItem[]>("/scheduled-runs/playbooks", { signal }),
+  getResearchPlaybook: (slug: string, signal?: AbortSignal) =>
+    request<PlaybookItem>(`/scheduled-runs/playbooks/${encodeURIComponent(slug)}`, { signal }),
+  createScheduledRunFromPlaybook: (slug: string, body?: CreateRunFromPlaybookRequest) =>
+    request<ScheduledRun>(`/scheduled-runs/playbooks/${encodeURIComponent(slug)}`, {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+    }),
   sendMessage: (sid: string, content: string) => request<{ message_id: string; attempt_id: string }>(`/sessions/${sid}/messages`, { method: "POST", body: JSON.stringify({ content }) }),
   cancelSession: (sid: string) => request<{ status: string }>(`/sessions/${sid}/cancel`, { method: "POST" }),
   getSessionMessages: (sid: string) => request<MessageItem[]>(`/sessions/${sid}/messages`),
@@ -823,6 +879,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ broker }),
     }),
+  getRunnerSettings: (broker?: string, signal?: AbortSignal) =>
+    request<LiveDecisionBudget>(
+      broker ? `/live/runner/settings?broker=${encodeURIComponent(broker)}` : "/live/runner/settings",
+      { signal },
+    ),
   saveRunnerSettings: (broker: string, settings: LiveDecisionSettings) =>
     request<LiveDecisionBudget>(`/live/runner/settings?broker=${encodeURIComponent(broker)}`, {
       method: "PUT",
@@ -946,6 +1007,42 @@ export interface ScheduledResearchProposal {
   job: ScheduledResearchProposalJob;
   job_id?: string | null;
   committed_job_id?: string | null;
+}
+
+export interface PlaybookVariableDecl {
+  name: string;
+  label?: string;
+  default?: string;
+  description?: string;
+}
+
+export interface PlaybookItem {
+  slug: string;
+  title: string;
+  description: string;
+  market?: string;
+  category?: string;
+  suggested_schedule?: string;
+  suggested_timezone?: string;
+  variables?: Record<string, PlaybookVariableDecl>;
+  body?: string;
+  version?: string;
+}
+
+export interface CreateRunFromPlaybookRequest {
+  id?: string;
+  schedule?: string;
+  timezone?: string | null;
+  variables?: Record<string, string>;
+  delivery_targets?: string[];
+  auto_commit?: boolean;
+}
+
+export interface ScheduledRunsStatus {
+  running: boolean;
+  active_jobs_count?: number;
+  delivery_targets?: Array<Record<string, unknown>>;
+  [key: string]: unknown;
 }
 
 // --- Swarm types ---
@@ -2236,9 +2333,16 @@ export interface PaperAccount {
 }
 export const paperApi = {
   list: () => request<PaperAccount[]>("/api/paper-accounts"),
+  getAccount: (id: string, signal?: AbortSignal) =>
+    request<PaperAccount>(`/api/paper-accounts/${encodeURIComponent(id)}`, { signal }),
   create: (body: { label: string; market: string; start: string; account_state: { cash: number; positions: PaperPosition[] } }) =>
     request<PaperAccount>("/api/paper-accounts", { method: "POST", body: JSON.stringify(body) }),
   advance: (id: string, body: { expected_revision: number; to_date: string; orders?: PaperOrder[]; strategy_path?: string }) =>
     request<{ account: PaperAccount; result: PaperResult; committed: boolean }>(`/api/paper-accounts/${encodeURIComponent(id)}/advance`, { method: "POST", body: JSON.stringify(body) }),
   history: (id: string) => request<PaperResult[]>(`/api/paper-accounts/${encodeURIComponent(id)}/history`),
+  step: (body: Record<string, unknown>) =>
+    request<{ code?: string; message?: string; [key: string]: unknown }>("/api/paper-trade/step", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

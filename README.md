@@ -81,6 +81,12 @@ Các README ngôn ngữ khác giữ phần hướng dẫn/danh mục từ baseli
 
 ## Phạm vi hiện tại và hướng mở rộng
 
+**Grounding báo cáo VN — 07/11:** đã sửa nạp chuỗi số BCTC có đơn vị/scale,
+giữ số hợp lệ trong bảng, kiểm tra tỷ lệ thanh khoản và giới hạn nghiên cứu lặp
+khi đổi query nhưng không có nguồn mới. Web Reader có cache TTL và phản hồi có
+giới hạn. [Chi tiết, kiểm thử và áp dụng](docs/GROUNDING_VIETNAM_REPORTS.md).
+Nguồn chưa xác minh không tự trở thành số liệu đã kiểm chứng độc lập.
+
 | Mảng | Đã thấy trong mã nguồn | Phần cần bổ sung hoặc kiểm chứng |
 | --- | --- | --- |
 | Điều phối AI | AgentLoop, tool registry, Swarm DAG, preset và task artifacts | Nhóm chuyên biệt theo market, quality gates và budget xuyên toàn run |

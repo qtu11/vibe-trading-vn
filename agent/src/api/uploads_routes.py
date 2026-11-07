@@ -122,14 +122,15 @@ def register_uploads_routes(
         return host._UPLOAD_CHUNK_SIZE if host else _UPLOAD_CHUNK_SIZE
 
     @app.get("/api/reports/{report_id}", dependencies=[Depends(require_auth)])
-    async def get_generated_report(report_id: str):
-        """Download only a staged generated PDF via an opaque ID."""
-        from src.tools.report_artifacts import report_path
+    async def get_generated_report(report_id: str, format: str | None = None):
+        """Download a staged generated report (PDF or DOCX) via an opaque ID."""
+        from src.tools.report_artifacts import resolve_report_artifact
 
-        path = report_path(report_id)
-        if path is None:
+        resolved = resolve_report_artifact(report_id, format=format)
+        if resolved is None:
             raise HTTPException(status_code=404, detail="Report not found")
-        return FileResponse(path, media_type="application/pdf", filename=path.name)
+        path, media_type = resolved
+        return FileResponse(path, media_type=media_type, filename=path.name)
 
     @app.get("/shadow-reports/{shadow_id}", dependencies=[Depends(require_auth)])
     async def get_shadow_report(shadow_id: str, format: str = "html"):

@@ -20,6 +20,7 @@ from src.agent.grounding.figures import (
     parse_figures_block,
     scan_figures,
     strip_figures_block,
+    table_block,
 )
 from src.agent.grounding.policies import ValidationResult
 
@@ -48,13 +49,24 @@ _REPAIRABLE_PROVENANCE_CODES = frozenset(
     {"data_source_not_surfaced", "currency_not_surfaced"}
 )
 
-_MAX_REDACTION_PASSES = 3
+_MAX_REDACTION_PASSES = 4
 
 # The omission mark replaces the number and its glued unit so the sentence still
 # reads ("0.95 元" → "（略※）"); ※ points at the single footnote.
 _REDACTION_MARKER_ZH = "（略※）"
 
 _REDACTION_MARKER_EN = "(omitted※)"
+
+#: The same mark in Vietnamese, so a Vietnamese report never reads like an
+#: English template leaked into it.
+_REDACTION_MARKER_VI = "(đã lược※)"
+
+#: Characters that identify Vietnamese prose. The Chinese check runs first, so
+#: a Latin-1 accented character here never outranks CJK text.
+_VIETNAMESE_RE = re.compile(
+    r"[\u00c0-\u00c3\u00e0-\u00e3\u0102\u0103\u0110\u0111\u0128\u0129"
+    r"\u0168\u0169\u01a0\u01a1\u01af\u01b0\u1ea0-\u1ef9]"
+)
 
 MAX_SYMBOL_RESOLUTION_ATTEMPTS = 2
 
@@ -164,8 +176,10 @@ def _strip_release_markers(content: str) -> str:
     Returns:
         The draft with every marker and note-shaped line removed.
     """
-    stripped = content.replace(_REDACTION_MARKER_ZH, "").replace(
-        _REDACTION_MARKER_EN, ""
+    stripped = (
+        content.replace(_REDACTION_MARKER_ZH, "")
+        .replace(_REDACTION_MARKER_EN, "")
+        .replace(_REDACTION_MARKER_VI, "")
     )
     return "\n".join(
         line for line in stripped.splitlines() if not line.lstrip().startswith("※")
@@ -330,6 +344,24 @@ class _ReleaseMixin:
             issue.get("code") in {"numeric_claim_unavailable", "unsourced_symbol_figures"}
             for issue in validation.issues
         ):
+            # Price recovery cannot repair a ratio or a missing statement
+            # fact. Check the affected instrument, not another ticker's OHLC.
+            missing = [issue for issue in validation.issues if issue.get("code") in {
+                "numeric_claim_unavailable", "unsourced_symbol_figures"}]
+            def needs_price(issue):
+                if issue.get("field") in {"open", "high", "low", "close", "adj_close", "price", "bid", "ask"}:
+                    return True
+                symbol = issue.get("symbol")
+                if str(issue.get("value", "")).rstrip().endswith(("%", "％")):
+                    return False
+                relevant = [record for record in self._evidence
+                            if record.status == "observed" and (not symbol or record.symbol == symbol)]
+                if any(record.tool in {"get_financial_statements", "financial_statements", "vietnam_research"}
+                       for record in relevant):
+                    return False
+                return not any(record for record in self._price_records() if not symbol or record.symbol == symbol)
+            if not any(needs_price(issue) for issue in missing):
+                return None
             if self._price_evidence_attempts < MAX_PRICE_EVIDENCE_ATTEMPTS:
                 return "get_market_data"
         return None
@@ -429,6 +461,14 @@ class _ReleaseMixin:
     def _user_writes_chinese(self) -> bool:
         """Return whether user-facing gate text should be Chinese."""
         return bool(re.search(r"[\u3400-\u9fff]", self.user_message))
+
+    def _user_writes_vietnamese(self) -> bool:
+        """Return whether user-facing gate text should be Vietnamese."""
+        if self._user_writes_chinese():
+            return False
+        if _VIETNAMESE_RE.search(self.user_message or ""):
+            return True
+        return bool(_VIETNAMESE_RE.search(getattr(self, "_active_content", "") or ""))
 
     def _observed_range_summary(self, is_zh: bool, content: str | None = None) -> str | None:
         """Summarise the observed OHLC range per symbol, or None without prices.
@@ -538,6 +578,87 @@ class _ReleaseMixin:
             return None
         return content.rstrip() + "\n\n" + note
 
+    def repair_citation_visibility(
+        self,
+        content: str,
+        validation: ValidationResult,
+    ) -> str | None:
+        """Make a declared ``[S#]`` visible on its figure's line or table caption.
+
+        A cited figure whose note names the ledger's source id but whose prose
+        line omits it is a display defect, not an unsupported figure. The
+        declaration is the model's own statement that the number came from that
+        source, so rendering the id it already declared repairs the citation
+        without inventing evidence.
+
+        Args:
+            content: The rejected draft.
+            validation: Its validation result.
+
+        Returns:
+            The draft with the declared ids rendered, or None when no issue is
+            a repairable visibility finding.
+        """
+        issues = [
+            issue
+            for issue in validation.issues
+            if issue.get("reason") == "citation_not_visible"
+            and issue.get("source_ids")
+        ]
+        if not issues:
+            return None
+        lines = content.split("\n")
+        line_appends: dict[int, list[str]] = {}
+        captions: dict[int, list[str]] = {}
+        for issue in issues:
+            span = issue.get("span")
+            if not isinstance(span, (list, tuple)) or len(span) != 2:
+                continue
+            try:
+                offset = int(span[0])
+            except (TypeError, ValueError):
+                continue
+            if not 0 <= offset <= len(content):
+                continue
+            line_index = content.count("\n", 0, offset)
+            if line_index >= len(lines):
+                continue
+            ids = [str(item) for item in issue.get("source_ids") or [] if str(item)]
+            if not ids:
+                continue
+            table = table_block(content, line_index)
+            if table is None:
+                line_appends.setdefault(line_index, []).extend(ids)
+            else:
+                captions.setdefault(table[1], []).extend(ids)
+        if not line_appends and not captions:
+            return None
+        if self._user_writes_chinese():
+            source_word = "来源"
+        elif self._user_writes_vietnamese():
+            source_word = "Nguồn"
+        else:
+            source_word = "Source"
+        for line_index, ids in line_appends.items():
+            unique = list(dict.fromkeys(ids))
+            line = lines[line_index]
+            ending = "\r" if line.endswith("\r") else ""
+            body = line[:-1] if ending else line
+            stripped = body.rstrip()
+            trailing = body[len(stripped):]
+            punctuation = ""
+            match = re.search(r"[.!?;:,。！？；：]$", stripped)
+            if match:
+                stripped, punctuation = stripped[: match.start()], match.group(0)
+            marker = " ".join(f"[{source_id}]" for source_id in unique)
+            lines[line_index] = f"{stripped} {marker}{punctuation}{trailing}{ending}"
+        # Insert one caption per table, bottom-up so earlier indexes stay valid.
+        for line_index in sorted(captions, reverse=True):
+            unique = list(dict.fromkeys(captions[line_index]))
+            caption = f"{source_word}: " + " ".join(f"[{source_id}]" for source_id in unique)
+            lines.insert(line_index + 1, caption)
+        return "\n".join(lines)
+
     def redacted_release(self, content: str, validation: ValidationResult) -> str | None:
         """Release the last rejected draft with its unverified figures cut out.
 
@@ -581,9 +702,18 @@ class _ReleaseMixin:
             check = self._validate(text, record=False)
         removed = 0
         keys: set[str] = set()
+        citations_restored = False
         for _ in range(_MAX_REDACTION_PASSES):
             if check.valid:
                 break
+            repaired = self.repair_citation_visibility(text, check)
+            if repaired is not None:
+                candidate = self._validate(repaired, record=False)
+                if len(candidate.issues) < len(check.issues):
+                    text, check = repaired, candidate
+                    citations_restored = True
+                    if check.valid:
+                        break
             codes = {issue.get("code") for issue in check.issues}
             if not codes <= (_REDACTABLE_CODES | _REPAIRABLE_PROVENANCE_CODES):
                 return None
@@ -604,7 +734,7 @@ class _ReleaseMixin:
                 continue
             text = repaired
             check = self._validate(text, record=False)
-        if not check.valid or (removed == 0 and not dropped_block):
+        if not check.valid or (removed == 0 and not dropped_block and not citations_restored):
             return None
         # A cut figure can still be standing where the shape rules never look.
         swept, swept_keys = self._sweep_same_values(text, keys - {""})
@@ -628,6 +758,7 @@ class _ReleaseMixin:
             "released_at": _utc_now(),
             "content_sha256": hashlib.sha256(released.encode("utf-8")).hexdigest(),
             "figures_removed": removed,
+            "citations_restored": citations_restored,
             "revalidated": True,
         }
         self.persist()
@@ -785,8 +916,12 @@ class _ReleaseMixin:
                 break
         if any("\u3400" <= char <= "\u9fff" for char in line):
             return _REDACTION_MARKER_ZH
-        if any(char.isascii() and char.isalpha() for char in line):
+        if _VIETNAMESE_RE.search(line):
+            return _REDACTION_MARKER_VI
+        if any(char.isascii() and char.isalpha() for char in line) and not self._user_writes_vietnamese():
             return _REDACTION_MARKER_EN
+        if self._user_writes_vietnamese():
+            return _REDACTION_MARKER_VI
         return (
             _REDACTION_MARKER_ZH
             if self._user_writes_chinese()
@@ -796,10 +931,16 @@ class _ReleaseMixin:
     def _release_note(self, removed: int, content: str | None = None) -> str:
         """Explain the redaction to the user, with the observed range."""
         is_zh = self._user_writes_chinese()
+        is_vi = not is_zh and self._user_writes_vietnamese()
         joined = self._observed_range_summary(is_zh, content)
         if joined is None:
             if is_zh:
                 return f"※ 略去 {removed} 处无法与本会话工具数据对上的数值。"
+            if is_vi:
+                return (
+                    f"※ Đã lược bỏ {removed} giá trị không khớp với dữ liệu công cụ "
+                    "của phiên này."
+                )
             return (
                 f"※ {removed} figure(s) that could not be matched to this session's "
                 "tool data were omitted."
@@ -809,6 +950,13 @@ class _ReleaseMixin:
                 f"※ 略去 {removed} 处无法与本会话工具数据对上的数值。"
                 f"已观测 OHLC 范围：{joined}。"
                 "如需买入价，请让我基于已观测的收盘价或均线给出带公式的推导。"
+            )
+        if is_vi:
+            return (
+                f"※ Đã lược bỏ {removed} giá trị không khớp với dữ liệu công cụ của "
+                f"phiên này. Vùng OHLC đã quan sát: {joined}. "
+                "Nếu cần giá mua, hãy yêu cầu tôi suy ra bằng công thức hiển thị từ "
+                "giá đóng cửa hoặc đường trung bình đã quan sát."
             )
         return (
             f"※ {removed} figure(s) that could not be matched to this session's tool data "

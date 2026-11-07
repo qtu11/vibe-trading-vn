@@ -29,7 +29,9 @@ dicts/lists so a downstream loader can map them into the project's OHLCV frame.
 from __future__ import annotations
 
 import logging
+import math
 import threading
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import requests
@@ -163,6 +165,7 @@ def get_chart(
     period1: Optional[int] = None,
     period2: Optional[int] = None,
     range_: Optional[str] = None,
+    metadata: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
     """Fetch OHLCV bars from the v8 chart endpoint as ascending rows.
 
@@ -178,6 +181,8 @@ def get_chart(
         period1: Inclusive start as epoch seconds, or ``None``.
         period2: Exclusive end as epoch seconds, or ``None``.
         range_: Relative range string; takes precedence over period1/period2.
+        metadata: Optional output mapping for the request URL, retrieval time
+            and the independently timestamped, unadjusted last-trade snapshot.
 
     Returns:
         ``(rows, currency)`` where ``rows`` is an ascending list of
@@ -204,13 +209,34 @@ def get_chart(
         if period2 is not None:
             params["period2"] = int(period2)
 
+    url = f"{_CHART_BASE}/{yahoo_symbol}"
     payload = throttled_get_json(
-        f"{_CHART_BASE}/{yahoo_symbol}",
+        url,
         host_key=HOST_KEY,
         min_interval=_min_interval(),
         params=params,
     )
-    return _parse_chart(payload, yahoo_symbol)
+    rows, currency = _parse_chart(payload, yahoo_symbol)
+    if metadata is not None:
+        source_url = requests.Request("GET", url, params=params).prepare().url
+        retrieved = datetime.now(timezone.utc)
+        metadata.update(source_url=source_url, retrieved_at=retrieved.isoformat())
+        result = ((payload.get("chart") or {}).get("result") or [{}])[0] or {}
+        meta = result.get("meta") or {}
+        value, stamp = meta.get("regularMarketPrice"), meta.get("regularMarketTime")
+        exchange = meta.get("fullExchangeName") or meta.get("exchangeName")
+        if (str(meta.get("symbol", "")).upper() == yahoo_symbol.upper()
+                and isinstance(exchange, str) and exchange and currency
+                and type(value) in (int, float) and math.isfinite(value) and value > 0
+                and type(stamp) in (int, float) and math.isfinite(stamp) and 0 < stamp <= retrieved.timestamp() + 300):
+            metadata["quote_observation"] = {
+                "symbol": symbol.strip().upper(), "exchange": exchange,
+                "value": value, "unit": currency, "scale": 1,
+                "observed_at": datetime.fromtimestamp(stamp, timezone.utc).isoformat(),
+                "price_basis": "raw", "data_role": "last_trade", "provider": "yahoo",
+                "source_url": source_url, "retrieved_at": retrieved.isoformat(),
+            }
+    return rows, currency
 
 
 _GBP_PENCE_CURRENCY = "GBp"
@@ -234,6 +260,9 @@ def _parse_chart(payload: Any, yahoo_symbol: str) -> Tuple[List[Dict[str, Any]],
     if not results:
         return [], ""
     result = results[0] or {}
+    declared_symbol = (result.get("meta") or {}).get("symbol")
+    if declared_symbol and str(declared_symbol).upper() != yahoo_symbol.upper():
+        raise ValueError(f"Yahoo chart identity mismatch: requested {yahoo_symbol}, returned {declared_symbol}")
     currency = (result.get("meta") or {}).get("currency") or ""
 
     timestamps = result.get("timestamp") or []

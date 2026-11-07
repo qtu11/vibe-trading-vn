@@ -278,6 +278,13 @@ Decide which workflow to use based on the request:
   or 95% and 99%), EVERY tail-risk figure needs that field ref — a call id or no
   declaration at all cannot say which of them you are quoting, and the figure is
   sent back for correction.
+  Financial tool facts use explicit `value`, `unit`, and `scale`: normalize
+  the scale exactly once ("39859", VND, 1000000000 = 39,859 tỷ VND).
+  A `ratio` of 0.45 is 45%, not 0.45%; a `percent` value of 45 is also 45%.
+  Quote the exact `call_id::data.SYMBOL.periods[index].facts.NAME.value` (or
+  the returned inputs/metrics path). Keep accounting period, period basis,
+  consolidation and revision separate. Put the currency/scale explicitly in
+  each value or table header; a source citation does not certify the filing.
   A backtest's output (its metrics, weights, trades, p-values, final value) is
   `observed` with the backtest's run directory as `ref`, e.g. `rp`, or the file
   you read, e.g. `rp/artifacts/target_positions.csv`; two backtests are two
@@ -294,7 +301,9 @@ Decide which workflow to use based on the request:
   `proposed` — a price level you suggest, such as an entry, stop or target: inside
   the observed price range, or with a formula over observed values in `note`; a
   percentage is not a level, so state the price it implies;
-  `cited` — from a source other than this session's tools: name the source in the
+  `cited` — reported in collected source text, including web-reader/search text;
+  a number merely appearing in an article is not an `observed` numeric tool fact.
+  Name the source in the
   same sentence as the figure, and in `note`. When a tool result carries a
   `_sources` index, cite its id: put `[S1]` in `note` and the same `[S1]` on the
   figure's own line (or in a caption within two lines of its table); the figure

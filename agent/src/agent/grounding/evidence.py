@@ -11,9 +11,12 @@ import hashlib
 import json
 import math
 import re
+from decimal import Decimal, DecimalException
 from dataclasses import dataclass, replace
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from src.agent.grounding.figures import _CURRENCY_CODES
 from src.agent.grounding.identity import (
@@ -29,6 +32,7 @@ _PRICE_FIELDS = {"open", "high", "low", "close", "adj_close", "price", "bid", "a
 _TIMESTAMP_FIELDS = ("trade_date", "date", "datetime", "timestamp", "time", "index")
 
 _MAX_GENERIC_EVIDENCE = 2_000
+_FINANCIAL_EVIDENCE_TOOLS = frozenset({"get_financial_statements", "financial_statements", "vietnam_research"})
 
 #: Top-level fields of a code-running tool's envelope (backtest, bash, ...). They
 #: describe the process, not the market, so they never become observed evidence.
@@ -511,9 +515,10 @@ def _is_registered_price_indicator(tool: str, path: str) -> bool:
         # A prefix ending in "_" names a parametrised family (``sma_20``): only a
         # numeric parameter may follow, so ``sma_cross`` is not a price.
         rest = leaf[len(prefix):]
-        if not prefix.endswith("_"):
-            return True
-        if rest.isdigit():
+        # Fixed scalar leaves (latest_close, Bollinger upper/middle/lower)
+        # authorize only themselves. A count or percentage whose name starts
+        # with one of those leaves is a different measurement.
+        if prefix.endswith("_") and rest.isdigit():
             return True
     return False
 
@@ -664,6 +669,11 @@ class EvidenceRecord:
     scope: str | None = None
     timeframe: str | None = None
     unit: str | None = None
+    source_url: str | None = None
+    source_id: str | None = None
+    retrieved_at: str | None = None
+    price_basis: str | None = None
+    data_role: str | None = None
 
 
 def _is_price_kind(record: EvidenceRecord) -> bool:
@@ -676,6 +686,10 @@ def _is_price_kind(record: EvidenceRecord) -> bool:
         True for OHLC/quote fields, registered price indicators and
         amount/turnover leaves.
     """
+    if record.tool in _FINANCIAL_EVIDENCE_TOOLS:
+        # Money and ratios in a statement have different dimensions. A whole
+        # financial payload must never become an OHLC/monetary allow-list.
+        return record.currency is not None and record.unit == record.currency
     return (
         (
             record.tool == "get_sec_filings"
@@ -1176,6 +1190,10 @@ class _EvidenceMixin:
                 and symbol_provenance.get("quote_currency")
                 else _infer_currency(symbol)
             )
+            # Raw last-trade metadata is separate from adjusted historical bars.
+            observed_quote = symbol_provenance.get("quote_observation") if isinstance(symbol_provenance, dict) else None
+            if isinstance(observed_quote, dict):
+                self._ingest_report_quote(observed_quote, symbol=symbol, call_id=call_id, tool_name=tool_name)
             for row in rows:
                 if not isinstance(row, dict):
                     continue
@@ -1202,6 +1220,7 @@ class _EvidenceMixin:
                             currency_conversion=currency_conversion,
                         )
                     )
+
         # Tick bid/ask are independent observations, never synthetic OHLC bars.
         quotes = payload.get("_broker_quotes")
         if isinstance(quotes, dict):
@@ -1234,6 +1253,41 @@ class _EvidenceMixin:
                         venue=_infer_venue(symbol),
                     )
                 )
+
+    def _ingest_report_quote(self, quote, *, symbol, call_id, tool_name):
+        """Retain only explicit provider quote identities, units and time bases."""
+        if tool_name != "get_market_data":
+            return
+        try:
+            value = quote["value"]
+            url = str(quote["source_url"])
+            parsed = urlsplit(url)
+            observed = datetime.fromisoformat(str(quote["observed_at"]).replace("Z", "+00:00"))
+            retrieved = datetime.fromisoformat(str(quote["retrieved_at"]).replace("Z", "+00:00"))
+            if (not _is_number(value) or value <= 0 or not math.isfinite(value)
+                    or _normalize_symbol(quote["symbol"]) != symbol
+                    or quote["price_basis"] not in {"raw", "split_adjusted", "total_return"}
+                    or quote["data_role"] != "last_trade"
+                    or not quote["exchange"] or not quote["unit"]
+                    or observed.tzinfo is None or retrieved.tzinfo is None or observed > retrieved
+                    or parsed.scheme not in {"http", "https"} or not parsed.hostname
+                    or parsed.username or parsed.password):
+                return
+        except (KeyError, TypeError, ValueError, OverflowError):
+            return
+        source = self._add_source(
+            call_id=call_id, tool=tool_name, url=url,
+            title=f"{symbol} — provider last-trade observation", publisher=str(quote.get("provider") or ""),
+            published_at=None, data_effective_at=observed.isoformat(), text=json.dumps(quote, ensure_ascii=False),
+            excerpt=f"{symbol}: {value} {quote['unit']} ({quote['price_basis']})", language=None,
+        )
+        self._evidence.append(EvidenceRecord(
+            call_id=call_id, tool=tool_name, symbol=symbol, source=str(quote.get("provider") or ""),
+            timestamp=observed.isoformat(), field="quote_observation.value", value=value, status="observed",
+            currency=quote["unit"], venue=quote["exchange"], unit=quote["unit"], source_url=url,
+            source_id=source.source_id if source else None, retrieved_at=retrieved.isoformat(),
+            price_basis=quote["price_basis"], data_role=quote["data_role"],
+        ))
 
     def _ingest_council_snapshot(
         self,
@@ -1376,12 +1430,20 @@ class _EvidenceMixin:
         call_id: str,
     ) -> None:
         """Flatten bounded numeric leaves from other market-sensitive tools."""
+        if tool_name in _FINANCIAL_EVIDENCE_TOOLS:
+            self._ingest_financial_numeric(tool_name, arguments, payload, call_id)
+            return
         symbols = self._extract_symbol_arguments(arguments)
         symbol = symbols[0] if len(symbols) == 1 else None
         if symbol:
             symbol = (
                 self._match_authorized_symbol(symbol, self.authorized_symbols) or symbol
             )
+        if tool_name == "technical_indicators" and payload.get("symbol") is not None:
+            returned_symbol = _normalize_symbol(payload["symbol"])
+            returned_symbol = self._match_authorized_symbol(returned_symbol, self.authorized_symbols) or returned_symbol
+            if not symbol or returned_symbol != symbol:
+                return
         source = str(payload.get("source") or tool_name)
         remaining = _MAX_GENERIC_EVIDENCE
         timestamp_fields = (*_TIMESTAMP_FIELDS, "latest_date", "as_of")
@@ -1396,6 +1458,7 @@ class _EvidenceMixin:
             if remaining <= 0:
                 return
             if _is_number(value):
+                typed_ratio = tool_name == "technical_indicators" and path == "indicators.volume.ratio_20"
                 self._evidence.append(
                     EvidenceRecord(
                         call_id=call_id,
@@ -1411,9 +1474,10 @@ class _EvidenceMixin:
                             if tool_name == "get_sec_filings"
                             and path.startswith("data.metric.points[")
                             and path.endswith("].val")
-                            else _infer_currency(symbol or "")
+                            else None if typed_ratio else _infer_currency(symbol or "")
                         ),
                         venue=_infer_venue(symbol or ""),
+                        unit="ratio" if typed_ratio else None,
                     )
                 )
                 remaining -= 1
@@ -1440,6 +1504,95 @@ class _EvidenceMixin:
             elif isinstance(value, list):
                 for index, item in enumerate(value):
                     visit(item, f"{path}[{index}]", timestamp)
+
+        visit(payload, "")
+
+    def _ingest_financial_numeric(self, tool_name, arguments, payload, call_id) -> None:
+        """Ingest typed financial values, not IDs, scales or source text.
+
+        Local statement facts carry value/unit/scale; quantitative research
+        carries value/unit/reason. Keep exact call/field and period identity,
+        normalize declared scales once, and retain ratios separately from money.
+        Observed means returned by this tool, not independently authenticated.
+        """
+        symbols = self._extract_symbol_arguments(arguments)
+        initial_symbol = symbols[0] if len(symbols) == 1 else None
+        source = str(payload.get("source") or tool_name)
+        remaining = _MAX_GENERIC_EVIDENCE
+        visited = 0
+
+        def visit(item, path, symbol=initial_symbol, stamp=None, depth=0):
+            nonlocal remaining, visited
+            visited += 1
+            if remaining <= 0 or visited > 20_000 or depth > 32:
+                return
+            if isinstance(item, dict):
+                stamp = item.get("period_end") or item.get("as_of") or item.get("REPORT_DATE") or stamp
+                if (payload.get("market") in {"us", "uk", "cn", "hk", "br"}
+                        and "REPORT_DATE" in item and ".periods[" in path):
+                    # Legacy provider rows are flat. SEC explicitly declares
+                    # units; other feeds keep unitless scalar authority only.
+                    # A listing's quote currency is not its reporting currency.
+                    units = item.get("_units")
+                    units = units if isinstance(units, dict) else {}
+                    for key, raw_value in item.items():
+                        if (remaining <= 0 or not _is_number(raw_value) or str(key).startswith("_")
+                                or key in {"fy", "endDate", "startDate", "maxAge", "timestamp"}):
+                            continue
+                        declared_unit = units.get(key)
+                        currency = declared_unit if isinstance(declared_unit, str) and declared_unit in _CURRENCY_CODES else None
+                        normalized_unit = "ratio" if declared_unit == "pure" else declared_unit
+                        self._evidence.append(EvidenceRecord(
+                            call_id=call_id, tool=tool_name, symbol=_normalize_symbol(symbol) if symbol else None,
+                            source=source, timestamp=str(stamp) if stamp else None,
+                            field=f"{path}.{key}", value=raw_value, status="observed",
+                            currency=currency, venue=_infer_venue(symbol or ""), unit=normalized_unit,
+                        ))
+                        remaining -= 1
+                typed = ".facts." in path or ".inputs." in path or ".metrics." in path
+                if typed and "value" in item and "unit" in item:
+                    raw, unit = item.get("value"), item.get("unit")
+                    scale = item.get("scale", 1)
+                    if item.get("reason") or type(scale) is not int or not 1 <= scale <= 10**12:
+                        return
+                    if isinstance(raw, bool) or not isinstance(raw, (str, int, float)):
+                        return
+                    text = str(raw).strip()
+                    if len(text) > 200 or not re.fullmatch(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", text):
+                        return
+                    if not isinstance(unit, str):
+                        return
+                    unit = unit.strip()
+                    currency = unit.upper() if unit.upper() in _CURRENCY_CODES else None
+                    if currency is None and unit not in {"ratio", "percent", "%", "days", "shares", "x"}:
+                        return
+                    try:
+                        original = Decimal(text)
+                        exact = original * scale / (100 if unit in {"percent", "%"} else 1)
+                        value = float(exact)
+                    except (DecimalException, ValueError, OverflowError):
+                        return
+                    if not math.isfinite(value) or (original != 0 and value == 0):
+                        return
+                    self._evidence.append(EvidenceRecord(
+                        call_id=call_id, tool=tool_name, symbol=_normalize_symbol(symbol) if symbol else None,
+                        source=source, timestamp=str(stamp) if stamp else None,
+                        field=f"{path}.value", value=value, status="observed",
+                        currency=currency, venue=_infer_venue(symbol or ""),
+                        unit=currency or ("ratio" if unit in {"percent", "%", "ratio"} else unit),
+                    ))
+                    remaining -= 1
+                    return
+                for key, child in item.items():
+                    # A typed result can contain several companies. Do not
+                    # silently assign every one to the first requested symbol.
+                    child_symbol = str(key) if path == "data" and _CANONICAL_SYMBOL_RE.fullmatch(str(key)) else symbol
+                    if str(key) in {"evidence", "sources", "paging", "checks", "metadata"}:
+                        continue
+                    visit(child, f"{path}.{key}" if path else str(key), child_symbol, stamp, depth + 1)
+            elif isinstance(item, list):
+                for index, child in enumerate(item):
+                    visit(child, f"{path}[{index}]", symbol, stamp, depth + 1)
 
         visit(payload, "")
 
@@ -1537,6 +1690,8 @@ class _EvidenceMixin:
         already_counted = {id(record) for record in records}
         for record in self._evidence:
             if id(record) in already_counted:
+                continue
+            if record.tool in _FINANCIAL_EVIDENCE_TOOLS:
                 continue
             if record.status != "observed" or record.value is None:
                 continue

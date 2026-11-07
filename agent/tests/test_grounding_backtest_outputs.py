@@ -35,6 +35,15 @@ from src.agent.grounding.evidence import ARCHIVE_MANIFEST
 from src.agent.grounding.figures import parse_figures_block, scan_figures
 from src.agent.tool_results import _archive_backtest_result
 
+
+def _symlink_or_skip(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks the symlink privilege")
+        raise
+
 RP = {
     "final_value": 1129817.32,
     "total_return": 0.129817,
@@ -461,7 +470,7 @@ def test_metrics_symlink_cannot_supply_another_runs_evidence(tmp_path: Path) -> 
     active, sibling = tmp_path / "active", tmp_path / "sibling"
     _write_backtest(sibling, RP)
     (active / "artifacts").mkdir(parents=True)
-    (active / "artifacts" / "metrics.csv").symlink_to(sibling / "artifacts" / "metrics.csv")
+    _symlink_or_skip(active / "artifacts" / "metrics.csv", sibling / "artifacts" / "metrics.csv")
     ledger = GroundingLedger(run_dir=active, user_message="Compare backtests")
     _backtest(ledger, active, "bt-active")
     assert not ledger._analysis_metrics
@@ -921,7 +930,7 @@ def test_external_symlink_is_not_registered_as_engine_table(tmp_path: Path) -> N
     _write_backtest(tmp_path / "ew", EW)
     target = tmp_path / "rp" / "artifacts" / "target_positions.csv"
     target.unlink()
-    target.symlink_to(tmp_path / "ew" / "artifacts" / "target_positions.csv")
+    _symlink_or_skip(target, tmp_path / "ew" / "artifacts" / "target_positions.csv")
     ledger = GroundingLedger(run_dir=tmp_path, user_message="回测风险平价")
     _backtest(ledger, tmp_path / "rp", "bt-rp")
     _read(ledger, target, "read-sibling")

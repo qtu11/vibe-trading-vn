@@ -114,6 +114,9 @@ class LLMModelsResponse(BaseModel):
     # Model id -> reasoning effort levels it accepts; an empty list means the
     # model takes no effort setting. Only providers that report it fill this.
     effort_levels: Optional[Dict[str, List[str]]] = None
+    # Explicit limits reported by this exact provider endpoint. An ID-only
+    # listing contributes no guessed context window.
+    model_metadata: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
 
 
 class SourceOrderEntry(BaseModel):
@@ -347,7 +350,11 @@ async def _list_provider_models(
         async with httpx.AsyncClient(timeout=12.0, follow_redirects=False) as client:
             response = await client.get(_model_list_url(base_url), headers=headers)
             response.raise_for_status()
-            models = _extract_model_ids(response.json())
+            payload = response.json()
+            models = _extract_model_ids(payload)
+            from src.providers.model_metadata import remember_model_metadata
+
+            model_metadata = remember_model_metadata(provider.name, base_url, payload)
     except (httpx.HTTPError, ValueError):
         return LLMModelsResponse(
             provider=provider.name,
@@ -363,6 +370,7 @@ async def _list_provider_models(
         provider=provider.name,
         models=models or fallback,
         source="provider" if discovered else "default",
+        model_metadata=model_metadata,
     )
 
 
@@ -758,6 +766,15 @@ def register_settings_routes(
                 from src.providers.openai_codex import validate_codex_base_url
 
                 base_url = validate_codex_base_url(base_url)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
+                ) from exc
+        elif base_url:
+            try:
+                from src.api.custom_provider_routes import _validate_custom_base_url
+
+                base_url = _validate_custom_base_url(base_url)
             except ValueError as exc:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
