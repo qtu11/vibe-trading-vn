@@ -133,50 +133,114 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 ---
 
 ## 3. Kiến trúc hệ thống & Luồng xử lý End-to-End
-
+> **Architecture overview:** 29 data loaders → Grounding Ledger → Specialist AI Swarm → Quant & Risk Validation → Research Reports / Guarded Execution.  
+> Sơ đồ thể hiện kiến trúc mục tiêu và các cơ chế kiểm soát; không đồng nghĩa tất cả kết nối đều đã được xác minh hoạt động trong môi trường production.
 ```mermaid
-flowchart TD
-    subgraph DataLayer["1. Tầng Dữ liệu & Bộ nạp Nguồn (29 Loaders)"]
-        D1["Chứng khoán VN: CafeF, Vietstock, TCBS, SSI"]
-        D2["Forex & Vàng: MetaTrader 5, Tick Stream, Economic Calendar"]
-        D3["Crypto: CCXT, Binance, OKX, On-chain Providers"]
-        D4["Quốc tế & Vĩ mô: Yahoo Finance, SEC Edgar, FRED"]
+%%{init: {"theme": "base", "themeVariables": {"fontFamily": "Inter, Segoe UI, Arial, sans-serif", "fontSize": "14px", "lineColor": "#94A3B8"}}}%%
+flowchart TB
+    %% ------------------------------------------------------------
+    %% VIBE-TRADING | END-TO-END ARCHITECTURE
+    %% Designed for GitHub README (Mermaid flowchart)
+    %% ------------------------------------------------------------
+    START(["VIBE-TRADING<br/>AI FINANCIAL RESEARCH PLATFORM"]):::hero
+
+    subgraph DATA["01  |  MARKET DATA & INGESTION"]
+        direction LR
+        VN["VIETNAM EQUITIES<br/>CafeF · Vietstock<br/>TCBS · SSI"]:::source
+        FX["FOREX / XAUUSD<br/>MetaTrader 5 · Tick Stream<br/>Economic Calendar"]:::source
+        CRYPTO["CRYPTO<br/>CCXT · Binance · OKX<br/>On-chain Providers"]:::source
+        GLOBAL["GLOBAL / MACRO<br/>Yahoo Finance · SEC EDGAR<br/>FRED"]:::source
+        INGEST["29 DATA LOADERS<br/>Normalize OHLCV · Timezone<br/>Source fallback & cache"]:::hub
+        VN --> INGEST
+        FX --> INGEST
+        CRYPTO --> INGEST
+        GLOBAL --> INGEST
     end
 
-    subgraph GroundingLayer["2. Sổ cái Bằng chứng & Kiểm toán (Grounding Ledger)"]
-        G1["Trích xuất Fact & Metric có dấu thời gian (as_of)"]
-        G2["Gán mã chứng từ siêu liên kết [S1], [S2]"]
-        G3["Kiểm toán chống bẫy pha loãng & điều chỉnh cổ tức"]
-        G4["Cơ chế Fail-Closed loại bỏ hoàn toàn thẻ ẩn và số liệu giả"]
+    subgraph EVIDENCE["02  |  EVIDENCE GOVERNANCE & GROUNDING"]
+        direction LR
+        FACT["FACT EXTRACTION<br/>Value · Unit · as_of<br/>Original data provenance"]:::proof
+        LEDGER[("GROUNDING LEDGER<br/>Linked references [S1], [S2]<br/>Auditable metrics")]:::proof
+        CHECK{"EVIDENCE VALID?<br/>Completeness · Freshness<br/>Corporate-action checks"}:::gate
+        REJECT["FAIL-CLOSED<br/>Block unsupported data<br/>Flag for re-check"]:::danger
+        FACT --> LEDGER --> CHECK
+        CHECK -->|FAIL| REJECT
     end
 
-    subgraph SwarmLayer["3. Hội đồng AI Chuyên gia (Swarm Council)"]
-        A1["Macro Strategist: Đánh giá chu kỳ & lãi suất"]
-        A2["Fundamental Analyst: Bóc tách BCTC & mô hình định giá"]
-        A3["Technical & SMC Analyst: Cấu trúc thị trường & Order Block"]
-        A4["Risk Manager: Kiểm soát Drawdown & VAR"]
-        A5["Portfolio Manager: Tranh biện Bull/Bear & phân bổ tỷ trọng"]
+    subgraph SWARM["03  |  SPECIALIST AI SWARM & INVESTMENT COUNCIL"]
+        direction LR
+        ROUTER["INTENT ROUTER<br/>Market · Task · Skills"]:::agent
+        MACRO["MACRO<br/>Cycle · Rates · Events"]:::agent
+        FUND["FUNDAMENTAL<br/>Financials · Valuation"]:::agent
+        TECH["TECHNICAL / SMC<br/>Structure · Liquidity"]:::agent
+        DEBATE["BULL / BEAR COUNCIL<br/>Challenge assumptions<br/>Synthesize conclusions"]:::hub
+        RISK_AGENT["RISK MANAGER<br/>Exposure · Drawdown<br/>Risk constraints"]:::agent
+        PORT["PORTFOLIO MANAGER<br/>Position sizing · Allocation"]:::agent
+        ROUTER --> MACRO
+        ROUTER --> FUND
+        ROUTER --> TECH
+        MACRO --> DEBATE
+        FUND --> DEBATE
+        TECH --> DEBATE
+        DEBATE --> RISK_AGENT --> PORT
     end
 
-    subgraph QuantLayer["4. Động cơ Định lượng & Kiểm định (Quantlib & 11 Engines)"]
-        Q1["Thư viện 310 hàm định lượng trên 24 module"]
-        Q2["Kho 478 Alphas định lượng (5 nhóm chuẩn hóa)"]
-        Q3["11 Động cơ Backtest đa thị trường"]
-        Q4["Kiểm định độ nhạy tham số & Stress testing"]
+    subgraph QUANT["04  |  QUANT RESEARCH & INDEPENDENT VALIDATION"]
+        direction LR
+        LIB["QUANT LIBRARY<br/>310 exports · 24 modules"]:::compute
+        ALPHA["ALPHA ZOO<br/>478 quantitative alphas"]:::compute
+        BACKTEST["BACKTEST ENGINES<br/>11 market-specific engines"]:::compute
+        RISK["RISK & ROBUSTNESS<br/>VaR · Drawdown · Stress<br/>Lookahead-bias checks"]:::hub
+        LIB --> RISK
+        ALPHA --> RISK
+        BACKTEST --> RISK
     end
 
-    subgraph OutputLayer["5. Đầu ra Thể chế & Thực thi có kiểm soát"]
-        O1["Báo cáo phân tích CFA 30 trang (Word DOCX / PDF)"]
-        O2["Giao diện trực quan React 19 & Desktop Windows"]
-        O3["Đặt lệnh có ủy quyền kiểm soát Mandate (19 Brokers)"]
-        O4["Công tắc ngắt khẩn cấp live trading (/halt)"]
+    subgraph OUTPUT["05  |  RESEARCH DELIVERY & GUARDED EXECUTION"]
+        direction LR
+        REPORT["RESEARCH REPORTS<br/>DOCX · PDF<br/>Traceable citations"]:::delivery
+        APP["APPLICATION<br/>React 19 · Desktop<br/>Dashboards & insights"]:::delivery
+        MANDATE{"LIVE TRADE ALLOWED?<br/>User authorization<br/>Exposure & order limits"}:::gate
+        PAPER["READ / PAPER MODE<br/>No real-money order"]:::safe
+        LIVE["BROKER EXECUTION<br/>Only supported live profiles"]:::live
+        HALT["EMERGENCY /halt<br/>Stop further live orders"]:::danger
+        MANDATE -->|NO| PAPER
+        MANDATE -->|YES| LIVE
+        HALT -.->|Emergency stop| LIVE
     end
 
-    DataLayer --> GroundingLayer
-    GroundingLayer --> SwarmLayer
-    SwarmLayer --> QuantLayer
-    QuantLayer --> OutputLayer
+    START --> INGEST
+    INGEST --> FACT
+    CHECK -->|PASS| ROUTER
+    PORT --> LIB
+    PORT --> ALPHA
+    PORT --> BACKTEST
+    RISK --> REPORT
+    RISK --> APP
+    RISK --> MANDATE
+
+    %% Color system: high contrast in both GitHub light and dark mode.
+    classDef hero fill:#0F172A,stroke:#22D3EE,stroke-width:3px,color:#F8FAFC,font-weight:bold
+    classDef source fill:#132941,stroke:#38BDF8,stroke-width:1.5px,color:#EAF4FF
+    classDef proof fill:#0D332F,stroke:#34D399,stroke-width:1.5px,color:#ECFDF5
+    classDef agent fill:#2A2149,stroke:#A78BFA,stroke-width:1.5px,color:#F5F3FF
+    classDef compute fill:#3C2815,stroke:#FBBF24,stroke-width:1.5px,color:#FFFBEB
+    classDef hub fill:#164E63,stroke:#22D3EE,stroke-width:2px,color:#F0FDFF,font-weight:bold
+    classDef gate fill:#422A18,stroke:#FB923C,stroke-width:2px,color:#FFF7ED,font-weight:bold
+    classDef delivery fill:#123D3B,stroke:#2DD4BF,stroke-width:1.5px,color:#F0FDFA
+    classDef safe fill:#153F32,stroke:#4ADE80,stroke-width:1.5px,color:#F0FDF4
+    classDef live fill:#124C4C,stroke:#2DD4BF,stroke-width:2px,color:#F0FDFA,font-weight:bold
+    classDef danger fill:#4C1D2A,stroke:#FB7185,stroke-width:2px,color:#FFF1F2
+
+    style DATA fill:#0B1B2D,stroke:#27618A,stroke-width:1.5px,color:#E2E8F0
+    style EVIDENCE fill:#0B2623,stroke:#217A64,stroke-width:1.5px,color:#E2E8F0
+    style SWARM fill:#1A1730,stroke:#6D56A8,stroke-width:1.5px,color:#E2E8F0
+    style QUANT fill:#2A2115,stroke:#A5742A,stroke-width:1.5px,color:#E2E8F0
+    style OUTPUT fill:#0D2428,stroke:#267F86,stroke-width:1.5px,color:#E2E8F0
+
+    linkStyle default stroke:#94A3B8,stroke-width:1.5px
 ```
+
 
 ### Chi tiết 5 bước vận hành của hệ thống:
 1. **Thu thập & Chuẩn hóa (Ingestion)**: 29 bộ nạp dữ liệu kết nối nguồn dữ liệu lịch sử và thời gian thực, đồng bộ múi giờ và cấu trúc nến OHLCV.
@@ -192,6 +256,9 @@ flowchart TD
 ### Case Study 1: Báo cáo Phân tích Vốn Cổ phần FPT HOSE (30 trang chuẩn CFA)
 Hệ thống kết xuất báo cáo hoàn chỉnh phục vụ nhà đầu tư tổ chức với đầy đủ các cấu phần:
 
+<p align="center">
+  <img src="assets/baocaomau.png" width="800" alt="Báo cáo phân tích mẫu FPT chuẩn CFA"/>
+</p>
 * **Tệp báo cáo xuất bản kiểm chứng thực tế**: [VIBE_Research_FPT_20261107_CFA.pdf](output/pdf/VIBE_Research_FPT_20261107_CFA.pdf) (Bản PDF 30 trang đầy đủ 20 biểu đồ combo 2 trục tung, bảng định giá P/E đa kịch bản và chứng từ kiểm toán).
 * **Tóm tắt luận điểm đầu tư**: Khuyến nghị **MUA**, Giá mục tiêu **121,909 VND/CP** (+20.6% upside so với thị giá đóng cửa 101,100 VND).
 * **Bảng định giá P/E đa kịch bản**:

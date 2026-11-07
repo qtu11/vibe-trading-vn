@@ -98,8 +98,8 @@ export function ContextUsageIndicator({ sessionId, live, modelKey = "", compact 
       onClick={() => { setOpen((current) => !current); setHovered(false); }}
       onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)} onBlur={() => setHovered(false)}
-      className="inline-flex min-h-8 min-w-8 items-center gap-1.5 rounded-md px-1.5 text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary motion-reduce:transition-none">
-      <svg viewBox="0 0 20 20" className={`h-4 w-4 shrink-0 -rotate-90 ${stroke}`} aria-hidden="true">
+      className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border/70 bg-background/80 hover:bg-muted/80 px-2.5 text-xs text-muted-foreground hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-xs motion-reduce:transition-none">
+      <svg viewBox="0 0 20 20" className={`h-3.5 w-3.5 shrink-0 -rotate-90 ${stroke}`} aria-hidden="true">
         <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-20" />
         {ratio !== null && <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
           pathLength="100" strokeDasharray={`${Math.min(100, Math.max(0, ratio * 100))} 100`} />}

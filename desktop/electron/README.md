@@ -1,4 +1,4 @@
-# Vibe-Trading Desktop (Unofficial Community Build)
+# Vibe-Trading Desktop
 
 This directory contains an Electron host for the existing Vibe-Trading FastAPI
 and React application. The Windows packaging layer can assemble an unsigned

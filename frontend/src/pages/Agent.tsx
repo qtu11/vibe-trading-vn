@@ -2015,9 +2015,24 @@ export function Agent() {
 
       <div
         data-agent-composer
-        className="border-t border-white/[0.06] dark:border-white/[0.04] px-4 pt-3 pb-5 bg-gradient-to-t from-background/95 via-background/90 to-background/50 backdrop-blur-xl"
+        className="border-t border-white/[0.06] dark:border-white/[0.04] px-4 pt-2 pb-3.5 bg-gradient-to-t from-background/95 via-background/90 to-background/50 backdrop-blur-xl"
       >
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-2xl mx-auto">
+          {/* Controls Bar đặt ở PHÍA TRÊN khung chat theo chuẩn Codex */}
+          <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-0.5">
+            <ComposerModelControls
+              settings={llmSettings}
+              disabled={status === "streaming"}
+              onChange={setLlmSettings}
+            />
+            <ContextUsageIndicator
+              key={`${sessionId || "draft"}:${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
+              sessionId={sessionId}
+              live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined}
+              modelKey={`${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
+            />
+          </div>
+
           <LiveRuntimePanel
             ref={liveRuntimeRef}
             sessionId={sessionId}
@@ -2054,15 +2069,6 @@ export function Agent() {
               onCancelSwarm={handleCancelSwarm}
             />
           </LiveRuntimePanel>
-          <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
-          <ComposerModelControls settings={llmSettings} disabled={status === "streaming"} onChange={setLlmSettings} />
-          <ContextUsageIndicator
-            key={`${sessionId || "draft"}:${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
-            sessionId={sessionId}
-            live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined}
-            modelKey={`${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
-          />
-          </div>
         </div>
       </div>
     </div>

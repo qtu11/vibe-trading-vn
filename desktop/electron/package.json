@@ -1,10 +1,10 @@
 {
-  "name": "vibe-trading-desktop-unofficial-community",
+  "name": "vibe-trading-desktop",
   "version": "0.3.0",
   "private": true,
-  "author": "Vibe-Trading Desktop Community Contributors",
+  "author": "Vibe-Trading Desktop",
   "license": "MIT",
-  "description": "Vibe-Trading Desktop (Unofficial Community Build)",
+  "description": "Vibe-Trading Desktop",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc && node scripts/copy-static.mjs",
@@ -32,10 +32,10 @@
     "typescript": "^5.9.3"
   },
   "build": {
-    "appId": "io.github.vibetrading.community.desktop",
-    "productName": "Vibe-Trading Desktop (Unofficial Community Build)",
+    "appId": "io.github.vibetrading.desktop",
+    "productName": "Vibe-Trading",
     "compression": "normal",
-    "artifactName": "Vibe-Trading-Desktop-Unofficial-${version}-${arch}.${ext}",
+    "artifactName": "Vibe-Trading-${version}-${arch}.${ext}",
     "asar": true,
     "electronLanguages": [
       "ar",

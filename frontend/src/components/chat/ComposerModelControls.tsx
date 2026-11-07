@@ -66,19 +66,29 @@ export function ComposerModelControls({ settings, disabled, onChange }: {
     } catch (reason) { setError(reason instanceof Error ? reason.message : String(reason)); }
     finally { setSaving(false); }
   }
-  const title = vi ? "Chọn mức nỗ lực" : "Reasoning effort";
+  const shortModel = (settings?.model_name || "").split("/").pop() || settings?.model_name || (vi ? "Chọn model" : "Select model");
+  const activeEffort = label(settings?.provider === "custom" ? "" : settings?.reasoning_effort);
+
   return <div ref={root} className="relative min-w-0 text-xs" data-composer-model-controls>
     <button ref={trigger} type="button" disabled={locked} aria-expanded={open} aria-haspopup="dialog" aria-controls={dialogId}
-      aria-label={`${title} · ${settings.model_name} · ${label(settings.provider === "custom" ? "" : settings.reasoning_effort)}`}
-      title={settings.model_name} onClick={() => {
+      aria-label={`${shortModel} · ${activeEffort || (vi ? "Mặc định" : "Default")}`}
+      title={`${settings.model_name}${activeEffort ? ` (${activeEffort})` : ""}`} onClick={() => {
         setModel(settings.model_name); setEffort(settings.provider === "custom" ? "" : settings.reasoning_effort);
         setPickingModel(false); setError(""); setOpen(!open);
       }}
-      className="flex h-7 max-w-full items-center gap-1.5 rounded-full bg-muted/70 px-2.5 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50">
-      <span className="truncate">{title}</span><ChevronDown size={12} className="shrink-0" aria-hidden="true" />
+      className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/80 hover:bg-muted/80 px-2.5 text-xs text-foreground transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50 shadow-xs">
+      <Zap size={12} className="shrink-0 text-amber-500 fill-amber-500/20" aria-hidden="true" />
+      <span className="truncate max-w-[140px] sm:max-w-[200px] font-medium">{shortModel}</span>
+      {activeEffort && (
+        <>
+          <span className="text-muted-foreground/40 shrink-0">·</span>
+          <span className="text-muted-foreground shrink-0 text-[11px]">{activeEffort}</span>
+        </>
+      )}
+      <ChevronDown size={12} className={`shrink-0 text-muted-foreground/70 transition-transform duration-200 ${open ? "rotate-180" : ""}`} aria-hidden="true" />
     </button>
     {open && <section id={dialogId} role="dialog" aria-modal="false" aria-label={vi ? "Model và mức suy nghĩ" : "Model and reasoning"}
-      className="absolute bottom-full end-0 z-50 mb-3 max-h-[min(70vh,28rem)] w-64 max-w-[calc(100vw-5rem)] overflow-y-auto rounded-2xl border border-border/70 bg-popover p-3 text-popover-foreground shadow-[0_4px_16px_rgba(0,0,0,0.09)]">
+      className="absolute bottom-full start-0 z-50 mb-2 max-h-[min(70vh,28rem)] w-72 max-w-[calc(100vw-3rem)] overflow-y-auto rounded-2xl border border-border/70 bg-popover p-3.5 text-popover-foreground shadow-xl animate-in fade-in slide-in-from-bottom-1 duration-150">
       <div className="grid grid-cols-[24px_minmax(0,1fr)_24px] items-start gap-1">
         <Zap size={14} className="mt-0.5 justify-self-start text-muted-foreground/65" aria-hidden="true" />
         <div className="min-w-0 text-center">

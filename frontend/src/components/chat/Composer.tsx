@@ -342,7 +342,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
       )}
       <LiveRuntimeControl />
 
-      <div data-composer-frame className="relative rounded-[24px] border border-border/70 bg-background p-3 shadow-sm transition-colors focus-within:border-border">
+      <div data-composer-frame className="relative rounded-[20px] border border-border/70 bg-background px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-sm transition-all focus-within:border-border/90 focus-within:ring-1 focus-within:ring-border/40">
           {/* Prompt Textarea */}
           <textarea
             ref={inputRef}
@@ -360,7 +360,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             onInput={(e) => {
               const el = e.target as HTMLTextAreaElement;
               el.style.height = "auto";
-              el.style.height = Math.min(el.scrollHeight, 180) + "px";
+              el.style.height = Math.min(el.scrollHeight, 160) + "px";
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -389,7 +389,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             aria-label={t("agent.messageInputLabel")}
             aria-readonly={streaming}
             className={[
-              "min-h-[56px] w-full resize-none overflow-y-auto bg-transparent px-1 py-2 text-sm leading-relaxed outline-none max-h-44",
+              "min-h-[40px] w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-sm leading-relaxed outline-none max-h-40",
               "placeholder:text-muted-foreground/45 focus:outline-none selection:bg-primary/20",
               streaming ? "cursor-not-allowed text-muted-foreground/70" : "text-foreground",
             ].join(" ")}

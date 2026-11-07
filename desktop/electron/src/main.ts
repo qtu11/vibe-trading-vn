@@ -26,7 +26,7 @@ let quitting = false;
 let desktopLocale: DesktopLocale = "en";
 let desktopMessages = getDesktopMessages(desktopLocale);
 const apiAuthKey = randomBytes(32).toString("base64url");
-const productName = "Vibe-Trading Desktop (Unofficial Community Build)";
+const productName = "Vibe-Trading";
 const testUserData = process.env.VIBE_TRADING_DESKTOP_TEST_USER_DATA;
 let credentialStore: SecureCredentialStore | undefined;
 
@@ -48,7 +48,7 @@ if (!app.requestSingleInstanceLock()) {
 
 async function ready(): Promise<void> {
   if (process.platform === "win32") {
-    app.setAppUserModelId("io.github.vibetrading.community.desktop");
+    app.setAppUserModelId("io.github.vibetrading.desktop");
   }
   desktopLocale = resolveDesktopLocale(
     process.env.VIBE_TRADING_DESKTOP_LOCALE ?? app.getLocale(),
