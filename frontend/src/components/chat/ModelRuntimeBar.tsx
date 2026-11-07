@@ -25,7 +25,7 @@ export function ModelRuntimeBar({
   const model = runtimeModel || settings.model_name || t("agent.unknownModel");
   const reasoningEffort = runtimeReasoningEffort !== undefined
     ? runtimeReasoningEffort
-    : settings.reasoning_effort;
+    : settings.provider === "custom" ? "" : settings.reasoning_effort;
   const effortKey = effortLabelKey(reasoningEffort);
   const effortLabel = effortKey ? t(effortKey) : t("settings.providerDefault");
 
@@ -42,7 +42,7 @@ export function ModelRuntimeBar({
         <a
           href="/settings"
           title={t("settings.reasoningEffortDesc")}
-          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 hover:bg-muted/80 px-2.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+          className="ml-auto hidden shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 hover:bg-muted/80 px-2.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-all cursor-pointer sm:inline-flex"
         >
           <Cpu className="h-3 w-3" aria-hidden="true" />
           <span>{t("agent.reasoningStrength")}: {effortLabel}</span>

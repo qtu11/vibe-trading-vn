@@ -1,0 +1,47 @@
+{
+  "input": "Replay of real HTTP snapshots collected 2026-11-07; no new model calls or orders",
+  "outputs": [
+    {
+      "symbol": "FPT.VN",
+      "price": 50800.0,
+      "observed_at": "2026-11-06T07:45:09+00:00",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/FPT.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "quote_verified": true,
+      "formats": {
+        "docx": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\e6064fb41587440a9d5f16f2549c4300\\VIBE_Research_FPT_20261107.docx",
+        "pdf": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\abb36fc356f34704b437c1a61a66e38f\\VIBE_Research_FPT_20261107.pdf",
+        "pptx": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\27f0c7acc4724379b10d86b37b5b7028\\VIBE_Research_FPT_20261107.pptx"
+      },
+      "pdf_pages": 3,
+      "slides": 7
+    },
+    {
+      "symbol": "VCB.VN",
+      "price": 53600.0,
+      "observed_at": "2026-11-06T07:45:19+00:00",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/VCB.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "quote_verified": true,
+      "formats": {
+        "docx": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\708603c71ea74feb8ceedd4b36963a68\\VIBE_Research_VCB_20261107.docx",
+        "pdf": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\aa12d4d362b04573b3dc38535037b6a8\\VIBE_Research_VCB_20261107.pdf",
+        "pptx": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\d63e1bdaf77b4727bdd8784c6ae8f629\\VIBE_Research_VCB_20261107.pptx"
+      },
+      "pdf_pages": 3,
+      "slides": 7
+    },
+    {
+      "symbol": "HPG.VN",
+      "price": 21200.0,
+      "observed_at": "2026-11-06T07:45:11+00:00",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/HPG.VN?interval=1d&events=div%2Csplits&period1=1793491200&period2=1794096000",
+      "quote_verified": true,
+      "formats": {
+        "docx": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\349b0227b0c24c08a025bd20e26ab64f\\VIBE_Research_HPG_20261107.docx",
+        "pdf": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\3e3f526d7cc44617941c15648f83d283\\VIBE_Research_HPG_20261107.pdf",
+        "pptx": "D:\\Vibe-Trading\\tmp\\report-evidence-smoke\\published\\f7b7926851514610bd0607a15adfdb94\\VIBE_Research_HPG_20261107.pptx"
+      },
+      "pdf_pages": 3,
+      "slides": 7
+    }
+  ]
+}

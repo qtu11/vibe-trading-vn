@@ -90,15 +90,15 @@ export default function ReportArtifactCard({ code }: { code: string }) {
   const isDemo = job.publication_status === "simulated_demo";
 
   return (
-    <div className="my-3 overflow-hidden rounded-2xl border border-red-400/30 bg-gradient-to-br from-[#391111] via-[#5C1717] to-[#251010] text-white shadow-lg">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <img src="/shrimp-vest-logo.png" alt="Logo tôm đỏ Vibe-Trading" className="h-9 w-9 rounded-lg object-contain" />
-          <span className="text-xs font-semibold tracking-wider text-red-100">
-            VIBE RESEARCH • BÁO CÁO PHÂN TÍCH
+    <div className="not-prose my-3 overflow-hidden rounded-2xl border border-red-400/30 bg-gradient-to-br from-[#391111] via-[#5C1717] to-[#251010] text-white shadow-lg">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5">
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+          <img src="/shrimp-vest-logo.png" alt="Logo tôm đỏ Vibe-Trading" className="h-9 w-9 shrink-0 object-contain" />
+          <span className="min-w-0 text-[10px] font-semibold tracking-wider text-red-100 sm:text-xs">
+            VIBE RESEARCH<span className="hidden sm:inline"> • BÁO CÁO PHÂN TÍCH</span>
           </span>
         </div>
-        <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-red-100">
+        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-red-100">
           {isDemo ? "Dữ liệu giả lập" : "Dự thảo nghiên cứu"}
         </span>
       </div>

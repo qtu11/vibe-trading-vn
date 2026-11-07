@@ -1,0 +1,35 @@
+
+Chạy menu điều khiển tương tác (Khuyên dùng):
+
+powershell
+
+.\build.ps1
+
+
+
+
+
+Chạy build toàn bộ không cần chọn menu:
+
+powershell
+
+.\build.ps1 -Target All
+
+
+
+
+
+
+Chạy chế độ Dev (Frontend + Electron Hot-Reload):
+
+powershell
+
+.\build.ps1 -Target Dev
+
+
+
+Khởi chạy ứng dụng Desktop đã đóng gói:
+
+powershell
+
+.\build.ps1 -Target Run

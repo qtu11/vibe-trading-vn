@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
+      content="default-src 'none'; img-src 'self' file: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'"
     />
     <title>Vibe-Trading Desktop (Unofficial Community Build)</title>
     <style>
@@ -13,7 +13,7 @@
       * { box-sizing: border-box; }
       body { margin: 0; background: #0b0f14; color: #f4f7fa; min-height: 100vh; display: grid; place-items: center; }
       main { width: min(560px, calc(100vw - 48px)); text-align: center; }
-      .logo { width: 68px; height: 68px; margin: 0 auto 24px; border-radius: 20px; display: grid; place-items: center; background: #14251f; color: #29d391; font: 700 36px/1 Inter, sans-serif; }
+      .logo { width: 72px; height: 72px; margin: 0 auto 20px; display: block; object-fit: contain; }
       h1 { margin: 0; font-size: 26px; font-weight: 650; }
       p { color: #9aa7b5; line-height: 1.65; margin: 13px 0 24px; }
       .track { height: 4px; overflow: hidden; border-radius: 4px; background: #1e2732; }
@@ -23,14 +23,13 @@
       button:hover { background: #22303d; }
       body.error .track { display: none; }
       body.error .actions { display: flex; }
-      body.error .logo { background: #2a171a; color: #ef5350; }
       html[dir="rtl"] .actions { flex-direction: row-reverse; }
       @keyframes loading { from { transform: translateX(-120%); } to { transform: translateX(300%); } }
     </style>
   </head>
   <body>
     <main>
-      <div class="logo" aria-hidden="true">V</div>
+      <img class="logo" src="icon.png" alt="Vibe-Trading Logo" />
       <h1 id="title"></h1>
       <p id="message" role="status" aria-live="polite"></p>
       <div id="progress" class="track" role="progressbar"><div class="bar"></div></div>

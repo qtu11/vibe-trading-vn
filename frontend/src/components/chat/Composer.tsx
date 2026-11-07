@@ -70,6 +70,7 @@ interface Props {
   goalComposerActive: boolean;
   swarmPreset: { name: string; title: string } | null;
   panels?: ReactNode;
+  controls?: ReactNode;
   onSubmit: (prompt: string, attachments: ComposerAttachment[]) => void;
   onCancel: () => void;
   onExport: () => void;
@@ -88,6 +89,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
   goalComposerActive,
   swarmPreset,
   panels,
+  controls,
   onSubmit,
   onCancel,
   onExport,
@@ -340,26 +342,61 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
       )}
       <LiveRuntimeControl />
 
-      {/* Main Composer Box with Dual-layer Glow & Glassmorphism */}
-      <div className="relative group rounded-2xl transition-all duration-300">
-        {/* Ambient glow backdrop on focus / streaming */}
-        <div
-          className={`absolute -inset-[1px] rounded-2xl transition-all duration-500 pointer-events-none ${
-            streaming
-              ? "bg-gradient-to-r from-rose-500/30 via-red-500/20 to-orange-500/30 blur-sm opacity-90 animate-pulse"
-              : "bg-gradient-to-r from-primary/30 via-[#13C6B0]/25 to-primary/30 opacity-40 blur-[2px] group-focus-within:opacity-100 group-focus-within:blur-md"
-          }`}
-          aria-hidden="true"
-        />
+      <div data-composer-frame className="relative rounded-[24px] border border-border/70 bg-background p-3 shadow-sm transition-colors focus-within:border-border">
+          {/* Prompt Textarea */}
+          <textarea
+            ref={inputRef}
+            dir="auto"
+            value={input}
+            rows={1}
+            onChange={(e) => setInput(e.target.value)}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+              lastCompositionEndRef.current = Date.now();
+            }}
+            onInput={(e) => {
+              const el = e.target as HTMLTextAreaElement;
+              el.style.height = "auto";
+              el.style.height = Math.min(el.scrollHeight, 180) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
+                const justFinishedComposing = Date.now() - lastCompositionEndRef.current < 80;
+                if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
+                  return;
+                }
+                if (justFinishedComposing) {
+                  e.preventDefault();
+                  return;
+                }
+                e.preventDefault();
+                submitPrompt(input);
+              }
+            }}
+            placeholder={
+              streaming
+                ? t(`agent.activity.verbs.${activityVerb ?? "working"}` as never)
+                : goalComposerActive
+                ? t("agent.describeGoal")
+                : hasCompletedTurn
+                ? t("agent.followUpPlaceholder" as never)
+                : t("agent.placeholder")
+            }
+            aria-label={t("agent.messageInputLabel")}
+            aria-readonly={streaming}
+            className={[
+              "min-h-[56px] w-full resize-none overflow-y-auto bg-transparent px-1 py-2 text-sm leading-relaxed outline-none max-h-44",
+              "placeholder:text-muted-foreground/45 focus:outline-none selection:bg-primary/20",
+              streaming ? "cursor-not-allowed text-muted-foreground/70" : "text-foreground",
+            ].join(" ")}
+            readOnly={streaming}
+          />
 
-        {/* Inner Interactive Card */}
-        <div
-          className={`relative flex items-end gap-2.5 rounded-2xl p-2.5 backdrop-blur-2xl transition-all duration-300 ${
-            streaming
-              ? "bg-[#0A101D]/95 border border-rose-500/35 shadow-[0_8px_32px_-8px_rgba(244,63,94,0.3)]"
-              : "bg-[#0B1422]/90 dark:bg-[#070D18]/95 border border-white/[0.12] dark:border-white/[0.08] group-focus-within:border-primary/50 shadow-[0_8px_32px_-8px_rgba(0,0,0,0.5),inset_0_1px_1px_0_rgba(255,255,255,0.08)] group-focus-within:shadow-[0_12px_40px_-10px_rgba(234,88,12,0.22),inset_0_1px_1px_0_rgba(255,255,255,0.12)]"
-          }`}
-        >
+        <div data-composer-toolbar className="flex min-w-0 items-center gap-1.5">
           {/* Options / Upload Menu Button */}
           <div className="relative shrink-0" ref={uploadMenuRef}>
             <button
@@ -370,10 +407,10 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
               aria-haspopup="menu"
               aria-expanded={showUploadMenu}
               aria-controls="agent-more-options-menu"
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 disabled:opacity-40 shrink-0 ${
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-40 shrink-0 ${
                 showUploadMenu
-                  ? "bg-primary text-white shadow-[0_0_14px_rgba(234,88,12,0.5)] rotate-45"
-                  : "bg-white/[0.04] hover:bg-white/[0.09] text-muted-foreground hover:text-foreground border border-white/[0.08] hover:border-white/20 active:scale-95 shadow-sm"
+                  ? "bg-muted text-foreground rotate-45"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95"
               }`}
               title={t("agent.moreOptions")}
             >
@@ -384,7 +421,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
               <div
                 id="agent-more-options-menu"
                 role="menu"
-                className="absolute bottom-full left-0 mb-3 w-64 rounded-2xl border border-white/10 bg-[#0E1724]/95 backdrop-blur-xl shadow-[0_16px_50px_-10px_rgba(0,0,0,0.7),inset_0_1px_1px_0_rgba(255,255,255,0.08)] p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1 text-xs"
+                className="absolute bottom-full left-0 mb-3 w-64 rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg p-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200 space-y-1 text-xs"
               >
                 <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
                   {t("agent.moreOptions")}
@@ -498,58 +535,9 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             className="hidden"
           />
 
-          {/* Prompt Textarea */}
-          <textarea
-            ref={inputRef}
-            dir="auto"
-            value={input}
-            rows={1}
-            onChange={(e) => setInput(e.target.value)}
-            onCompositionStart={() => {
-              isComposingRef.current = true;
-            }}
-            onCompositionEnd={() => {
-              isComposingRef.current = false;
-              lastCompositionEndRef.current = Date.now();
-            }}
-            onInput={(e) => {
-              const el = e.target as HTMLTextAreaElement;
-              el.style.height = "auto";
-              el.style.height = Math.min(el.scrollHeight, 180) + "px";
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                const nativeEvent = e.nativeEvent as KeyboardEvent & { isComposing?: boolean };
-                const justFinishedComposing = Date.now() - lastCompositionEndRef.current < 80;
-                if (isComposingRef.current || nativeEvent.isComposing || nativeEvent.keyCode === 229) {
-                  return;
-                }
-                if (justFinishedComposing) {
-                  e.preventDefault();
-                  return;
-                }
-                e.preventDefault();
-                submitPrompt(input);
-              }
-            }}
-            placeholder={
-              streaming
-                ? t(`agent.activity.verbs.${activityVerb ?? "working"}` as never)
-                : goalComposerActive
-                ? t("agent.describeGoal")
-                : hasCompletedTurn
-                ? t("agent.followUpPlaceholder" as never)
-                : t("agent.placeholder")
-            }
-            aria-label={t("agent.messageInputLabel")}
-            aria-readonly={streaming}
-            className={[
-              "min-h-[44px] flex-1 resize-none overflow-y-auto bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none max-h-44",
-              "placeholder:text-muted-foreground/45 focus:outline-none selection:bg-primary/20",
-              streaming ? "cursor-not-allowed text-muted-foreground/70" : "text-foreground",
-            ].join(" ")}
-            readOnly={streaming}
-          />
+          <div className="ms-auto flex min-w-0 items-center justify-end gap-1">
+            {controls}
+          </div>
 
           {/* Export Button */}
           {showExport && (
@@ -557,7 +545,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
               type="button"
               onClick={onExport}
               disabled={!canExport}
-              className="h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-95 transition-all disabled:opacity-20 disabled:pointer-events-none shrink-0"
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-20 sm:flex"
               title={t("agent.exportChat")}
             >
               <Download className="h-4 w-4" />
@@ -569,7 +557,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             <button
               type="button"
               onClick={onCancel}
-              className="group relative h-9 w-9 rounded-xl bg-gradient-to-r from-rose-500/20 via-red-500/25 to-rose-500/20 border border-rose-500/40 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.25)] hover:bg-rose-500/30 hover:border-rose-500/60 hover:shadow-[0_0_20px_rgba(244,63,94,0.45)] active:scale-95 transition-all flex items-center justify-center shrink-0"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-80"
               title={t("agent.stopGeneration")}
               aria-label={t("agent.stopGeneration")}
             >
@@ -579,12 +567,12 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             <button
               type="submit"
               disabled={uploading || (goalComposerActive ? !input.trim() : (!input.trim() && attachments.length === 0))}
-              className="h-9 px-3.5 sm:px-4 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:via-orange-500 hover:to-amber-500 text-white text-xs font-semibold shadow-[0_2px_14px_rgba(234,88,12,0.35)] hover:shadow-[0_4px_22px_rgba(234,88,12,0.55)] active:scale-95 transition-all duration-200 disabled:opacity-25 disabled:pointer-events-none disabled:shadow-none flex items-center justify-center gap-1.5 shrink-0"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-80 disabled:opacity-25"
               title={t("agent.send")}
               aria-label={t("agent.send")}
             >
               <Send className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Gửi</span>
+              
             </button>
           )}
         </div>

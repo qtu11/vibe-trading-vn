@@ -15,9 +15,10 @@ export interface ContextSnapshot {
 export interface ContextView {
   version: 1; session_id: string; model_calls: 0; stored_messages: number; preview: Selection;
   last_run: ContextSnapshot | null;
+  current_context?: ContextSnapshot | null;
   last_run_usage?: { totals?: { input_tokens?: number; output_tokens?: number; calls?: number; cache_read_tokens?: number } } | null;
   last_run_council_usage_tracked?: boolean | null;
-  model_context?: { model?: string; provider?: string; window?: number; source?: string; confidence?: string; prompt_cost_cap?: number; compact_at?: number } | null;
+  model_context?: { model?: string; provider?: string; window?: number; source?: string; confidence?: string; prompt_cost_cap?: number; compact_at?: number; automatic_compaction?: boolean } | null;
   memory: { available_entries: number | null; error: string | null; entries: Array<{ id: string; title: string; type: string }>; recall_preview: Array<{ id: string; title: string; type: string; excerpt: string }>; automatic_fact_extraction: false };
 }
 

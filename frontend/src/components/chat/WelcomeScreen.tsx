@@ -250,10 +250,7 @@ export function WelcomeScreen({ onExample }: Props) {
           {/* Hero Mascot & Brand Emblem */}
           <div className="mb-6 flex flex-col items-center">
             <div className="relative mb-3 flex items-center justify-center">
-              <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-primary/20 via-orange-500/15 to-primary/10 blur-xl opacity-75" />
-              <div className="relative flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-2xl border border-border/80 bg-card/90 p-2.5 shadow-xl shadow-primary/10 backdrop-blur-md ring-1 ring-white/10 transition-transform hover:scale-105">
-                <BrandMark className="h-full w-full" priority />
-              </div>
+              <BrandMark className="h-20 w-20 sm:h-24 sm:w-24 transition-transform hover:scale-105" priority />
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary tracking-wide">
               <span className="relative flex h-2 w-2">

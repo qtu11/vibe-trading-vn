@@ -173,3 +173,59 @@ def test_redaction_keeps_valid_financial_amount_and_removes_only_unsupported_cla
 def test_invalid_scale_does_not_mint_financial_evidence(tmp_path, scale):
     gate = ledger(tmp_path, {"bad": {"value": "45", "unit": "VND", "scale": scale}})
     assert not [r for r in gate._evidence if r.call_id == "financials"]
+
+
+def test_vietnam_source_appendix_table_and_headings_pass_grounding(tmp_path):
+    gate = GroundingLedger(run_dir=tmp_path, user_message="Phân tích cổ phiếu TCB")
+    gate.ingest_tool_result(
+        tool_name="get_market_data",
+        arguments={"codes": ["TCB.VN"]},
+        result=json.dumps({
+            "TCB.VN": [{"trade_date": "2026-11-06", "open": 29533, "close": 21650, "high": 21850, "low": 15, "volume": 11339600}],
+            "_provenance": {"TCB.VN": {"source": "yahoo", "quote_currency": "VND"}},
+        }),
+        call_id="quote",
+        success=True,
+    )
+    gate.ingest_tool_result(
+        tool_name="read_url",
+        arguments={"url": "https://techcombank.com.vn/kqkd-q3-2026"},
+        result=json.dumps({
+            "status": "ok",
+            "url": "https://techcombank.com.vn/kqkd-q3-2026",
+            "title": "Thông cáo KQKD Q3/2026 Techcombank",
+            "content": (
+                "Tổng thu nhập hoạt động (TOI) đạt 45,2 nghìn tỷ đồng; LNTT đạt 28,9 nghìn tỷ đồng. "
+                "Mảng IB đạt 2.800 tỷ đồng, giảm 17,5% so với cùng kỳ. Tỷ lệ CAR đạt 15%."
+            ),
+        }),
+        call_id="tcb_pr",
+        success=True,
+    )
+    source_id = gate.sources[0].source_id
+    draft = (
+        "TCB.VN (yahoo, VND).\n"
+        "### 3.1 Hiệu suất giá\n"
+        "C 21.650 · KL 11.339.600. Giá mục tiêu cao nhất 29.533, từ 15 chuyên gia.\n\n"
+        "### 5.2 Lũy kế 9 tháng 2026\n"
+        "| Mã | Nguồn | Nội dung |\n"
+        "|---|---|---|\n"
+        f"| {source_id} | Techcombank | TOI 45.200; LNTT 28.900; IB 2.800 (−17,5%); CAR 15% |\n\n"
+        "```figures\n"
+        "21.650 | observed | close | quote\n"
+        "11.339.600 | observed | volume | quote\n"
+        "29.533 | observed | target high | quote\n"
+        "15 | observed | analyst count | quote\n"
+        f"45.200 | cited | TOI 45.2 nghin ty [{source_id}] | tcb_pr\n"
+        f"28.900 | cited | LNTT 28.9 nghin ty [{source_id}] | tcb_pr\n"
+        f"2.800 | cited | IB 9M [{source_id}] | tcb_pr\n"
+        f"−17,5% | cited | IB YoY [{source_id}] | tcb_pr\n"
+        f"15% | cited | CAR [{source_id}] | tcb_pr\n"
+        "```"
+    )
+    res = gate.validate_final_answer(draft)
+    assert res.valid, res.issues
+    assert "(omitted※)" not in res.released_text
+    assert "45.200" in res.released_text
+    assert "−17,5%" in res.released_text
+    assert "15%" in res.released_text

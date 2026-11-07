@@ -17,7 +17,7 @@ const context = (sessionId = "session-one"): ContextView => ({
   memory: { available_entries: 0, error: null, entries: [], recall_preview: [], automatic_fact_extraction: false },
 });
 beforeAll(async () => { await i18n.changeLanguage("en"); });
-beforeEach(() => { vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: true, json: async () => context() })); });
+beforeEach(() => { vi.stubGlobal("fetch", vi.fn().mockImplementation(async (url) => ({ ok: true, json: async () => String(url).startsWith("/settings/") ? context().model_context : context() }))); });
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 it("uses one estimated prompt rather than last-request or cumulative billed tokens", async () => {
@@ -36,11 +36,45 @@ it("uses one estimated prompt rather than last-request or cumulative billed toke
   expect(screen.queryByText("Saved messages")).not.toBeInTheDocument();
 });
 
+it("discovers the selected model window before a chat session exists", async () => {
+  vi.mocked(fetch).mockResolvedValue({ ok:true,json:async()=>({model:"model-exact",provider:"custom",window:64000,source:"provider:/models",confidence:"provider_reported", automatic_compaction: true, prompt_cost_cap: 60000}) } as Response);
+  render(<ContextUsageIndicator sessionId={null} modelKey="custom:model-exact" />);
+  await waitFor(() => expect(fetch).toHaveBeenCalledWith("/settings/llm/context",expect.anything()));
+  fireEvent.click(screen.getByRole("button",{name:"Context usage unknown"}));
+  expect(await screen.findByText("model-exact")).toBeVisible();
+  expect(screen.getByText("64,000")).toBeVisible();
+  expect(screen.getByRole("button",{name:"Refresh metadata"})).toBeEnabled();
+  expect(screen.getByText("Automatic compaction enabled")).toBeVisible();
+  expect(screen.getByText("60,000")).toBeVisible();
+  expect(screen.getByText("Window confidence: provider_reported")).toBeVisible();
+  expect(document.querySelector("circle[stroke-dasharray]")).toBeNull();
+});
+
+it("drops a live context percentage when the selected model changes", () => {
+  const { rerender } = render(<ContextUsageIndicator sessionId="session-one" modelKey="fixture:fixture-model" live={snapshot()} />);
+  expect(screen.getByRole("button", { name: "Context approximately 25% used" })).toBeVisible();
+  rerender(<ContextUsageIndicator sessionId="session-one" modelKey="fixture:another-model" live={snapshot()} />);
+  expect(screen.getByRole("button", { name: "Context usage unknown" })).toBeVisible();
+});
+
+it("discovers model metadata for existing chats before reading context and on refresh", async () => {
+  const metadata = { ...context().model_context, source: "provider:/models", confidence: "provider_reported" };
+  vi.mocked(fetch).mockImplementation(async (url) => ({ ok: true, json: async () => String(url).startsWith("/settings/") ? metadata : context() }) as Response);
+  render(<ContextUsageIndicator sessionId="session-one" modelKey="fixture:fixture-model" />);
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+  expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual(["/settings/llm/context", "/sessions/session-one/context"]);
+  fireEvent.click(screen.getByRole("button", { name: "Context usage unknown" }));
+  expect(screen.getByText("Window source: provider:/models")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh metadata" }));
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
+  expect(vi.mocked(fetch).mock.calls[2][0]).toBe("/settings/llm/context?refresh=true");
+});
+
 it("does not turn the previous run's context into the current occupancy", async () => {
   const data = context(); data.last_run = snapshot({ estimated_next_request_tokens: 99000 });
   vi.mocked(fetch).mockResolvedValue({ ok: true, json: async () => data } as Response);
   render(<ContextUsageIndicator sessionId="session-one" />);
-  await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+  await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   fireEvent.click(screen.getByRole("button", { name: "Context usage unknown" }));
   expect(await screen.findByText(/prior run's context is available in diagnostics/)).toBeVisible();
   expect(screen.queryByText("~99%")).not.toBeInTheDocument();
@@ -83,10 +117,12 @@ it("dismisses by Escape, returns keyboard focus, and keeps diagnostics behind an
   fireEvent.click(trigger);
   expect(screen.getByText("History & long-term memory")).toBeVisible();
   expect(screen.queryByText("Persistent memory")).not.toBeInTheDocument();
+  const cancellation = vi.fn(); document.addEventListener("keydown", cancellation);
   fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
   expect(trigger).toHaveFocus();
+  expect(cancellation).not.toHaveBeenCalled(); document.removeEventListener("keydown", cancellation);
 });
 
 it("aborts metadata reads and ignores stale session results", async () => {

@@ -50,8 +50,8 @@ class LLMProviderOption(BaseModel):
     api_key_required: bool = True
     auth_type: str = "api_key"
     login_command: Optional[str] = None
-    # Levels the settings form offers and the update route accepts; "" (unset)
-    # is always allowed on top of these.
+    # Candidate levels narrowed to the selected adapter/model before use;
+    # "" (unset) is always allowed.
     reasoning_efforts: List[str] = Field(default_factory=lambda: list(DEFAULT_REASONING_EFFORTS))
 
 
@@ -112,7 +112,8 @@ class LLMModelsResponse(BaseModel):
     source: str
     warning_code: Optional[ModelDiscoveryWarningCode] = None
     # Model id -> reasoning effort levels it accepts; an empty list means the
-    # model takes no effort setting. Only providers that report it fill this.
+    # model takes no effort setting. Derived from the adapter contract or a
+    # provider's explicit model discovery (the Claude CLI).
     effort_levels: Optional[Dict[str, List[str]]] = None
     # Explicit limits reported by this exact provider endpoint. An ID-only
     # listing contributes no guessed context window.
@@ -317,6 +318,36 @@ def _extract_model_ids(payload: Any) -> List[str]:
     return sorted(model_ids, key=str.casefold)[:1000]
 
 
+def _supported_reasoning_efforts(provider: LLMProviderOption, model: str, base_url: str) -> List[str]:
+    """Offer only named effort controls the selected adapter can actually send."""
+    from src.providers import llm
+    from src.providers.capabilities import get_provider_capabilities
+    from src.providers.model_metadata import normalize_endpoint
+
+    levels = list(provider.reasoning_efforts)
+    if provider.auth_type == "claude_cli":
+        return levels  # The CLI's model-list response narrows these per model.
+    if (provider.name == "custom" or not normalize_endpoint(base_url)
+            or normalize_endpoint(base_url) != normalize_endpoint(provider.default_base_url)):
+        return []
+    if provider.name == "openai-codex":
+        return [level for level in levels if level != "none"]
+    if provider.name == "anthropic":
+        if not llm._anthropic_supports_effort(model):
+            return []
+        try:
+            adapter = llm.import_module("langchain_anthropic").ChatAnthropic
+        except Exception:  # noqa: BLE001 -- a broken optional adapter exposes no control
+            return []
+        return [level for level in levels if level != "none"] if llm._adapter_accepts_effort(adapter) else []
+    if provider.name == "deepseek":
+        mode = llm._deepseek_adapter_mode()
+        if mode == "native" or (mode == "auto" and llm._native_deepseek_adapter_available()):
+            return []
+    caps = get_provider_capabilities(provider.name, model)
+    return levels if caps.openrouter_reasoning_body or llm._supports_top_level_reasoning_effort(caps) else []
+
+
 async def _list_provider_models(
     provider: LLMProviderOption,
     *,
@@ -371,6 +402,7 @@ async def _list_provider_models(
         models=models or fallback,
         source="provider" if discovered else "default",
         model_metadata=model_metadata,
+        effort_levels={model: _supported_reasoning_efforts(provider, model, base_url) for model in models},
     )
 
 
@@ -453,10 +485,16 @@ def _build_llm_settings_response(
         active_url = active["base_url"] if active else ""
         provider = LLMProviderOption(name="custom", label="Custom (credential vault)",
             api_key_env=None, base_url_env="OPENAI_BASE_URL", default_model=active_model,
-            default_base_url=active_url, auth_type="credential_vault", reasoning_efforts=list(DEFAULT_REASONING_EFFORTS))
+            default_base_url=active_url, auth_type="credential_vault", reasoning_efforts=[])
         env_values = {**env_values, "LANGCHAIN_MODEL_NAME": active_model, "OPENAI_BASE_URL": active_url}
         api_key_configured, api_key_hint = bool(active and active["api_key_configured"]), None
         options = [*LLM_PROVIDERS, provider]
+    options = [option.model_copy(update={"reasoning_efforts": _supported_reasoning_efforts(
+        option, env_values.get("LANGCHAIN_MODEL_NAME", option.default_model) if option.name == provider.name else option.default_model,
+        env_values.get(option.base_url_env, option.default_base_url),
+    )}) for option in options]
+    active_levels = next(option.reasoning_efforts for option in options if option.name == provider.name)
+    effort = env_values.get("LANGCHAIN_REASONING_EFFORT", "").strip().lower()
     return LLMSettingsResponse(
         provider=provider.name,
         model_name=env_values.get("LANGCHAIN_MODEL_NAME", provider.default_model),
@@ -468,7 +506,7 @@ def _build_llm_settings_response(
         temperature=host._coerce_float(env_values.get("LANGCHAIN_TEMPERATURE", "0.0"), 0.0),
         timeout_seconds=host._coerce_int(env_values.get("TIMEOUT_SECONDS", "120"), 120),
         max_retries=host._coerce_int(env_values.get("MAX_RETRIES", "2"), 2),
-        reasoning_effort=env_values.get("LANGCHAIN_REASONING_EFFORT", "").strip().lower(),
+        reasoning_effort=effort if effort in active_levels else "",
         sse_timeout_seconds=host._coerce_int(env_values.get("VIBE_TRADING_SSE_TIMEOUT", "90"), 90),
         env_path=host._project_relative_path(host.ENV_PATH),
         providers=options,
@@ -698,6 +736,45 @@ def register_settings_routes(
 
     # --- Routes ---
 
+    @app.get("/settings/llm/context", dependencies=[Depends(require_local_or_auth)])
+    async def get_llm_context(refresh: bool = False):
+        """Discover explicit limits for the configured endpoint without a model call."""
+        from src.agent.context_budget import resolve_configured_context
+        from src.providers.model_metadata import cached_model_metadata, configured_model_identity, normalize_endpoint, remember_model_metadata
+
+        identity = configured_model_identity()
+        warning = None
+        cached = cached_model_metadata(identity["provider"], identity["base_url"], identity["model"])
+        if refresh or cached is None:
+            if identity["provider"] == "custom":
+                from src.providers.custom_profiles import active_provider_credentials
+                from src.api.custom_provider_routes import _provider_async_client, _reject_private_dns_targets
+                try:
+                    credentials = await asyncio.to_thread(active_provider_credentials)
+                    if (not credentials
+                            or normalize_endpoint(credentials.get("base_url")) != identity["base_url"]
+                            or credentials.get("model") != identity["model"]):
+                        raise ValueError("The active custom provider changed during discovery")
+                    await asyncio.to_thread(_reject_private_dns_targets, identity["base_url"])
+                    async with _provider_async_client(identity["base_url"]) as client:
+                        response = await client.get(_model_list_url(identity["base_url"]),
+                            headers={"Authorization": f"Bearer {credentials['api_key']}"})
+                        response.raise_for_status()
+                        remember_model_metadata("custom", identity["base_url"], response.json())
+                except (ValueError, RuntimeError, OSError, httpx.HTTPError):
+                    warning = "model_metadata_unavailable"
+            elif identity["provider"] in LLM_PROVIDER_BY_NAME:
+                discovered = await list_llm_models(ListLLMModelsRequest(
+                    provider=identity["provider"], base_url=identity["base_url"], refresh=refresh,
+                ))
+                warning = discovered.warning_code
+        data = resolve_configured_context().as_dict()
+        data.pop("endpoint_scope", None)
+        data["model"] = data["model_id"]
+        data["automatic_compaction"] = True
+        data["warning"] = warning
+        return data
+
     @app.get(
         "/settings/llm",
         response_model=LLMSettingsResponse,
@@ -729,7 +806,7 @@ def register_settings_routes(
                 raise HTTPException(status_code=400, detail="Edit and test a custom provider in the provider manager before activating it")
             provider = LLMProviderOption(name="custom", label="Custom (credential vault)", api_key_env=None,
                 base_url_env="OPENAI_BASE_URL", default_model=active["model"], default_base_url=active["base_url"],
-                auth_type="credential_vault", reasoning_efforts=list(DEFAULT_REASONING_EFFORTS))
+                auth_type="credential_vault", reasoning_efforts=[])
         if provider is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported LLM provider"
@@ -745,16 +822,6 @@ def register_settings_routes(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Temperature must be between 0 and 2",
-            )
-
-        reasoning_effort = (payload.reasoning_effort or "").strip().lower()
-        if reasoning_effort and reasoning_effort not in provider.reasoning_efforts:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    f"Reasoning effort must be one of {', '.join(provider.reasoning_efforts)}, "
-                    "or empty to leave it unset"
-                ),
             )
 
         current_values = _read_settings_env_values()
@@ -779,6 +846,18 @@ def register_settings_routes(
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)
                 ) from exc
+        reasoning_effort = (payload.reasoning_effort or "").strip().lower()
+        supported_efforts = _supported_reasoning_efforts(provider, model_name, base_url)
+        if reasoning_effort and reasoning_effort not in supported_efforts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Reasoning effort must be one of {', '.join(supported_efforts)}, "
+                    "or empty to leave it unset"
+                    if supported_efforts else
+                    "Reasoning effort must be empty to leave it unset; this adapter has no confirmed effort control"
+                ),
+            )
         updates: Dict[str, str] = {
             "LANGCHAIN_PROVIDER": provider.name,
             "LANGCHAIN_MODEL_NAME": model_name,

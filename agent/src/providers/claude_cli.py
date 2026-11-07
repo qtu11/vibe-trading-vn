@@ -469,7 +469,7 @@ class ClaudeCliLLM:
         bash_policy()
         self.model = model
         self.timeout = timeout
-        self.reasoning_effort = reasoning_effort
+        self.reasoning_effort = reasoning_effort if reasoning_effort in CLAUDE_CLI_EFFORT_LEVELS else ""
         self.tools = tools or []
 
     def bind_tools(self, tools: list[dict[str, Any]]) -> "ClaudeCliLLM":

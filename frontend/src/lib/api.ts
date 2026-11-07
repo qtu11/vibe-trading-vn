@@ -1,5 +1,5 @@
 import i18n from "@/i18n";
-import { artifactFormat, isReportHandle, MAX_REPORT_ARTIFACT_BYTES, REPORT_MEDIA_TYPES, safeReportFilename, validReportArtifact, validReportJob, type ReportArtifact, type ReportEngineJob, type ReportFormat } from "@/lib/reportEngine";
+import { isReportHandle, MAX_REPORT_ARTIFACT_BYTES, REPORT_MEDIA_TYPES, safeReportFilename, validReportJob, type ReportEngineJob, type ReportFormat } from "@/lib/reportEngine";
 import type { CryptoRequest, ResearchResult, VietnamRequest } from "@/lib/research";
 import type { ForexCostStressRequest, ForexTradePathsRequest, ForexExperimentDetail, ForexExperimentList, ForexExperimentRun, ForexResearchRequest, ForexResearchResult } from "@/lib/forexResearch";
 import type { ResearchObject } from "@/lib/research";
@@ -68,11 +68,16 @@ async function readGeneratedReport(reportId: string, format: ReportFormat, signa
   });
 }
 
-export async function fetchGeneratedReport(artifact: ReportArtifact, signal?: AbortSignal): Promise<Blob> {
-  if (!validReportArtifact(artifact)) throw new Error("Thông tin tài liệu không hợp lệ");
-  const blob = await readGeneratedReport(artifact.report_id, artifactFormat(artifact)!, signal);
-  if (blob.size !== artifact.size_bytes) throw new Error("Dung lượng tài liệu không khớp bản xuất");
-  return blob;
+export async function fetchReportPreviewPage(reportId: string, pageIndex: number, signal?: AbortSignal): Promise<Blob> {
+  if (!isReportHandle(reportId) || !Number.isSafeInteger(pageIndex) || pageIndex < 0) throw new Error("Trang xem trước không hợp lệ");
+  return performRequest(`/api/reports/${reportId}/preview/${pageIndex}`, { headers: authHeaders(), signal }, async (response) => {
+    if (response.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "image/png"
+      || Number(response.headers.get("content-length")) > MAX_REPORT_ARTIFACT_BYTES) throw new Error("Ảnh xem trước không hợp lệ");
+    const blob = await response.blob();
+    const signature = new Uint8Array(await blob.slice(0, 8).arrayBuffer());
+    if (!blob.size || blob.size > MAX_REPORT_ARTIFACT_BYTES || signature.join(",") !== "137,80,78,71,13,10,26,10") throw new Error("Ảnh xem trước không hợp lệ");
+    return blob;
+  });
 }
 
 export async function downloadGeneratedReport(reportId: string, filename: string): Promise<void> {
@@ -562,6 +567,13 @@ export const api = {
     return request<ReportEngineJob>(`/api/reports/artifacts/${reportId}/job`, { signal }).then((job) => {
       if (!validReportJob(job) || !job.artifacts.some((artifact) => artifact.report_id === reportId)) throw new Error("Dữ liệu báo cáo không hợp lệ");
       return job;
+    });
+  },
+  getReportPreviewPages: (reportId: string, signal?: AbortSignal) => {
+    if (!isReportHandle(reportId)) return Promise.reject(new Error("Mã tài liệu không hợp lệ"));
+    return request<{ pages: number }>(`/api/reports/${reportId}/preview`, { signal }).then((value) => {
+      if (!Number.isSafeInteger(value.pages) || value.pages < 1 || value.pages > 2000) throw new Error("Số trang xem trước không hợp lệ");
+      return value.pages;
     });
   },
   exportReportJob: (report: Record<string, unknown>, formats: ReportFormat[] = ["docx", "pdf", "pptx"], runId?: string) =>

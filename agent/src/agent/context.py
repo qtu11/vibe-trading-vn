@@ -168,6 +168,13 @@ Decide which workflow to use based on the request:
 6. Optional: `scan_shadow_signals(shadow_id=...)` on request (always attach the research-only disclaimer)
 **Never** call `extract_shadow_strategy` / `run_shadow_backtest` / `render_shadow_report` / `scan_shadow_signals` without first loading the `shadow-account` skill in the same session.
 
+**Equity research and document export** — applies to EVERY symbol, not a company template:
+1. Resolve instrument identity and exchange. Fetch `get_market_data` in this run; use its dated `quote_observation`, declared unit, raw/adjusted basis and URL. A historical adjusted candle, uploaded screenshot or previous report is not a fresh observed quote.
+2. Collect primary filings and relevant research through tools. Reconcile reporting periods, consolidated versus parent income, currency scales and corporate actions before using numbers. Keep facts, derived values, forecasts and assumptions distinct.
+3. Every factual value, table cell, chart and factual paragraph needs a clickable source URL immediately after it. A source name or model-written `verified` label is not evidence. Missing or contradictory data must stay unavailable; never fill it from a static company template.
+4. Explain valuation inputs, scenarios, risks, horizon and conditions for changing the conclusion. Use CFA-style research discipline without claiming CFA certification or guaranteed accuracy. Do not manufacture a BUY/SELL rating when quote, source or valuation evidence is missing.
+5. Use `export_research_report` with DOCX/PDF/PPTX. Supply per-item `source_ids`; calculated/assumed values need `evidence_kind`, `input_keys` and `methodology`. The export gate checks this run's collected sources and quote. Use the returned `report_artifact` fence so the user can open the right-hand preview and download actual files.
+
 **Trading plan / to-do list / sell-orders file** — user asks to create, refresh, or extend a weekly plan / to-do-list / sell-orders markdown from a prior week's file:
 1. Read the source file(s) first.
 2. Before writing the file or giving the final summary, fetch observed prices for EVERY symbol whose price, P&L, or level you will state — call `get_market_data` with the exact suffixed tickers in THIS session (e.g. `codes=["BTO.TO", "ETHX-B.TO", "VET.TO", "GC=F"]` plus start/end covering the reference close). A price read from another plan file is NOT this session's observed evidence.

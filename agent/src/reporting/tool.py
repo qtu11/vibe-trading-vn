@@ -1,4 +1,4 @@
-"""Agent tool for rendering Vibe-Trading research drafts (DOCX + PDF)."""
+"""Agent tool for rendering Vibe-Trading research drafts (DOCX, PDF and PPTX)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from src.reporting.service import ReportJobError, ReportJobService
 
 
 class ExportResearchReportTool(BaseTool):
-    """Render a Vibe-Trading branded research draft in DOCX and PDF formats."""
+    """Render the same evidence-bound research into all three document formats."""
 
     name = "export_research_report"
     is_readonly = False
@@ -33,6 +33,17 @@ class ExportResearchReportTool(BaseTool):
                     "each substantive chapter. Meet a requested page count with distinct evidenced analysis, "
                     "never repeated filler. Include dated price references, explicit valuation assumptions and "
                     "conditional buy/sell rules; never invent prices or erase missing-evidence markers."
+                    " All facts require source_ids resolving to Source.url collected this run. All numeric "
+                    "surfaces, including key_stats, forecast_stats, table rows/cell_evidence, charts and "
+                    "paragraphs, require attribution. Each NarrativeSection may include up to 2 charts "
+                    "(title, caption, categories, bars={label, unit, decimals, values, source_ids, "
+                    "evidence_kind=cited|observed}, optional line or line_formula=ratio_to_bars_pct|"
+                    "share_of_total_pct with line_numerator/line_base_index); chart numbers must come from "
+                    "collected sources and derived lines are server-computed. Set evidence_kind=derived or "
+                    "assumption, methodology and input_keys for calculated/analytical values. overview_evidence and "
+                    "executive_summary_evidence attribute their prose. market_price requires as_of, "
+                    "observed_at, unit and price_basis matching get_market_data.quote_observation; "
+                    "historical adjusted closes cannot substitute for the latest raw trade."
                 ),
             },
             "formats": {

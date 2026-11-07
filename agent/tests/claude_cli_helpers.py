@@ -7,6 +7,7 @@ subprocess handling runs; every call is logged to disk for the test to inspect.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import textwrap
 from pathlib import Path
@@ -73,6 +74,16 @@ def _install(
     script = tmp_path / "claude"
     script.write_text(script_text.format(python=sys.executable))
     script.chmod(0o755)
+    if sys.platform == "win32":
+        original_popen = subprocess.Popen
+
+        def launch_fake(args, *values, **kwargs):
+            # Windows has no shebang execution; keep the real subprocess lifecycle.
+            if isinstance(args, list) and args and args[0] == str(script):
+                args = [sys.executable, "-X", "utf8", *args]
+            return original_popen(args, *values, **kwargs)
+
+        monkeypatch.setattr(subprocess, "Popen", launch_fake)
     log = tmp_path / "log"
     log.mkdir()
     reply_path = tmp_path / "replies.json"

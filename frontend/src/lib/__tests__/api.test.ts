@@ -34,14 +34,26 @@ describe("generated report download", () => {
     for (let index = 0; index < 3; index++) await expect(downloadGeneratedReport("a".repeat(32), "report.pdf")).rejects.toThrow(/tài liệu/);
     expect(fetch).toHaveBeenCalledTimes(3);
   });
-  it("checks preview bytes against receipt size and supports aborting authenticated reads", async () => {
-    const fetch = vi.fn().mockResolvedValue(new Response("%PDF-test", { headers: { "content-type": "application/pdf" } }));
+  it("authenticates preview pages and rejects invalid PNG bytes or page handles", async () => {
+    vi.stubGlobal("localStorage", { getItem: () => "preview-key", setItem: vi.fn(), removeItem: vi.fn() });
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(new Uint8Array([137,80,78,71,13,10,26,10,0]), { headers: { "content-type": "image/png" } }))
+      .mockResolvedValueOnce(new Response("not-png", { headers: { "content-type": "image/png" } }));
     vi.stubGlobal("fetch", fetch);
-    const { fetchGeneratedReport } = await loadApiModule();
+    const { fetchReportPreviewPage } = await loadApiModule();
     const controller = new AbortController();
-    await expect(fetchGeneratedReport({ report_id: "a".repeat(32), download_url: `/api/reports/${"a".repeat(32)}`,
-      media_type: "application/pdf", filename: "report.pdf", sha256: "c".repeat(64), size_bytes: 20 }, controller.signal)).rejects.toThrow("không khớp");
-    expect(fetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    await expect(fetchReportPreviewPage("a".repeat(32), 0, controller.signal)).resolves.toHaveProperty("size", 9);
+    expect(fetch.mock.calls[0][0]).toBe(`/api/reports/${"a".repeat(32)}/preview/0`);
+    expect(fetch.mock.calls[0][1]).toMatchObject({ headers: { Authorization: "Bearer preview-key" }, signal: expect.any(AbortSignal) });
+    await expect(fetchReportPreviewPage("a".repeat(32), 1)).rejects.toThrow("Ảnh xem trước");
+    await expect(fetchReportPreviewPage("a".repeat(32), -1)).rejects.toThrow("Trang xem trước");
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it("validates the authenticated preview page count", async () => {
+    const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ pages: 2001 }), { headers: { "content-type": "application/json" } }));
+    vi.stubGlobal("fetch", fetch);
+    const { api } = await loadApiModule();
+    await expect(api.getReportPreviewPages("a".repeat(32))).rejects.toThrow("Số trang xem trước");
   });
   it("looks up the owning job by fixed artifact route and rejects another job's receipt", async () => {
     const artifactId = "b".repeat(32);

@@ -138,16 +138,28 @@ interface MarkdownContentProps {
   showCursor?: boolean;
 }
 
+function sanitizeGroundingRedactions(text: string): string {
+  if (!text.includes("※")) return text;
+  return text
+    .replace(
+      /\n*※\s*(?:\d+\s+figure\(s\)\s+that\s+could\s+not\s+be\s+matched|Đã\s+lược\s+bỏ\s+\d+\s+giá\s+trị\s+không\s+khớp|略去\s*\d+\s*处无法与本会话工具数据对上的数值)[^\n]*/gi,
+      "",
+    )
+    .replace(/\((?:omitted|đã lược)※\)/gi, "—")
+    .replace(/（略※）/g, "—");
+}
+
 export const MarkdownContent = memo(function MarkdownContent({
   content,
   streaming = false,
   showCursor = false,
 }: MarkdownContentProps) {
-  let normalized = content;
+  const cleanedContent = sanitizeGroundingRedactions(content);
+  let normalized = cleanedContent;
   try {
-    normalized = normalizeMathDelimiters(content);
+    normalized = normalizeMathDelimiters(cleanedContent);
   } catch {
-    normalized = content;
+    normalized = cleanedContent;
   }
 
   const structuralMarkdown = (

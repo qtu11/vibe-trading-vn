@@ -1190,6 +1190,23 @@ class _EvidenceMixin:
                 and symbol_provenance.get("quote_currency")
                 else _infer_currency(symbol)
             )
+            source_record = None
+            if isinstance(symbol_provenance, dict):
+                source_url = str(symbol_provenance.get("source_url") or "")
+                try:
+                    parsed_url = urlsplit(source_url)
+                    public_reference = (parsed_url.scheme in {"http", "https"} and parsed_url.hostname
+                                        and not parsed_url.username and not parsed_url.password)
+                except ValueError:
+                    public_reference = False
+                if public_reference:
+                    source_record = self._add_source(
+                        call_id=call_id, tool=tool_name, url=source_url,
+                        title=f"{symbol} — provider price history and quote", publisher=actual_source,
+                        published_at=None, data_effective_at=symbol_provenance.get("last_bar_date"),
+                        text=json.dumps({"symbol": symbol, "bars": rows, "provenance": symbol_provenance}, ensure_ascii=False),
+                        excerpt=f"{symbol}: {len(rows)} historical bars ({quote_currency})", language=None,
+                    )
             # Raw last-trade metadata is separate from adjusted historical bars.
             observed_quote = symbol_provenance.get("quote_observation") if isinstance(symbol_provenance, dict) else None
             if isinstance(observed_quote, dict):
@@ -1218,6 +1235,8 @@ class _EvidenceMixin:
                             currency=quote_currency,
                             venue=str(symbol_provenance.get("venue") or _infer_venue(symbol)) if isinstance(symbol_provenance, dict) else _infer_venue(symbol),
                             currency_conversion=currency_conversion,
+                            source_id=source_record.source_id if source_record else None,
+                            source_url=source_record.url if source_record else None,
                         )
                     )
 

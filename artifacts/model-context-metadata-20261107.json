@@ -1,0 +1,12 @@
+{
+  "provider": "custom",
+  "model": "deepseek-ai/deepseek-v4.1-flash-1017",
+  "window": 128000,
+  "source": "default",
+  "confidence": "fallback",
+  "max_input_tokens": null,
+  "max_output_tokens": null,
+  "automatic_compaction": true,
+  "warning": null,
+  "test": "Configured dotenv loaded; metadata read only; no completions or orders"
+}

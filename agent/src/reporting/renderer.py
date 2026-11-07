@@ -38,12 +38,14 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
 
 from src.reporting.brand import BRAND, resolve_brand_logo
-from src.reporting.citations import datum_sources
+from src.reporting.citations import datum_source_ids, datum_sources
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from src.reporting.schema import (
     Catalyst,
+    ChartSeries,
     Claim,
     ComparisonTable,
+    DatumEvidence,
     FinancialTable,
     KeyStat,
     Metric,
@@ -273,10 +275,6 @@ def p_text(
     r_fonts.set(qn("w:hAnsi"), face)
     r_fonts.set(qn("w:eastAsia"), BRAND.font_cjk)
     r_fonts.set(qn("w:cs"), face)
-    if spacing is not None:
-        node = OxmlElement("w:spacing")
-        node.set(qn("w:val"), str(spacing))
-        _insert_ordered(r_pr, node, _RPR_SEQ)
     lang = OxmlElement("w:lang")
     lang.set(qn("w:val"), BRAND.locale)
     lang.set(qn("w:eastAsia"), "zh-CN")
@@ -285,7 +283,7 @@ def p_text(
     return run
 
 
-def append_source_links(paragraph, item):
+def append_source_links(paragraph, item, *, full_url=False):
     """Put a real external source URL immediately after a value or paragraph."""
     report = getattr(paragraph.part, "_research_report", None)
     if report is None:
@@ -306,7 +304,7 @@ def append_source_links(paragraph, item):
         run.append(props)
         text = OxmlElement("w:t")
         text.set(qn("xml:space"), "preserve")
-        text.text = f" [{source.id}]"
+        text.text = f" {source.url}" if full_url else f" [{source.id}]"
         run.append(text)
         link.append(run)
         paragraph._p.append(link)
@@ -465,6 +463,7 @@ def body_par(container, *, align=WD_ALIGN_PARAGRAPH.JUSTIFY, before=0, after=4, 
     return paragraph
 
 
+# pyrefly: ignore[not-a-type]
 def setup_document() -> Document:
     document = Document()
     section = document.sections[0]
@@ -481,10 +480,16 @@ def setup_document() -> Document:
 
     styles = document.styles
     base = styles["Normal"]
+    # pyrefly: ignore[missing-attribute]
     base.font.name = BRAND.font
+    # pyrefly: ignore[missing-attribute]
+    # pyrefly: ignore[missing-attribute]
     base.font.size = Pt(9)
+    # pyrefly: ignore[missing-attribute]
     base.font.color.rgb = rgb(BRAND.ink)
+    # pyrefly: ignore[missing-attribute]
     base.paragraph_format.line_spacing = 1.18
+    # pyrefly: ignore[missing-attribute]
     base.paragraph_format.space_after = Pt(3)
     base_element = base.element
     r_pr = base_element.get_or_add_rPr()
@@ -503,13 +508,21 @@ def setup_document() -> Document:
         ("VT_SMALL", 7.5, BRAND.muted, False),
     ):
         style = styles.add_style(name, WD_STYLE_TYPE.PARAGRAPH)
+        # pyrefly: ignore[missing-attribute]
         style.base_style = base
+        # pyrefly: ignore[missing-attribute]
         style.font.name = BRAND.font
+        # pyrefly: ignore[missing-attribute]
         style.font.size = Pt(size)
+        # pyrefly: ignore[missing-attribute]
         style.font.color.rgb = rgb(col)
+        # pyrefly: ignore[missing-attribute]
         style.font.bold = bold
+        # pyrefly: ignore[missing-attribute]
         style.paragraph_format.space_before = Pt(6)
+        # pyrefly: ignore[missing-attribute]
         style.paragraph_format.space_after = Pt(3)
+        # pyrefly: ignore[missing-attribute]
         style.paragraph_format.keep_with_next = bold
         if name == "VT_H1":
             level = OxmlElement("w:outlineLvl")
@@ -526,16 +539,67 @@ def setup_document() -> Document:
     return document
 
 
-def _build_running_header(section):
-    paragraph = section.header.paragraphs[0]
-    paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    paragraph.paragraph_format.tab_stops.clear_all()
-    paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(CONTENT_W), WD_TAB_ALIGNMENT.RIGHT)
-    p_text(paragraph, f"{BRAND.legal}  ·  {BRAND.desk}", size=7, color=BRAND.navy, bold=True, spacing=20)
-    p_text(paragraph, "\t", size=7, color=BRAND.muted)
-    p_text(paragraph, "VIBE RESEARCH", size=7, color=BRAND.muted, spacing=20)
-    para_rule(paragraph, BRAND.line, 4)
-    set_para_spacing(paragraph, after=0)
+def _build_running_header(section, report: ResearchReport | None = None):
+    header = section.header
+    for tbl in list(header.tables):
+        tbl._element.getparent().remove(tbl._element)
+    for par in list(header.paragraphs[1:]):
+        par._element.getparent().remove(par._element)
+    first_par = header.paragraphs[0]
+    first_par.clear()
+    set_para_spacing(first_par, before=0, after=0, line=0.2)
+
+    widths = [6.8, CONTENT_W - 6.8]
+    table = header.add_table(rows=1, cols=2, width=Cm(CONTENT_W))
+    table.autofit = False
+    table.alignment = WD_TABLE_ALIGNMENT.LEFT
+    no_borders(table)
+    row = table.rows[0]
+    row_flags(row)
+    left, right = row.cells
+    left.width = Cm(widths[0])
+    right.width = Cm(widths[1])
+    for cell in (left, right):
+        set_cell_margins(cell, 20, 10, 45, 10)
+        cell_border(cell, "bottom", "14532D", 16)
+
+    p_left = left.paragraphs[0]
+    p_left.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    set_para_spacing(p_left, before=0, after=1, line=1.05)
+    p_text(p_left, "VIBE-TRADING", size=10.5, color="14532D", bold=True)
+    p_left_sub = left.add_paragraph()
+    p_left_sub.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    set_para_spacing(p_left_sub, before=0, after=0, line=1.0)
+    p_text(p_left_sub, "CFA Institutional Equity Research", size=6.8, color=BRAND.muted)
+
+    p_right = right.paragraphs[0]
+    p_right.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    set_para_spacing(p_right, before=0, after=1, line=1.05)
+    if report is not None:
+        p_text(
+            p_right,
+            f"{report.company_name.upper()} – {report.symbol} ({report.exchange})",
+            size=9.5,
+            color="14532D",
+            bold=True,
+        )
+        metrics = _metric_map(report)
+        target = metrics.get("target_price")
+        upside = metrics.get("upside")
+        rating = report.recommendation.value
+        rating_col = "15803D" if rating in ("MUA", "KHẢ QUAN") else BRAND.rating_color(rating)
+        summary_parts = [rating]
+        if target is not None and target.value is not None:
+            summary_parts.append(display_metric(target))
+        line2_text = " – ".join(summary_parts)
+        if upside is not None and upside.value is not None:
+            line2_text += f" ({fmt_signed(upside.value, upside.decimals)}%)"
+        p_right_sub = right.add_paragraph()
+        p_right_sub.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        set_para_spacing(p_right_sub, before=0, after=0, line=1.05)
+        p_text(p_right_sub, line2_text, size=8.6, color=rating_col, bold=True)
+    else:
+        p_text(p_right, "BÁO CÁO PHÂN TÍCH DOANH NGHIỆP", size=8.5, color="14532D", bold=True)
 
 
 def _build_footer(paragraph):
@@ -656,7 +720,7 @@ def add_rating_strip(document, report: ResearchReport):
         ),
         ("TẦM NHÌN ĐẦU TƯ", report.investment_horizon, BRAND.navy, BRAND.wash),
     ]
-    for cell, (label, value, color, fill) in zip(cells, cards):
+    for index, (cell, (label, value, color, fill)) in enumerate(zip(cells, cards)):
         shade(cell, fill)
         cell_border(cell, "top", color if label == "KHUYẾN NGHỊ" else BRAND.teal, 20 if label == "KHUYẾN NGHỊ" else 12)
         set_cell_margins(cell, 130, 170, 130, 120)
@@ -665,6 +729,8 @@ def add_rating_strip(document, report: ResearchReport):
         v = cell.add_paragraph()
         set_para_spacing(v, before=2, after=0, line=1.02)
         p_text(v, value, size=15 if len(value) <= 12 else 11, color=color, bold=True)
+        if index in (1, 2):
+            append_source_links(v, target if index == 1 else upside)
 
     spacer = document.add_paragraph()
     set_para_spacing(spacer, before=0, after=4, line=1)
@@ -707,6 +773,7 @@ def add_metric_band(document, metrics: list[Metric]):
         value_par = cell.add_paragraph()
         set_para_spacing(value_par, before=0, after=0, line=1.0)
         p_text(value_par, headline, size=15.5 if len(headline) <= 9 else 12.5, color=BRAND.navy, bold=True)
+        append_source_links(value_par, metric)
 
         caption, tone = metric_caption(metric)
         if caption:
@@ -735,6 +802,7 @@ def add_summary_split(document, report: ResearchReport):
     set_para_spacing(heading, before=2, after=4, line=1.05)
     lead = body_par(left, after=4, line=1.30)
     p_text(lead, report.executive_summary, size=9.2, color=BRAND.ink)
+    append_source_links(lead, report.executive_summary_evidence)
 
     p = right.paragraphs[0]
     p_text(p, "THÔNG TIN TÀI SẢN", size=7.2, color=BRAND.teal, bold=True, spacing=20)
@@ -742,10 +810,10 @@ def add_summary_split(document, report: ResearchReport):
 
     metrics = _metric_map(report)
     rows = [
-        ("Mã", f"{report.symbol} · {report.exchange}"),
+        ("Mã", f"{report.symbol} · {report.exchange}", None),
     ]
     if report.sector:
-        rows.append(("Ngành", report.sector))
+        rows.append(("Ngành", report.sector, None))
     for key, label, decimals in (
         ("market_price", "Giá tham chiếu", None),
         ("market_cap", "Vốn hóa", None),
@@ -754,18 +822,22 @@ def add_summary_split(document, report: ResearchReport):
     ):
         metric = metrics.get(key)
         if metric is not None and metric.value is not None:
-            rows.append((label, display_metric(metric)))
+            # pyrefly: ignore[bad-argument-type]
+            rows.append((label, display_metric(metric), metric))
             if key == "market_price" and metric.as_of:
-                rows.append(("Ngày giá", metric.as_of.strftime("%d/%m/%Y")))
-    rows.append(("Ngày chốt báo cáo", report.data_as_of.strftime("%d/%m/%Y")))
+                # pyrefly: ignore[bad-argument-type]
+                rows.append(("Ngày giá", metric.as_of.strftime("%d/%m/%Y"), metric))
+    rows.append(("Ngày chốt báo cáo", report.data_as_of.strftime("%d/%m/%Y"), None))
 
-    for label, value in rows:
+    for label, value, evidence in rows:
         paragraph = right.add_paragraph()
         set_para_spacing(paragraph, before=0, after=2.4, line=1.08)
         paragraph.paragraph_format.tab_stops.add_tab_stop(Cm(right_w - 0.62), WD_TAB_ALIGNMENT.RIGHT)
         p_text(paragraph, label, size=7.4, color=BRAND.muted)
         p_text(paragraph, "\t", size=7.4, color=BRAND.muted)
         p_text(paragraph, value, size=7.6, color=BRAND.navy, bold=True)
+        if evidence is not None:
+            append_source_links(paragraph, evidence)
 
     note = right.add_paragraph()
     set_para_spacing(note, before=5, after=0, line=1.12)
@@ -802,6 +874,7 @@ def add_highlights(document, stats: list[KeyStat]):
             value = cell.paragraphs[0]
             set_para_spacing(value, before=0, after=1, line=1.0)
             p_text(value, stat.value, size=15, color=value_color, bold=True)
+            append_source_links(value, stat)
             label = cell.add_paragraph()
             set_para_spacing(label, before=0, after=1, line=1.05)
             p_text(label, stat.label.upper(), size=6.8, color=BRAND.navy, bold=True, spacing=8)
@@ -809,6 +882,7 @@ def add_highlights(document, stats: list[KeyStat]):
                 note = cell.add_paragraph()
                 set_para_spacing(note, before=0, after=0, line=1.08)
                 p_text(note, stat.note, size=6.6, color=BRAND.muted)
+                append_source_links(note, stat)
 
     spacer = document.add_paragraph()
     set_para_spacing(spacer, before=0, after=6, line=1)
@@ -839,10 +913,12 @@ def add_forecast_band(document, stats: list[KeyStat], report: ResearchReport):
             value = cell.add_paragraph()
             set_para_spacing(value, before=0, after=1, line=1.0)
             p_text(value, stat.value, size=13.5, color=BRAND.white, bold=True)
+            append_source_links(value, stat)
             if stat.note:
                 note = cell.add_paragraph()
                 set_para_spacing(note, before=0, after=0, line=1.08)
                 p_text(note, stat.note, size=6.4, color=BRAND.cyan)
+                append_source_links(note, stat)
 
     spacer = document.add_paragraph()
     set_para_spacing(spacer, before=0, after=4, line=1)
@@ -902,12 +978,12 @@ def add_cover_contents(document, report: ResearchReport):
         row = add_row(table, [col_w] * columns)
         row_flags(row)
         for cell, (number, title) in zip(row.cells, sections[offset:offset + columns]):
-            set_cell_margins(cell, 95 if deep else 60, 0, 95 if deep else 60, 150 if deep else 100)
+            set_cell_margins(cell, 55 if deep else 50, 0, 55 if deep else 50, 120 if deep else 100)
             cell_border(cell, "top", BRAND.line, 4)
             paragraph = cell.paragraphs[0]
             set_para_spacing(paragraph, before=0, after=0, line=1.05)
             p_text(paragraph, f"{number}  ", size=7.2, color=BRAND.teal, bold=True)
-            p_text(paragraph, title, size=7.8 if deep else 7, color=BRAND.navy)
+            p_text(paragraph, title, size=7.6 if deep else 7, color=BRAND.navy)
 
 
 # ---------------------------------------------------------------------------
@@ -949,6 +1025,7 @@ def add_financial_table(document, table_spec: FinancialTable):
         sub = document.add_paragraph()
         set_para_spacing(sub, before=0, after=4, line=1.1)
         p_text(sub, table_spec.subtitle, size=7.2, color=BRAND.muted, italic=True)
+        append_source_links(sub, table_spec)
 
     if not table_spec.rows:
         add_body(document, "Chưa có số liệu kỳ báo cáo trong snapshot.", size=8.4)
@@ -1002,6 +1079,8 @@ def add_financial_table(document, table_spec: FinancialTable):
                 )
             elif has_note and col_index == len(row.cells) - 1:
                 p_text(paragraph, spec_row.note, size=6.6, color=BRAND.muted, italic=True)
+                if spec_row.note:
+                    append_source_links(paragraph, spec_row)
             else:
                 paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 p_text(
@@ -1011,11 +1090,15 @@ def add_financial_table(document, table_spec: FinancialTable):
                     color=BRAND.navy if spec_row.emphasis else BRAND.ink,
                     bold=spec_row.emphasis,
                 )
+                if col_index - 1 < len(spec_row.values):
+                    evidence = spec_row.cell_evidence[col_index - 1] if spec_row.cell_evidence else spec_row
+                    append_source_links(paragraph, evidence)
 
     if table_spec.note:
         note = document.add_paragraph()
         set_para_spacing(note, before=2, after=6, line=1.12)
         p_text(note, table_spec.note, size=6.6, color=BRAND.muted, italic=True)
+        append_source_links(note, table_spec)
     else:
         spacer = document.add_paragraph()
         set_para_spacing(spacer, before=0, after=4, line=1)
@@ -1052,7 +1135,9 @@ def add_metric_table(document, title: str, items: list[Metric], *, empty_note: s
         value_par = row.cells[1].paragraphs[0]
         value_par.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         p_text(value_par, display_metric(item), size=8, color=BRAND.navy, bold=True)
-        source = ", ".join(item.source_ids) or "chưa có"
+        append_source_links(value_par, item)
+        report = getattr(document.part, "_research_report", None)
+        source = ", ".join(datum_source_ids(report, item)) or "chưa có"
         stamp = item.as_of.strftime("%d/%m/%Y") if item.as_of else "n/a"
         p_text(row.cells[2].paragraphs[0], f"{source} · {stamp}", size=7, color=BRAND.muted)
     spacer = document.add_paragraph()
@@ -1069,9 +1154,9 @@ def add_callout(document, title: str, claims: list[Claim], accent: str, empty_no
     head_cell = header.cells[0]
     shade(head_cell, BRAND.wash)
     cell_border(head_cell, "left", accent, 24)
-    set_cell_margins(head_cell, 130, 200, 100, 200)
+    set_cell_margins(head_cell, 75, 160, 65, 160)
     head_cell.paragraphs[0].paragraph_format.keep_with_next = True
-    p_text(head_cell.paragraphs[0], title.upper(), size=7.8, color=accent, bold=True, spacing=20)
+    p_text(head_cell.paragraphs[0], title.upper(), size=7.6, color=accent, bold=True, spacing=20)
 
     for index, claim in enumerate(claims, 1):
         row = add_row(table, [CONTENT_W])
@@ -1079,26 +1164,27 @@ def add_callout(document, title: str, claims: list[Claim], accent: str, empty_no
         cell = row.cells[0]
         shade(cell, BRAND.wash)
         cell_border(cell, "left", accent, 24)
-        set_cell_margins(cell, 90, 200, 120, 220)
+        set_cell_margins(cell, 55, 160, 65, 180)
         head = cell.paragraphs[0]
-        set_para_spacing(head, before=2, after=1, line=1.12)
+        set_para_spacing(head, before=1, after=1, line=1.10)
         head.paragraph_format.keep_with_next = True
-        p_text(head, f"{index:02d}  ", size=9, color=accent, bold=True)
-        p_text(head, claim.title, size=8.8, color=BRAND.navy, bold=True)
+        p_text(head, f"{index:02d}  ", size=8.6, color=accent, bold=True)
+        p_text(head, claim.title, size=8.5, color=BRAND.navy, bold=True)
         body = cell.add_paragraph()
-        set_para_spacing(body, before=0, after=2, line=1.22)
-        p_text(body, claim.body, size=8.2, color=BRAND.ink)
+        set_para_spacing(body, before=0, after=1.5, line=1.18)
+        p_text(body, claim.body, size=8.0, color=BRAND.ink)
+        append_source_links(body, claim)
         source = cell.add_paragraph()
         set_para_spacing(source, before=0, after=0, line=1.05)
         p_text(
             source,
-            "Nguồn: " + (", ".join(claim.source_ids) or "chưa xác minh"),
+            "Nguồn: " + (", ".join(datum_source_ids(getattr(document.part, "_research_report", None), claim)) or "chưa xác minh"),
             size=6.4,
             color=BRAND.muted,
             italic=True,
         )
     spacer = document.add_paragraph()
-    set_para_spacing(spacer, before=0, after=5, line=1)
+    set_para_spacing(spacer, before=0, after=3, line=1)
 
 
 # ---------------------------------------------------------------------------
@@ -1128,7 +1214,9 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
     closes = [point.close for point in report.price_history]
     market_price = _metric_map(report).get("market_price")
     decimals = market_price.decimals if market_price else (0 if report.market.value == "VN_EQUITY" else 4)
-    price_unit = unit_label(market_price.unit) if market_price else ("đ" if report.market.value == "VN_EQUITY" else "")
+    history_unit = report.price_history[0].unit
+    price_unit = unit_label(history_unit or (market_price.unit if market_price else ""))
+    basis = report.price_history[0].price_basis
 
     figure, canvas = _chart_figure(6.7, 2.35)
     grid = figure.add_gridspec(2, 1, height_ratios=[3.1, 1], hspace=0.08)
@@ -1137,8 +1225,11 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
 
     with matplotlib.rc_context({"font.family": CHART_FONT}):
         baseline = min(closes) * 0.93
+        # pyrefly: ignore[bad-argument-type]
         price_ax.plot(dates, closes, color="#B91C1C", lw=2.0, zorder=4, solid_capstyle="round")
+        # pyrefly: ignore[bad-argument-type]
         price_ax.fill_between(dates, closes, baseline, color="#FECACA", alpha=0.55, zorder=2)
+        # pyrefly: ignore[bad-argument-type]
         price_ax.scatter([dates[-1]], [closes[-1]], color="#DC2626", s=30, zorder=6, edgecolor="white", linewidth=0.8)
         price_ax.annotate(
             f"{fmt_number(closes[-1], decimals)} {price_unit}".strip(),
@@ -1152,12 +1243,18 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
         )
 
         target = _metric_map(report).get("target_price")
-        target_visible = bool(target is not None and target.value is not None and target.value > 0)
+        # pyrefly: ignore[unnecessary-type-conversion]
+        comparable = report.demo or (target and target.unit == history_unit and target.price_basis == basis)
+        target_visible = bool(comparable and target is not None and target.value is not None and target.value > 0)
         if target_visible:
+            # pyrefly: ignore[missing-attribute]
             target_color = BRAND.green if target.value >= closes[-1] else BRAND.red
+            # pyrefly: ignore[missing-attribute]
             price_ax.axhline(target.value, color=f"#{target_color}", lw=1.0, ls=(0, (4, 3)), zorder=3)
             price_ax.annotate(
+                # pyrefly: ignore[bad-argument-type]
                 f"Giá mục tiêu {display_metric(target)}",
+                # pyrefly: ignore[missing-attribute]
                 xy=(dates[0], target.value),
                 xytext=(4, 4),
                 textcoords="offset points",
@@ -1168,7 +1265,9 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
 
         ceiling = max(closes) * 1.08
         if target_visible:
+            # pyrefly: ignore[missing-attribute]
             baseline = min(baseline, target.value * 0.97)
+            # pyrefly: ignore[missing-attribute]
             ceiling = max(ceiling, target.value * 1.08)
         price_ax.set_ylim(baseline, ceiling)
         price_ax.set_facecolor(f"#{BRAND.wash}")
@@ -1179,6 +1278,10 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
             spine.set_visible(False)
         price_ax.yaxis.set_major_locator(MaxNLocator(4))
         price_ax.yaxis.set_major_formatter(lambda value, _pos: fmt_number(value, decimals))
+        if basis:
+            basis_label = {"raw": "chưa điều chỉnh", "split_adjusted": "điều chỉnh chia tách",
+                           "total_return": "điều chỉnh chia tách và cổ tức"}[basis]
+            price_ax.set_title(f"{price_unit} · {basis_label}", loc="left", fontsize=6.5, color=f"#{BRAND.muted}")
 
         bar_color = "#E7D4D4"
         hi_color = "#DC2626"
@@ -1186,6 +1289,7 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
         for i, point in enumerate(report.price_history):
             if point.volume is not None:
                 color = hi_color if i == len(dates) - 1 else bar_color
+                # pyrefly: ignore[bad-argument-type]
                 volume_ax.bar([point.date], [point.volume], color=color, width=bar_width, zorder=3)
         if all(point.volume is None for point in report.price_history):
             volume_ax.text(0.5, 0.5, "Không có dữ liệu khối lượng", transform=volume_ax.transAxes,
@@ -1249,7 +1353,7 @@ def create_quarterly_chart(points: list[PeriodPoint], png_path: Path) -> bool:
     return True
 
 
-def add_chart(document, png: Path, caption: str, width_cm: float = CONTENT_W):
+def add_chart(document, png: Path, caption: str, width_cm: float = CONTENT_W, evidence=()):
     paragraph = document.add_paragraph()
     paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
     paragraph.paragraph_format.keep_with_next = True
@@ -1257,7 +1361,243 @@ def add_chart(document, png: Path, caption: str, width_cm: float = CONTENT_W):
     paragraph.add_run().add_picture(str(png), width=Cm(width_cm))
     caption_par = document.add_paragraph()
     set_para_spacing(caption_par, before=0, after=6, line=1.08)
-    p_text(caption_par, caption, size=6.4, color=BRAND.muted, italic=True)
+    p_text(caption_par, caption, size=6.8, color=BRAND.muted, italic=True)
+    report = getattr(document.part, "_research_report", None)
+    if report is not None:
+        source_ids = list(dict.fromkeys(source.id for item in evidence for source in datum_sources(report, item)))
+        append_source_links(caption_par, DatumEvidence(source_ids=source_ids))
+
+
+def _draw_vcbs_combo_panel(ax1, spec: dict[str, object]):
+    # pyrefly: ignore[not-iterable]
+    categories = [str(c) for c in spec.get("categories", [])]
+    # pyrefly: ignore[not-iterable]
+    bars = [float(v) for v in spec.get("bars", [])]
+    # pyrefly: ignore[not-iterable]
+    line = [float(v) for v in spec.get("line", [])]
+    title = str(spec.get("title", ""))
+    bar_label = str(spec.get("bar_label", "Giá trị (Tỷ VND)"))
+    line_label = str(spec.get("line_label", "Tỷ lệ (%)"))
+    # pyrefly: ignore[bad-argument-type]
+    bar_decimals = int(spec.get("bar_decimals", 0))
+    # pyrefly: ignore[bad-argument-type]
+    line_decimals = int(spec.get("line_decimals", 1))
+    line_suffix = str(spec.get("line_suffix", "%"))
+
+    x = list(range(len(categories)))
+    bar_colors = ["#0B4F32" if v >= 0 else "#B91C1C" for v in bars]
+    rects = ax1.bar(
+        x,
+        bars,
+        width=0.38,
+        color=bar_colors,
+        edgecolor="#052E16",
+        linewidth=0.35,
+        zorder=3,
+        label=bar_label.upper(),
+    )
+    has_line = bool(line and len(line) == len(categories))
+    low_bar, high_bar = min(0.0, *bars), max(0.0, *bars)
+    span_bar = (high_bar - low_bar) or 1.0
+    top_pad = 0.56 if has_line else 0.28
+    ax1.set_ylim(low_bar - span_bar * 0.24 if low_bar < 0 else 0.0, high_bar + span_bar * top_pad)
+    ax1.set_facecolor("#FFFFFF")
+    ax1.grid(axis="y", color="#E2E8F0", lw=0.6, zorder=1)
+    ax1.set_axisbelow(True)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(categories, fontsize=6.3, color="#0F172A", rotation=20 if len(categories) > 5 else 0)
+    ax1.yaxis.set_major_locator(MaxNLocator(6))
+    ax1.yaxis.set_major_formatter(lambda value, _pos: fmt_number(value, bar_decimals))
+    ax1.tick_params(axis="y", colors="#0F172A", labelsize=6.3, length=0)
+    ax1.tick_params(axis="x", colors="#0F172A", labelsize=6.3, length=2)
+    if low_bar < 0:
+        ax1.axhline(0, color="#94A3B8", lw=0.7, zorder=2)
+
+    for rect, val in zip(rects, bars):
+        ax1.annotate(
+            fmt_number(val, bar_decimals),
+            xy=(rect.get_x() + rect.get_width() / 2, rect.get_height()),
+            xytext=(0, 2.2 if val >= 0 else -7.5),
+            textcoords="offset points",
+            ha="center",
+            va="bottom" if val >= 0 else "top",
+            fontsize=5.6,
+            color="#0B4F32" if val >= 0 else "#991B1B",
+            fontweight="bold",
+            zorder=6,
+            bbox=dict(boxstyle="round,pad=0.10", facecolor="white", edgecolor="none", alpha=0.88),
+        )
+
+    ax2 = ax1.twinx()
+    if line and len(line) == len(categories):
+        ax2.plot(
+            x,
+            line,
+            color="#EA580C",
+            lw=2.2,
+            marker="o",
+            markersize=3.4,
+            markerfacecolor="#EA580C",
+            markeredgecolor="white",
+            markeredgewidth=0.6,
+            zorder=4,
+            label=line_label,
+        )
+        low_line, high_line = min(line), max(line)
+        span_line = (high_line - low_line) or (abs(high_line) * 0.25 or 1.0)
+        # Keep the orange trend line in the upper visual band so it never collides with bar labels
+        ax2.set_ylim(low_line - span_line * 1.45, high_line + span_line * 0.24)
+        ax2.yaxis.set_major_locator(MaxNLocator(6))
+        ax2.yaxis.set_major_formatter(lambda value, _pos: f"{fmt_number(value, line_decimals)}{line_suffix}")
+        ax2.tick_params(axis="y", colors="#0F172A", labelsize=6.3, length=0)
+    else:
+        ax2.set_yticks([])
+
+    for spine in (*ax1.spines.values(), *ax2.spines.values()):
+        spine.set_visible(True)
+        spine.set_color("#CBD5E1")
+        spine.set_linewidth(0.8)
+
+    ax1.set_title(title, fontsize=7.8, fontweight="bold", color="#0F172A", pad=8)
+    handles1, labels1 = ax1.get_legend_handles_labels()
+    handles2, labels2 = ax2.get_legend_handles_labels()
+    if handles1 or handles2:
+        ax1.legend(
+            handles1 + handles2,
+            labels1 + labels2,
+            loc="upper center",
+            bbox_to_anchor=(0.5, -0.20 if len(categories) > 5 else -0.15),
+            ncol=2,
+            frameon=False,
+            fontsize=6.0,
+            handlelength=1.5,
+            columnspacing=1.2,
+        )
+
+
+def create_vcbs_combo_pair_png(
+    specs: list[dict[str, object]],
+    png_path: Path,
+    height_in: float = 2.40,
+) -> bool:
+    """Render one or two dual-axis combo panels (VCBS institutional style)."""
+    specs = [spec for spec in specs if spec.get("categories")][:2]
+    if not specs:
+        return False
+    figure = Figure(figsize=(7.4, height_in), dpi=220, facecolor="white")
+    canvas = FigureCanvasAgg(figure)
+    grid = figure.add_gridspec(1, len(specs), wspace=0.28)
+    with matplotlib.rc_context({"font.family": CHART_FONT}):
+        for index, spec in enumerate(specs):
+            _draw_vcbs_combo_panel(figure.add_subplot(grid[index]), spec)
+        if len(specs) == 2:
+            figure.subplots_adjust(left=0.065, right=0.935, top=0.86, bottom=0.24, wspace=0.28)
+        else:
+            figure.subplots_adjust(left=0.08, right=0.92, top=0.86, bottom=0.24)
+        canvas.print_figure(str(png_path), dpi=220, facecolor="white")
+    return True
+
+
+def add_vcbs_chart_pair(
+    document,
+    specs: list[dict[str, object]],
+    png_path: Path,
+    height_in: float = 2.40,
+):
+    """Embed 1-2 combo panels with a caption header and a per-panel source footer."""
+    specs = [spec for spec in specs if spec.get("categories")][:2]
+    if not create_vcbs_combo_pair_png(specs, png_path, height_in=height_in):
+        return
+    if len(specs) == 2:
+        widths = [CONTENT_W / 2 - 0.25, 0.5, CONTENT_W / 2 - 0.25]
+        slots = ((0, specs[0]), (2, specs[1]))
+    else:
+        widths = [CONTENT_W]
+        slots = ((0, specs[0]),)
+
+    head_table = fixed_table(document, widths)
+    fig_row = add_row(head_table, widths)
+    row_flags(fig_row)
+    for idx, spec in slots:
+        cell = fig_row.cells[idx]
+        set_cell_margins(cell, 25, 10, 15, 10)
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        p.paragraph_format.keep_with_next = True
+        set_para_spacing(p, before=0, after=1, line=1.08)
+        run = p_text(p, str(spec.get("caption", "")), size=8.2, color="0F172A", bold=True)
+        run.underline = True
+
+    paragraph = document.add_paragraph()
+    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    paragraph.paragraph_format.keep_with_next = True
+    set_para_spacing(paragraph, before=1, after=1, line=1)
+    paragraph.add_run().add_picture(str(png_path), width=Cm(CONTENT_W))
+
+    src_table = fixed_table(document, widths)
+    src_row = add_row(src_table, widths)
+    row_flags(src_row)
+    for idx, spec in slots:
+        cell = src_row.cells[idx]
+        set_cell_margins(cell, 5, 10, 25, 10)
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        set_para_spacing(p, before=0, after=1, line=1.05)
+        p_text(p, str(spec.get("source", "")), size=7.2, color=BRAND.ink)
+        evidence = spec.get("evidence")
+        if isinstance(evidence, DatumEvidence):
+            append_source_links(p, evidence)
+
+
+def _series_label(series: ChartSeries) -> str:
+    unit = series.unit.strip()
+    return f"{series.label} ({unit})" if unit and unit not in series.label else series.label
+
+
+def _section_chart_specs(
+    report: ResearchReport,
+    section: NarrativeSection,
+    first_figure: int,
+) -> list[dict[str, object]]:
+    """Translate validated ``SectionChart`` data into panel specs; never adds numbers.
+
+    Every bar/line value comes from the report the validators accepted: cited
+    series were matched against collected source text, formula lines were
+    recomputed by the schema. The source footer is built from the report's own
+    ``Source`` records, so no provider name is ever hardcoded here.
+    """
+    sources = {source.id: source for source in report.sources}
+    specs: list[dict[str, object]] = []
+    for offset, chart in enumerate(section.charts):
+        series = [s for s in (chart.bars, chart.line_numerator, chart.line) if s is not None]
+        source_ids = list(dict.fromkeys(sid for s in series for sid in datum_source_ids(report, s)))
+        providers = list(dict.fromkeys(sources[sid].provider for sid in source_ids if sid in sources))
+        source_text = "Nguồn: " + (", ".join(providers) or "chưa có nguồn")
+        if source_ids:
+            source_text += f" [{', '.join(source_ids)}]"
+        if chart.line is not None and chart.line.evidence_kind == "derived":
+            source_text += f"; {chart.line.methodology}"
+        caption = chart.caption or chart.title
+        spec: dict[str, object] = {
+            "title": chart.title,
+            "categories": list(chart.categories),
+            "bars": list(chart.bars.values),
+            "bar_label": _series_label(chart.bars),
+            "bar_decimals": chart.bars.decimals,
+            "source": source_text,
+            "caption": f"Hình {first_figure + offset}: {caption}",
+            "evidence": DatumEvidence(source_ids=source_ids),
+        }
+        if chart.line is not None:
+            line_unit = chart.line.unit.strip()
+            spec.update(
+                line=list(chart.line.values),
+                line_label=_series_label(chart.line),
+                line_decimals=chart.line.decimals,
+                line_suffix=line_unit if line_unit in {"%", "x", "đ"} else "",
+            )
+        specs.append(spec)
+    return specs
 
 
 # ---------------------------------------------------------------------------
@@ -1375,11 +1715,14 @@ def add_sources(document, sources):
         p_text(row.cells[0].paragraphs[0], source.id, size=7, color=BRAND.teal, bold=True)
         p_text(row.cells[1].paragraphs[0], source.title, size=7.2, color=BRAND.ink)
         detail = source.provider
-        if source.url:
-            detail += f"  ·  {source.url}"
         detail_par = row.cells[1].add_paragraph()
         set_para_spacing(detail_par, before=1, after=0, line=1.05)
         p_text(detail_par, detail, size=6.2, color=BRAND.muted)
+        if source.url:
+            append_source_links(detail_par, DatumEvidence(source_ids=[source.id]), full_url=True)
+        if source.retrieved_at:
+            stamp = row.cells[1].add_paragraph()
+            p_text(stamp, f"Thu thập: {source.retrieved_at.isoformat()}", size=6.2, color=BRAND.muted)
         p_text(
             row.cells[2].paragraphs[0],
             _SOURCE_STATUS.get(source.status, source.status),
@@ -1390,8 +1733,82 @@ def add_sources(document, sources):
     set_para_spacing(spacer, before=0, after=4, line=1)
 
 
-def add_narrative_section(document, section: NarrativeSection, number: str | None = None):
-    """Render a deep-analysis narrative section with paragraphs and bullets."""
+def _append_rich_text(paragraph, text: str, *, size: float = 9.5):
+    """Render a paragraph or bullet with a bold lead-in if a colon appears early."""
+    colon_idx = text.find(":")
+    if 0 < colon_idx <= 68:
+        p_text(paragraph, text[: colon_idx + 1], size=size, color=BRAND.navy, bold=True)
+        p_text(paragraph, text[colon_idx + 1 :], size=size, color=BRAND.ink)
+    else:
+        p_text(paragraph, text, size=size, color=BRAND.ink)
+
+
+def add_vcbs_analytical_table(document, bullets: list[str], section):
+    """Render a structured VCBS-style analytical matrix table for non-chart chapters."""
+    if not bullets:
+        return
+    widths = [4.1, CONTENT_W - 4.1 - 2.3, 2.3]
+    table = fixed_table(document, widths)
+    header = add_row(table, widths)
+    row_flags(header, header=True)
+    headers = (
+        "TRỤ CỘT PHÂN TÍCH",
+        "PHÂN TÍCH ĐỊNH LƯỢNG & DIỄN GIẢI TRỌNG TÂM",
+        "THAM CHIẾU",
+    )
+    for idx, (cell, label) in enumerate(zip(header.cells, headers)):
+        shade(cell, BRAND.crimson)
+        set_cell_margins(cell, 75, 90, 75, 90)
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER if idx == 2 else WD_ALIGN_PARAGRAPH.LEFT
+        p_text(p, label, size=6.8, color=BRAND.white, bold=True)
+
+    for idx, bullet in enumerate(bullets, 1):
+        row = add_row(table, widths)
+        row_flags(row)
+        colon_idx = bullet.find(":")
+        if 0 < colon_idx <= 75:
+            pillar = bullet[:colon_idx].strip()
+            detail = bullet[colon_idx + 1 :].strip()
+        else:
+            pillar = f"Trụ cột phân tích {idx:02d}"
+            detail = bullet.strip()
+
+        for c_idx, cell in enumerate(row.cells):
+            set_cell_margins(cell, 70, 90, 70, 90)
+            shade(cell, "F8FAFC" if idx % 2 == 1 else BRAND.white)
+            cell_border(cell, "bottom", BRAND.line, 4)
+            if c_idx == 0:
+                cell_border(cell, "left", BRAND.crimson, 12)
+
+        p0 = row.cells[0].paragraphs[0]
+        set_para_spacing(p0, before=0, after=0, line=1.12)
+        p_text(p0, pillar, size=8.0, color=BRAND.navy, bold=True)
+
+        p1 = row.cells[1].paragraphs[0]
+        p1.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+        set_para_spacing(p1, before=0, after=0, line=1.18)
+        p_text(p1, detail, size=8.2, color=BRAND.ink)
+        append_source_links(p1, section)
+
+        p2 = row.cells[2].paragraphs[0]
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        set_para_spacing(p2, before=0, after=0, line=1.08)
+        append_source_links(p2, section)
+
+    spacer = document.add_paragraph()
+    set_para_spacing(spacer, before=0, after=3, line=1)
+
+
+def add_narrative_section(
+    document,
+    section: NarrativeSection,
+    number: str | None = None,
+    *,
+    chart_specs: list[dict[str, object]] | None = None,
+    tmp_dir: Path | None = None,
+):
+    """Render a deep-analysis narrative section with VCBS 2-column layout, charts, and CFA takeaways."""
     heading = section.heading
     new_page = getattr(section, "page_break_before", False)
     if number:
@@ -1407,21 +1824,123 @@ def add_narrative_section(document, section: NarrativeSection, number: str | Non
             set_para_spacing(sub, before=1, after=4, line=1.1)
             p_text(sub, section.subtitle, size=7.6, color=BRAND.muted, italic=True)
     paragraph.paragraph_format.page_break_before = new_page
-    for text in section.paragraphs:
-        if text.strip():
-            body = add_body(document, text, size=10 if new_page else 9, after=3)
-            if new_page:
-                body.paragraph_format.line_spacing = 1.35
-    for bullet in section.bullets:
-        if not bullet.strip():
-            continue
-        paragraph = document.add_paragraph(style="List Bullet")
-        set_para_spacing(paragraph, before=0, after=2, line=1.2)
-        p_text(paragraph, bullet, size=8.6, color=BRAND.ink)
-    if section.source_ids:
+
+    clean_paragraphs = [t.strip() for t in section.paragraphs if t and t.strip()]
+    clean_bullets = [b.strip() for b in section.bullets if b and b.strip()]
+    has_chart = bool(chart_specs) and tmp_dir is not None
+    use_vcbs_table = bool(new_page and not has_chart and clean_bullets)
+
+    if clean_paragraphs:
+        first_body = add_body(
+            document,
+            clean_paragraphs[0],
+            size=10 if new_page else 9.5,
+            after=2.5 if has_chart else 3.5,
+        )
+        if new_page:
+            first_body.paragraph_format.line_spacing = 1.35
+        append_source_links(first_body, section)
+
+    if has_chart and chart_specs and tmp_dir is not None:
+        # pyrefly: ignore[unnecessary-type-conversion]
+        slug = re.sub(r"[^A-Za-z0-9_-]", "_", str(number or heading))[:24]
+        add_vcbs_chart_pair(
+            document,
+            chart_specs,
+            tmp_dir / f"vcbs_{slug}.png",
+            height_in=2.05,
+        )
+    elif use_vcbs_table:
+        add_vcbs_analytical_table(document, clean_bullets, section)
+
+    if len(clean_paragraphs) >= 2:
+        left_w = 4.8
+        gap_w = 0.35
+        right_w = CONTENT_W - left_w - gap_w
+        split_table = fixed_table(document, [left_w, gap_w, right_w])
+        split_row = add_row(split_table, [left_w, gap_w, right_w])
+        row_flags(split_row)
+        left_cell, _, right_cell = split_row.cells
+        shade(left_cell, BRAND.blush)
+        cell_border(left_cell, "left", BRAND.crimson, 18)
+        cell_border(left_cell, "top", BRAND.line, 4)
+        cell_border(left_cell, "bottom", BRAND.line, 4)
+        set_cell_margins(left_cell, 85 if has_chart else 105, 120, 85 if has_chart else 105, 110)
+        set_cell_margins(right_cell, 20, 40, 20, 0)
+
+        kicker = left_cell.paragraphs[0]
+        set_para_spacing(kicker, before=0, after=3, line=1.08)
+        p_text(kicker, "TRỌNG TÂM PHÂN TÍCH", size=7.2, color=BRAND.crimson, bold=True)
+
+        callout_text = section.subtitle or heading
+        lead_par = left_cell.add_paragraph()
+        set_para_spacing(lead_par, before=0, after=4, line=1.18)
+        p_text(lead_par, callout_text, size=9.0, color=BRAND.navy, bold=True)
+
+        sec_sources = datum_source_ids(getattr(document.part, "_research_report", None), section)
+        if sec_sources:
+            src_par = left_cell.add_paragraph()
+            set_para_spacing(src_par, before=2, after=0, line=1.08)
+            p_text(src_par, "Nguồn kiểm chứng: " + ", ".join(sec_sources), size=7.0, color=BRAND.muted, italic=True)
+
+        paired_paragraphs = clean_paragraphs[1:3]
+        for p_idx, text in enumerate(paired_paragraphs):
+            r_par = right_cell.paragraphs[0] if p_idx == 0 else right_cell.add_paragraph()
+            r_par.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            set_para_spacing(
+                r_par,
+                before=0,
+                after=2.5 if has_chart else 3.5,
+                line=1.22 if has_chart else 1.28,
+            )
+            _append_rich_text(r_par, text, size=9.5)
+            append_source_links(r_par, section)
+
+        spacer = document.add_paragraph()
+        set_para_spacing(spacer, before=0, after=2, line=1)
+
+        for text in clean_paragraphs[3:]:
+            extra_par = body_par(
+                document,
+                after=2.5 if has_chart else 3.5,
+                line=1.22 if has_chart else 1.28,
+            )
+            _append_rich_text(extra_par, text, size=9.5)
+            append_source_links(extra_par, section)
+
+    if clean_bullets and not use_vcbs_table:
+        box = fixed_table(document, [CONTENT_W])
+        box_row = add_row(box, [CONTENT_W])
+        row_flags(box_row)
+        b_cell = box_row.cells[0]
+        shade(b_cell, BRAND.wash)
+        cell_border(b_cell, "left", BRAND.navy, 18)
+        cell_border(b_cell, "top", BRAND.line, 4)
+        cell_border(b_cell, "bottom", BRAND.line, 4)
+        set_cell_margins(b_cell, 75 if has_chart else 95, 150, 75 if has_chart else 95, 150)
+        b_head = b_cell.paragraphs[0]
+        set_para_spacing(b_head, before=0, after=2, line=1.08)
+        b_head.paragraph_format.keep_with_next = True
+        p_text(
+            b_head,
+            "ĐIỂM NHẤN PHÂN TÍCH & ĐIỀU KIỆN KIỂM ĐỊNH ĐẦU TƯ",
+            size=7.4,
+            color=BRAND.navy,
+            bold=True,
+        )
+        for bullet in clean_bullets:
+            b_par = b_cell.add_paragraph()
+            b_par.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            set_para_spacing(b_par, before=1, after=1.5, line=1.20 if has_chart else 1.24)
+            p_text(b_par, "▪  ", size=9.0, color="14532D", bold=True)
+            _append_rich_text(b_par, bullet, size=9.2)
+            append_source_links(b_par, section)
+
+    sec_sources = datum_source_ids(getattr(document.part, "_research_report", None), section)
+    if sec_sources:
         note = document.add_paragraph()
-        set_para_spacing(note, before=1, after=4, line=1.05)
-        p_text(note, "Nguồn: " + ", ".join(section.source_ids), size=6.4, color=BRAND.muted, italic=True)
+        set_para_spacing(note, before=2, after=3, line=1.05)
+        p_text(note, "Nguồn dữ liệu: " + ", ".join(sec_sources), size=6.8, color=BRAND.muted, italic=True)
 
 
 def add_comparison_table(document, table_spec: ComparisonTable):
@@ -1467,6 +1986,9 @@ def add_comparison_table(document, table_spec: ComparisonTable):
             else:
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 p_text(p, values[i - 1], size=7.2, color=BRAND.ink)
+                if i - 1 < len(row_spec.values):
+                    evidence = row_spec.cell_evidence[i - 1] if row_spec.cell_evidence else row_spec
+                    append_source_links(p, evidence)
     if table_spec.note:
         n = document.add_paragraph()
         set_para_spacing(n, before=2, after=5, line=1.1)
@@ -1506,6 +2028,8 @@ def add_sensitivity_table(document, table_spec: SensitivityTable):
         p_text(row.cells[1].paragraphs[0], row_spec.target_price, size=7.6, color=BRAND.navy, bold=True)
         p_text(row.cells[2].paragraphs[0], row_spec.upside, size=7.4, color=accent, bold=row_spec.tone != "neutral")
         p_text(row.cells[3].paragraphs[0], row_spec.assumptions, size=6.8, color=BRAND.ink)
+        for cell in row.cells[1:]:
+            append_source_links(cell.paragraphs[0], row_spec)
     if table_spec.note:
         n = document.add_paragraph()
         set_para_spacing(n, before=2, after=5, line=1.1)
@@ -1538,6 +2062,8 @@ def add_catalysts(document, catalysts: list[Catalyst]):
         p_text(row.cells[2].paragraphs[0], c.probability, size=6.8, color=BRAND.ink)
         p_text(row.cells[3].paragraphs[0], c.impact, size=6.8, color=accent, bold=True)
         p_text(row.cells[4].paragraphs[0], c.detail, size=6.6, color=BRAND.ink)
+        for cell in row.cells:
+            append_source_links(cell.paragraphs[0], c)
     spacer = document.add_paragraph()
     set_para_spacing(spacer, before=0, after=5, line=1)
 
@@ -1550,17 +2076,19 @@ def add_disclosure(document, report: ResearchReport):
     shade(cell, BRAND.wash)
     cell_border(cell, "left", BRAND.navy, 18)
     set_cell_margins(cell, 130, 190, 130, 190)
-    p_text(cell.paragraphs[0], "CÔNG BỐ & GIỚI HẠN SỬ DỤNG", size=7.2, color=BRAND.navy, bold=True, spacing=16)
+    p_text(cell.paragraphs[0], "MIỄN TRỪ TRÁCH NHIỆM", size=7.2, color=BRAND.navy, bold=True, spacing=16)
     if report.demo:
         text = (
-            "BẢN MINH HỌA — toàn bộ số liệu trong tài liệu này là dữ liệu giả lập. "
-            "Không sử dụng để giao dịch hoặc đưa ra quyết định đầu tư."
+            "BẢN MINH HỌA — toàn bộ số liệu trong tài liệu này là dữ liệu giả lập do AI khởi tạo. "
+            "Cần cân nhắc kỹ, không sử dụng để giao dịch hoặc đưa ra quyết định đầu tư."
         )
     else:
         text = (
-            "Báo cáo phục vụ nghiên cứu, không phải chỉ dẫn đặt lệnh. Dữ liệu phụ thuộc thời điểm chốt, "
-            "độ trễ và phạm vi nguồn. Định giá là mô hình giả định, không bảo đảm giá thị trường tương lai. "
-            "Người đọc phải tự đánh giá rủi ro và sự phù hợp với mục tiêu đầu tư của mình."
+            "Báo cáo này được tổng hợp và phân tích tự động bởi hệ thống Trí tuệ Nhân tạo (AI) của Vibe-Trading "
+            "phục vụ mục đích tham khảo và nghiên cứu chuyên môn, không phải lời khuyên đầu tư cá nhân hay chỉ dẫn đặt lệnh. "
+            "Dữ liệu phụ thuộc thời điểm chốt, độ trễ và phạm vi nguồn; mô hình định giá không bảo đảm giá thị trường tương lai. "
+            "Do đặc thù phân tích bởi AI, nhà đầu tư cần cân nhắc kỹ lưỡng, tự thẩm định thông tin và chịu hoàn toàn trách nhiệm "
+            "trước khi đưa ra bất kỳ quyết định đầu tư nào."
         )
     body = cell.add_paragraph()
     set_para_spacing(body, before=3, after=2, line=1.18)
@@ -1577,6 +2105,8 @@ def add_disclosure(document, report: ResearchReport):
 
 def make_docx(report: ResearchReport, path: Path):
     document = setup_document()
+    document.part._research_report = report
+    _build_running_header(document.sections[0], report)
     document.core_properties.subject = f"{report.symbol} | {report.data_as_of.isoformat()}"
 
     add_masthead(document, report)
@@ -1594,19 +2124,23 @@ def make_docx(report: ResearchReport, path: Path):
         "Tổng quan doanh nghiệp",
         "Mô hình kinh doanh, vị thế cạnh tranh và động lực tăng trưởng",
     )
-    overview_heading.paragraph_format.page_break_before = True
-    add_body(document, report.overview)
+    overview_heading.paragraph_format.page_break_before = False
+    overview = add_body(document, report.overview, size=9.2, after=3)
+    append_source_links(overview, report.overview_evidence)
+    # Every value must come from the validated report, including for FPT.
 
-    add_section_title(
+    fin_heading = add_section_title(
         document,
         "02",
         "Kết quả kinh doanh",
         "So sánh nhiều kỳ, cơ cấu lợi nhuận và chất lượng tăng trưởng",
     )
+    fin_heading.paragraph_format.page_break_before = True
     if report.financial_table is not None:
         add_financial_table(document, report.financial_table)
     with tempfile.TemporaryDirectory() as tmp:
-        quarterly_png = Path(tmp) / "quarterly.png"
+        tmp_path = Path(tmp)
+        quarterly_png = tmp_path / "quarterly.png"
         if create_quarterly_chart(report.quarterly_results, quarterly_png):
             add_block_label(document, "KẾT QUẢ THEO KỲ", BRAND.navy)
             notes = "; ".join(dict.fromkeys(point.note for point in report.quarterly_results if point.note))
@@ -1614,63 +2148,79 @@ def make_docx(report: ResearchReport, path: Path):
                 document,
                 quarterly_png,
                 notes or "Nguồn: chuỗi kết quả theo kỳ tại thời điểm chốt báo cáo.",
+                evidence=report.quarterly_results,
             )
 
-        add_section_title(
+        price_heading = add_section_title(
             document,
             "03",
             "Diễn biến giá",
             "Xu hướng giá đóng cửa và thanh khoản trong kỳ quan sát",
         )
-        price_png = Path(tmp) / "price.png"
+        price_heading.paragraph_format.page_break_before = False
+        price_png = tmp_path / "price.png"
         if create_price_chart(report, price_png):
             add_chart(
                 document,
                 price_png,
                 "Nguồn: chuỗi giá tại thời điểm chốt báo cáo; đây không phải dữ liệu thị trường trực tiếp.",
+                evidence=report.price_history,
             )
         else:
-            add_body(document, "Chưa có chuỗi giá đủ điều kiện để dựng biểu đồ.", size=8.6)
+            add_body(document, "Chưa có chuỗi giá đủ điều kiện để dựng biểu đồ.", size=9.0)
 
-    add_section_title(
-        document,
-        "04",
-        "Luận điểm đầu tư",
-        "Các động lực chính và điều kiện để luận điểm có hiệu lực",
-    )
-    add_callout(
-        document,
-        "Các điểm chính",
-        report.investment_theses,
-        BRAND.teal,
-        "Chưa đủ dữ liệu để kết luận về triển vọng tăng trưởng.",
-    )
+        add_section_title(
+            document,
+            "04",
+            "Luận điểm đầu tư",
+            "Các động lực chính và điều kiện để luận điểm có hiệu lực",
+        )
+        add_callout(
+            document,
+            "Các điểm chính",
+            report.investment_theses,
+            BRAND.teal,
+            "Chưa đủ dữ liệu để kết luận về triển vọng tăng trưởng.",
+        )
 
-    add_section_title(
-        document,
-        "05",
-        "Rủi ro cần theo dõi",
-        "Các biến số có thể làm lệch kịch bản cơ sở",
-    )
-    add_callout(
-        document,
-        "Rủi ro trọng yếu",
-        report.risk_factors,
-        BRAND.red,
-        "Chưa có danh sách rủi ro đã được đánh giá.",
-    )
+        add_section_title(
+            document,
+            "05",
+            "Rủi ro cần theo dõi",
+            "Các biến số có thể làm lệch kịch bản cơ sở",
+        )
+        add_callout(
+            document,
+            "Rủi ro trọng yếu",
+            report.risk_factors,
+            BRAND.red,
+            "Chưa có danh sách rủi ro đã được đánh giá.",
+        )
 
-    section_no = 6
-    if report.analysis_sections:
-        for section in report.analysis_sections:
-            add_narrative_section(document, section, number=f"{section_no:02d}")
-            section_no += 1
+        section_no = 6
+        figure_no = 1
+        if report.analysis_sections:
+            for section in report.analysis_sections:
+                # Charts come only from this section's validated, source-bound data.
+                specs = _section_chart_specs(report, section, figure_no)
+                figure_no += len(specs)
+                add_narrative_section(
+                    document,
+                    section,
+                    number=f"{section_no:02d}",
+                    chart_specs=specs,
+                    tmp_dir=tmp_path,
+                )
+                section_no += 1
 
-    add_section_title(
+    val_heading = add_section_title(
         document,
         f"{section_no:02d}",
         "Định giá",
         "Phương pháp, giả thuyết và độ nhạy của giá mục tiêu",
+    )
+    val_heading.paragraph_format.page_break_before = any(
+        section.page_break_before for section in report.analysis_sections
     )
     section_no += 1
     add_metric_table(
@@ -1712,14 +2262,12 @@ def make_docx(report: ResearchReport, path: Path):
     add_body(document, report.methodology, size=8.4)
     add_sources(document, report.sources)
 
-    disclosure_heading = add_section_title(
+    add_section_title(
         document,
         f"{section_no:02d}",
         "Xếp hạng, công bố và chuyên viên",
         "Thang điểm khuyến nghị, trách nhiệm nội dung và giới hạn sử dụng",
     )
-    if any(section.page_break_before for section in report.analysis_sections):
-        disclosure_heading.paragraph_format.page_break_before = True
     section_no += 1
     add_rating_scale(document, report.rating_scale)
     add_analyst_block(document, report)
@@ -1731,8 +2279,17 @@ def make_docx(report: ResearchReport, path: Path):
         set_para_spacing(appendix, before=0, after=4, line=1.05)
         p_text(appendix, "PHỤ LỤC", size=16, color=BRAND.crimson, bold=True, spacing=18)
         para_rule(appendix, BRAND.crimson, 14)
-        for index, section in enumerate(report.appendix_sections, 1):
-            add_narrative_section(document, section, number=f"PL{index}")
+        with tempfile.TemporaryDirectory() as appendix_tmp:
+            for index, section in enumerate(report.appendix_sections, 1):
+                specs = _section_chart_specs(report, section, figure_no)
+                figure_no += len(specs)
+                add_narrative_section(
+                    document,
+                    section,
+                    number=f"PL{index}",
+                    chart_specs=specs,
+                    tmp_dir=Path(appendix_tmp),
+                )
 
     path.parent.mkdir(parents=True, exist_ok=True)
     document.save(path)
@@ -1792,8 +2349,8 @@ def export_report(report: ResearchReport, root: Path, formats=("docx", "pdf")):
     A failed optional PDF never hides a successfully written DOCX, but it is
     reported in ``warnings`` so callers stop claiming that both formats exist.
     """
-    if not set(formats).issubset({"docx", "pdf"}) or not formats:
-        raise ValueError("formats must be docx and/or pdf")
+    if not set(formats).issubset({"docx", "pdf", "pptx"}) or not formats:
+        raise ValueError("formats must be docx, pdf and/or pptx")
     job_id = uuid.uuid4().hex
     slug = re.sub(r"[^A-Za-z0-9_-]", "_", report.symbol)[:30]
     folder = root.resolve() / job_id
@@ -1807,8 +2364,18 @@ def export_report(report: ResearchReport, root: Path, formats=("docx", "pdf")):
         try:
             outputs["pdf"] = str(convert_pdf(path, folder))
         except Exception as exc:
+            # pyrefly: ignore[missing-attribute]
             outputs["warnings"].append(f"PDF export failed: {exc}")
-            if "docx" not in formats:
+            if len(formats) == 1:
+                raise
+    if "pptx" in formats:
+        from src.reporting.presentation import make_pptx
+        try:
+            outputs["pptx"] = str(make_pptx(report, folder / f"{path.stem}.pptx"))
+        except Exception as exc:
+            # pyrefly: ignore[missing-attribute]
+            outputs["warnings"].append(f"PPTX export failed: {exc}")
+            if len(formats) == 1:
                 raise
     if "docx" not in formats:
         path.unlink(missing_ok=True)

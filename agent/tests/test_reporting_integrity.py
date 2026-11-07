@@ -83,6 +83,12 @@ def test_model_cannot_self_certify_publication():
     payload["publication_status"] = "certified"
     for source in payload["sources"]:
         source["status"] = "user_supplied"
+        source["url"] = f"https://example.test/research/{source['id']}"
+    payload["overview_evidence"] = {"source_ids": ["SIM02"]}
+    payload["executive_summary_evidence"] = {"source_ids": ["SIM02"]}
+    for point in payload["price_history"]:
+        point["source_ids"] = ["SIM01"]
+        point.update(unit="VND", price_basis="raw")
     assert ResearchReport.model_validate(payload).publication_status == "draft_unverified"
 
 
@@ -153,6 +159,26 @@ def test_tool_does_not_replace_empty_format_request_with_defaults():
     receipt = json.loads(ExportResearchReportTool().execute(sample(), formats=[]))
     assert receipt["ok"] is False
     assert receipt["error_code"] == "MISSING_FORMATS"
+
+
+def test_artifact_lookup_survives_restart_and_missing_legacy_index(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.reporting.service.export_report", fake_renderer)
+    service = ReportJobService(tmp_path)
+    job = service.create_job(sample(), formats=["docx"])
+    report_id = job["artifacts"][0]["report_id"]
+    assert ReportJobService(tmp_path).get_job_for_artifact(report_id) == job
+    (tmp_path / "artifacts" / f"{report_id}.json").unlink()
+    assert ReportJobService(tmp_path).get_job_for_artifact(report_id) == job
+    assert service.get_job_for_artifact("../" + report_id) is None
+
+
+def test_auxiliary_index_failure_does_not_hide_a_completed_export(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.reporting.service.export_report", fake_renderer)
+    (tmp_path / "artifacts").write_text("legacy file blocks index directory", encoding="utf-8")
+    service = ReportJobService(tmp_path)
+    job = service.create_job(sample(), formats=["docx"])
+    assert job["status"] == "succeeded" and job["error"] is None
+    assert service.get_job_for_artifact(job["artifacts"][0]["report_id"]) == job
 
 
 @pytest.mark.parametrize("error_type", [ValueError, OSError, RuntimeError])

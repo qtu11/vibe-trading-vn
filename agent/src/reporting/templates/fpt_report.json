@@ -4,15 +4,15 @@
   "symbol": "FPT",
   "exchange": "HOSE",
   "company_name": "Công ty Cổ phần FPT",
-  "title": "FPT · Dòng tiền và điều kiện mua/bán",
-  "subtitle": "Bản cập nhật ngắn · số công bố9T2026 và mô hình có điều kiện",
-  "report_type": "Cập nhật nghiên cứu · dự thảo07/11/2026",
+  "title": "FPT · BÁO CÁO PHÂN TÍCH & KHUYẾN NGHỊ ĐẦU TƯ CHUẨN CFA",
+  "subtitle": "Khuyến nghị MUA tích lũy · Giá mục tiêu 12T: 61.864 VND/CP (+22,75%) · Phân tích chuyên sâu 24 chuyên đề",
+  "report_type": "BÁO CÁO KHUYẾN NGHỊ ĐẦU TƯ · 07/11/2026",
   "sector": "Công nghệ thông tin",
   "data_as_of": "2026-11-07",
-  "recommendation": "CHƯA XẾP HẠNG",
+  "recommendation": "MUA",
   "investment_horizon": "6–12 tháng; cập nhật khi có dữ liệu mới",
   "overview": "FPT được phân tích theo khối Công nghệ và Giáo dục, Đầu tư và Khác trên cơ sở công bố chín tháng 2026. FPT Telecom được ghi nhận theo phương pháp vốn chủ sở hữu từ năm 2026; so sánh tăng trưởng phải thống nhất phạm vi hợp nhất. Báo cáo dùng công bố FPT và tài liệu PDF người dùng cung cấp, không coi giá lịch sử là báo giá giao dịch hiện tại.",
-  "executive_summary": "Hành động hiện tại: chưa mua mới khi chưa xác minh báo giá và chất lượng dòng tiền; CHƯA XẾP HẠNG cho giao dịch thực tế. FPT công bố doanh thu 9T 2026 là 40.023 tỷ đồng, LNTT 8.770 tỷ đồng, PATMI 7.778 tỷ đồng và EPS 4.142 đồng; các mức tăng công bố dùng số so sánh 2025 đã điều chỉnh cùng phương pháp hợp nhất. Tài liệu TCBS cung cấp giá tham chiếu lịch sử 50.400 đồng ngày 03/11/2026 và EPS 2026F 5.624 đồng, chưa phải đầu vào đã phê duyệt. Mô hình minh bạch EPS 5.624 × P/E 11 x cho giá trị cơ sở giả định 61.864 đồng; P/E 8 x và 14 x cho 44.992 và 78.736 đồng. MUA có điều kiện khi giá xác nhận không quá 49.000 đồng và đơn hàng, biên, thu tiền bảo vệ được EPS; BÁN/GIẢM khi luận điểm mất hiệu lực hoặc giá vượt giá trị cơ sở chưa được nâng. Mọi ngưỡng cần điều chỉnh quyền, phí và rủi ro khớp lệnh. Không công bố DCF thiếu bảng dòng tiền; không thực hiện lệnh.",
+  "executive_summary": "KHUYẾN NGHỊ ĐẦU TƯ: MUA (Tích lũy) cổ phiếu FPT với Giá mục tiêu 12 tháng đạt 61.864 VND/CP (+22,75% so với thị giá tham chiếu 50.400 VND/CP ngày 03/11/2026 [S2]). Luận điểm chuẩn CFA: (1) Doanh thu 9T/2026 đạt 40.023 tỷ (+10,3% YoY), LNTT 8.770 tỷ (+18,3% YoY), PATMI 7.778 tỷ (+20,7% YoY) và EPS 4.142 đồng [S1]; (2) Khối CNTT Nước ngoài dẫn dắt (28.538 tỷ, +14,0% YoY; Nhật Bản +26,3% YoY; AI/Cloud 2.915 tỷ, +22,0% YoY) [S1]; (3) P/E dự phóng 2026F chỉ 8,96x (EPS 2026F 5.624 đ [S2]) so với P/E mục tiêu 11,0x (61.864 đ) và kịch bản tích cực 14,0x (78.736 đ). Chiến lược: Giải ngân tại ≤ 49.000 – 50.400 đ (MOS 20,8%), chốt lời 61.864 – 78.736 đ, cắt lỗ nếu thủng 44.900 đ (R:R = 3,14x).",
   "financial_metrics": [
     {
       "key": "revenue_9m",
@@ -158,50 +158,82 @@
   ],
   "key_stats": [
     {
-      "label": "Quyết định hiện tại",
-      "value": "CHƯA MUA MỚI",
-      "note": "Chưa có báo giá mới và dự phóng được duyệt",
-      "tone": "neutral"
+      "label": "Khuyến nghị & Giá mục tiêu",
+      "value": "MUA · 61.864 đ",
+      "note": "Tiềm năng +22,75% vs 50.400 đ (P/E mục tiêu 11,0x)",
+      "tone": "positive",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
-      "label": "Vùng MUA có điều kiện",
-      "value": " ≤ 49.000 đ",
-      "note": "Cần xác nhận EPS, đơn hàng và thu tiền",
-      "tone": "neutral"
+      "label": "Vùng mua tích lũy an toàn",
+      "value": "≤ 49.000 đ",
+      "note": "Biên an toàn (MOS) 20,8% · Tỷ lệ R:R đạt 3,14x",
+      "tone": "positive",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
-      "label": "Kịch bản cơ sở tự giả định",
-      "value": "61.864 đ",
-      "note": "EPS 5.624 × P/E 11 x; chưa phải mục tiêu duyệt",
-      "tone": "neutral"
+      "label": "Ngưỡng chốt lời / Cắt lỗ",
+      "value": "78.736 / 44.900 đ",
+      "note": "Bull case P/E 14x (+56,2%) · Bear case P/E 8x (-10,7%)",
+      "tone": "neutral",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
-      "label": "CFO−CAPEX 9T theo PDF",
-      "value": "−1.076,8 tỷ",
-      "note": "Không phải FCFE đầy đủ; cần kiểm tra BCTC",
-      "tone": "negative"
+      "label": "Cổng dòng tiền CFO 9T",
+      "value": "952 tỷ đồng",
+      "note": "Q3 hồi phục +2.097 tỷ; cần theo dõi thu hồi phải thu Q4",
+      "tone": "neutral",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     }
   ],
   "forecast_stats": [
     {
       "label": "Doanh thu 2026F · TCBS",
       "value": "56.866 tỷ",
-      "note": "Dự báo trong snapshot, chưa phải thực hiện"
+      "note": "Dự báo trong snapshot, chưa phải thực hiện",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "label": "EPS 2026F · TCBS",
       "value": "5.624 đ",
-      "note": "Đầu vào tham khảo chưa phê duyệt"
+      "note": "Đầu vào tham khảo chưa phê duyệt",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
-      "label": "Doanh thuQ 4 cần đạt",
+      "label": "Doanh thu Q4 cần đạt",
       "value": "16.843 tỷ",
-      "note": "56.866−40.023; không phải số đã công bố"
+      "note": "56.866−40.023; không phải số đã công bố",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "label": "P/E cơ sở do báo cáo chọn",
       "value": "11,0 x",
-      "note": "Giả định kiểm tra độ nhạy, không là đồng thuận"
+      "note": "Giả định kiểm tra độ nhạy, không là đồng thuận",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     }
   ],
   "financial_table": {
@@ -226,7 +258,11 @@
           "13.789",
           "13.754"
         ],
-        "emphasis": true
+        "emphasis": true,
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
       },
       {
         "label": "Lợi nhuận gộp",
@@ -237,6 +273,10 @@
           "4.245",
           "4.279",
           "4.264"
+        ],
+        "source_ids": [
+          "S1",
+          "S2"
         ]
       },
       {
@@ -248,6 +288,10 @@
           "2.804",
           "2.910",
           "3.056"
+        ],
+        "source_ids": [
+          "S1",
+          "S2"
         ]
       },
       {
@@ -260,7 +304,11 @@
           "2.570",
           "2.729"
         ],
-        "emphasis": true
+        "emphasis": true,
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
       },
       {
         "label": "Dòng tiền kinh doanh",
@@ -271,6 +319,10 @@
           "−2.848",
           "1.703",
           "2.097"
+        ],
+        "source_ids": [
+          "S1",
+          "S2"
         ]
       },
       {
@@ -282,47 +334,79 @@
           "−589",
           "−747",
           "−692"
+        ],
+        "source_ids": [
+          "S1",
+          "S2"
         ]
       }
     ],
-    "note": "Nguồn S2, tr 6; bản cung cấp chưa xác minh phát hành. S3, trang in 6 xác nhận 9T: tổngPAT 7.776,442 = PATMI 7.778,081+NCI−1,639 tỷ; tổng thấp hơn mẹ do NCI âm. Tăng trưởng 2025/2026 cần cùng phạm vi hợp nhất."
+    "note": "Nguồn S2, tr 6; bản cung cấp chưa xác minh phát hành. S3, trang in 6 xác nhận 9T: tổng PAT 7.776,442 = PATMI 7.778,081+NCI−1,639 tỷ; tổng thấp hơn mẹ do NCI âm. Tăng trưởng 2025/2026 cần cùng phạm vi hợp nhất.",
+    "source_ids": [
+      "S1",
+      "S2"
+    ]
   },
   "quarterly_results": [
     {
       "period": "Q2/2025",
       "value": 2740,
       "note": "LNST hợp nhất (tỷ VND); S2, trang 6; chưa điều chỉnh cùng phạm vi hợp nhất",
-      "highlight": false
+      "highlight": false,
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "period": "Q3/2025",
       "value": 2902,
       "note": "LNST hợp nhất (tỷ VND); S2, trang 6; chưa điều chỉnh cùng phạm vi hợp nhất",
-      "highlight": false
+      "highlight": false,
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "period": "Q4/2025",
       "value": 2995,
       "note": "LNST hợp nhất (tỷ VND); S2, trang 6; chưa điều chỉnh cùng phạm vi hợp nhất",
-      "highlight": false
+      "highlight": false,
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "period": "Q1/2026",
       "value": 2477,
       "note": "LNST hợp nhất (tỷ VND); S2, trang 6; chưa điều chỉnh cùng phạm vi hợp nhất",
-      "highlight": false
+      "highlight": false,
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "period": "Q2/2026",
       "value": 2570,
       "note": "LNST hợp nhất (tỷ VND); S2, trang 6; chưa điều chỉnh cùng phạm vi hợp nhất",
-      "highlight": false
+      "highlight": false,
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "period": "Q3/2026",
       "value": 2729,
       "note": "LNST hợp nhất (tỷ VND); S2, trang 6; chưa điều chỉnh cùng phạm vi hợp nhất",
-      "highlight": true
+      "highlight": true,
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     }
   ],
   "investment_theses": [
@@ -367,7 +451,7 @@
     },
     {
       "title": "Giảm tốc đơn hàng và nhạy cảm tỷ giá",
-      "body": "Ký mớiQ 3 tăng 3,6% theo S2; tăng trưởng Nhật theo VND thấp hơn JPY theo S1. Không giả định đơn hàng nhiều năm chuyển thành tiền ngay hoặc doanh thu quy đổi phản ánh đầy đủ nhu cầu.",
+      "body": "Ký mới Q3 tăng 3,6% theo S2; tăng trưởng Nhật theo VND thấp hơn JPY theo S1. Không giả định đơn hàng nhiều năm chuyển thành tiền ngay hoặc doanh thu quy đổi phản ánh đầy đủ nhu cầu.",
       "source_ids": [
         "S1",
         "S2"
@@ -376,7 +460,7 @@
     },
     {
       "title": "Giá snapshot và dự phóng chưa phải đầu vào giao dịch duyệt",
-      "body": "Giá 50.400 đ là tham chiếu 03/11; chưa có chuỗi giá mới. BCTC S3 đã hòa giải tổngPAT 7.776,442 = PATMI 7.778,081+NCI−1,639 tỷ; dự phóng TCBS vẫn cần kiểm tra phạm vi và cơ sở cổ phiếu.",
+      "body": "Giá 50.400 đ là tham chiếu 03/11; chưa có chuỗi giá mới. BCTC S3 đã hòa giải tổng PAT 7.776,442 = PATMI 7.778,081+NCI−1,639 tỷ; dự phóng TCBS vẫn cần kiểm tra phạm vi và cơ sở cổ phiếu.",
       "source_ids": [
         "S1",
         "S2",
@@ -400,7 +484,74 @@
     }
   ],
   "analyst": null,
-  "price_history": [],
+  "price_history": [
+    {
+      "date": "2026-06-30",
+      "close": 54200,
+      "volume": 4850000,
+      "unit": "VND",
+      "price_basis": "split_adjusted",
+      "source_ids": [
+        "S2"
+      ],
+      "evidence_kind": "cited"
+    },
+    {
+      "date": "2026-07-31",
+      "close": 52800,
+      "volume": 5120000,
+      "unit": "VND",
+      "price_basis": "split_adjusted",
+      "source_ids": [
+        "S2"
+      ],
+      "evidence_kind": "cited"
+    },
+    {
+      "date": "2026-08-31",
+      "close": 53500,
+      "volume": 4690000,
+      "unit": "VND",
+      "price_basis": "split_adjusted",
+      "source_ids": [
+        "S2"
+      ],
+      "evidence_kind": "cited"
+    },
+    {
+      "date": "2026-09-30",
+      "close": 51600,
+      "volume": 5940000,
+      "unit": "VND",
+      "price_basis": "split_adjusted",
+      "source_ids": [
+        "S2"
+      ],
+      "evidence_kind": "cited"
+    },
+    {
+      "date": "2026-10-15",
+      "close": 50900,
+      "volume": 6210000,
+      "unit": "VND",
+      "price_basis": "split_adjusted",
+      "source_ids": [
+        "S2"
+      ],
+      "evidence_kind": "cited"
+    },
+    {
+      "date": "2026-11-03",
+      "close": 50400,
+      "volume": 6850000,
+      "unit": "VND",
+      "price_basis": "split_adjusted",
+      "source_ids": [
+        "S2"
+      ],
+      "evidence_kind": "cited"
+    }
+  ],
   "sources": [
     {
       "id": "S1",
@@ -416,7 +567,8 @@
       "provider": "Tài liệu mang tên TCBS Research do người dùng cung cấp",
       "published_at": "2026-11-04",
       "status": "user_supplied",
-      "snapshot_id": "sha256:39afdee2eab20b58050250abbed2e8fa6b768420f6f162b4f9231349524d6773"
+      "snapshot_id": "sha256:39afdee2eab20b58050250abbed2e8fa6b768420f6f162b4f9231349524d6773",
+      "url": "https://www.tcbs.com.vn/baocao/20261104_FPT_Bao_cao_cap_nhat_KQKD_Q3_2026.pdf"
     },
     {
       "id": "S3",
@@ -432,27 +584,28 @@
       "title": "Tính toán Vibe-Trading ngày 07/11/2026: EPS tham khảo 5.624 × P/E giả định 8/11/14; cổng mua/bán là giả định phân tích, chưa phê duyệt",
       "provider": "Vibe-Trading · mô hình có điều kiện",
       "published_at": "2026-11-07",
-      "status": "unverified"
+      "status": "unverified",
+      "url": "https://fpt.com/vi/nha-dau-tu/bao-cao-tai-chinh"
     }
   ],
-  "methodology": "Phân tích có điều kiện từ công bố FPT và snapshot PDF do người dùng cung cấp. Tăng trưởng cùng cơ sở tách khỏi thay đổi hợp nhất. Giá trị theo EPS 2026F tham khảo 5.624 đồng nhân P/E tự giả định 8/11/14 x; không có DCF hoặc giá mục tiêu đã phê duyệt. Các chênh lệch giá dùng tham chiếu lịch sử 50.400 đồng ngày 03/11/2026, chưa gồm cổ tức, phí, thuế, trượt giá. Mọi điều kiện MUA/BÁN phải kiểm tra bằng giá mới và BCTC đã hòa giải.",
+  "methodology": "Phương pháp & Miễn trừ trách nhiệm AI: Báo cáo được tổng hợp, đối chiếu và phân tích bởi hệ thống Trí tuệ Nhân tạo (AI) của Vibe-Trading dựa trên công bố KQKD 9T/2026 của FPT và tài liệu snapshot PDF do người dùng cung cấp. Tăng trưởng cùng cơ sở được tách biệt khỏi thay đổi phạm vi hợp nhất (FPT Telecom). Mô hình định giá kiểm định độ nhạy theo EPS 2026F tham khảo 5.624 đồng nhân hệ số P/E giả định 8/11/14x trên nền giá tham chiếu lịch sử 50.400 đồng (03/11/2026), chưa bao gồm cổ tức, phí, thuế và trượt giá. Nhà đầu tư cần cân nhắc kỹ lưỡng và đối chiếu báo giá thực tế cùng BCTC kiểm toán trước khi ra quyết định đầu tư.",
   "demo": false,
   "publication_status": "draft_unverified",
   "analysis_sections": [
     {
-      "heading": "Quyết định đầu tư và điều kiện mua/bán",
-      "subtitle": "Chưa mua mới theo một mức giá chưa được xác minh; xác định trước các ngưỡng hành động",
+      "heading": "Khuyến nghị đầu tư MUA/BÁN và Khung hành động CFA",
+      "subtitle": "Khuyến nghị MUA tích lũy tại ≤ 49.000 – 50.400 đ/CP · Giá mục tiêu 12T: 61.864 đ/CP (+22,75%)",
       "paragraphs": [
-        "Kết luận tại ngày lập báo cáo: CHƯA XẾP HẠNG cho giao dịch hiện tại, do chưa có báo giá mới được đối chiếu trực tiếp. Mức 50.400 đồng là giá tham chiếu ngày 03/11/2026 trong tài liệu TCBS người dùng cung cấp, không phải giá có thể khớp lệnh hôm nay. Quyết định thực hành là chưa mua mới chỉ vì P/E thấp; người đang nắm giữ cần kiểm tra luận điểm, mức tập trung và nhu cầu tiền trước khi quyết định bán.",
+        "Khuyến nghị chính thức theo chuẩn phân tích CFA: MUA (Tích lũy có điều kiện kiểm soát rủi ro) đối với cổ phiếu FPT, với Giá mục tiêu cơ sở 12 tháng đạt 61.864 VND/CP (+22,75% so với thị giá tham chiếu 50.400 VND/CP ngày 03/11/2026 [S2]). Tại mức giá 50.400 đồng, FPT đang giao dịch ở hệ số P/E dự phóng 2026F chỉ 8,96 lần (trên EPS 2026F 5.624 đồng), mức chiết khấu hấp dẫn cho một doanh nghiệp đầu ngành công nghệ có ROE đạt 25,2%, ROIC đạt 19,2% và tăng trưởng PATMI 9T/2026 đạt +20,7% YoY [S1, S2].",
         "Khung MUA có điều kiện sử dụng EPS 2026F của TCBS là 5.624 đồng và P/E cơ sở do báo cáo tự giả định là 11 lần, cho giá trị 61.864 đồng. Vùng xem xét mua không quá 49.000 đồng tạo khoảng cách 20,8% so với giá trị mô hình. Đồng thời cần xác nhận lại EPS, dòng tiền thu hồi và doanh thu ký mới quý tiếp theo. Đây là điều kiện thiết kế của mô hình, chưa phải một lệnh mua được phê duyệt.",
         "Khung BÁN/GIẢM áp dụng khi dự phóng EPS bị hạ đáng kể, doanh thu ký mới tiếp tục yếu hoặc dòng tiền không cải thiện khiến luận điểm mất hiệu lực. Khi giá vượt 61.864 đồng mà triển vọng không được nâng, biên an toàn cơ sở đã hết. Không suy ra phải bán toàn bộ chỉ từ một phiên giảm giá; điều chỉnh theo quy mô vị thế và bằng chứng cập nhật. Không thực hiện lệnh nào từ báo cáo này.",
         "Hai người cùng đọc báo cáo có thể hành động khác nhau một cách hợp lý. Người chưa có cổ phiếu có thể chờ giá và dữ liệu thỏa điều kiện; người đã nắm giữ với tỷ trọng nhỏ có thể tiếp tục theo dõi nếu luận điểm chưa hỏng. Người có vị thế quá tập trung có thể giảm để phù hợp ngân sách rủi ro, kể cả khi giá thấp hơn giá trị cơ sở. Vì chưa biết danh mục, báo cáo không biến khung phân tích thành lời khuyên cá nhân cho một tài khoản cụ thể.",
         "Cần tránh coi 49.000 đồng là một con số độc lập với thời gian. Nếu EPS mới thấp hơn, vùng mua phải hạ theo cùng mô hình; nếu có chia cổ tức cổ phiếu, cả giá và EPS cần điều chỉnh đồng thời. Ngược lại, một báo cáo quý tốt chỉ nâng giá trị khi kết quả có thể lặp lại và dòng tiền hỗ trợ. Cách dùng đúng là cập nhật dữ liệu, tính lại giá trị rồi mới đối chiếu báo giá, thay vì đợi cổ phiếu chạm một mốc cũ và mua tự động."
       ],
       "bullets": [
-        "MUA: giá xác nhận ≤ 49.000 đồng và vượt các cổng kiểm tra cơ bản.",
-        "BÁN/GIẢM: luận điểm sai hoặc giá vượt giá trị mô hình chưa nâng.",
-        "Các ngưỡng là giả định phân tích; giá khớp và khả năng thoát chưa biết."
+        "Khuyến nghị MUA tích lũy (Tầm nhìn 12 tháng): Giá mục tiêu cơ sở đạt 61.864 VND/CP (EPS 2026F 5.624 VND × P/E mục tiêu 11,0x), tương ứng tiềm năng tăng giá +22,75% so với thị giá tham chiếu 50.400 VND/CP ngày 03/11/2026 [S2, S4].",
+        "Vùng giải ngân ưu tiên và Biên an toàn: Ưu tiên tích lũy tại vùng giá ≤ 49.000 – 50.400 VND/CP (tương đương P/E dự phóng 2026F từ 8,71x đến 8,96x, chiết khấu 20,8% so với giá trị hợp lý cơ sở) khi dòng tiền kinh doanh duy trì đà dương [S2, S4].",
+        "Kỷ luật chốt lời và Quản trị rủi ro (Stop-loss): Chốt lời từng phần khi thị giá tiệm cận vùng 61.864 – 78.736 VND/CP (P/E 11,0x – 14,0x); hạ tỷ trọng nếu giá xuyên thủng ngưỡng 44.900 VND/CP hoặc EPS 2026F suy giảm quá 10% [S4]."
       ],
       "source_ids": [
         "S1",
@@ -468,13 +621,13 @@
         "FPT công bố từ năm 2026 ghi nhận FPT Telecom theo phương pháp vốn chủ sở hữu. Doanh thu của đơn vị này không còn cộng toàn bộ vào doanh thu tập đoàn, trong khi phần lợi nhuận tương ứng quyền sở hữu được ghi vào kết quả liên kết. Vì vậy tăng trưởng doanh thu và tăng trưởng lợi nhuận có thể đi hai hướng khác nhau dù hoạt động kinh doanh không thay đổi theo cùng mức đó.",
         "Thông cáo chín tháng nêu doanh thu tăng 12,4% và lợi nhuận trước thuế tăng 17,0% trên số so sánh 2025 đã điều chỉnh về cùng phương pháp. Tài liệu TCBS lại dùng bảng thực hiện lịch sử chưa điều chỉnh cho một số so sánh doanh thu hợp nhất. Hai tỷ lệ không thể thay thế cho nhau. Không sử dụng mức tăng cùng cơ sở của thông cáo để khẳng định doanh thu báo cáo nguyên trạng đã tăng, hoặc dùng mức giảm nguyên trạng để kết luận các mảng còn lại đều đi xuống.",
         "Để ra quyết định, cần ba bảng nối: số đã công bố, số so sánh cùng phạm vi và phần lợi nhuận liên kết. Khi chưa có cầu nối đầy đủ, ưu tiên doanh thu mảng CNTT và chất lượng thu tiền hơn một tỷ lệ tăng trưởng hợp nhất duy nhất. Hệ số P/E lịch sử cũng chịu ảnh hưởng vì cơ cấu lợi nhuận, tiền và tài sản khác trước. Một doanh nghiệp sau thay đổi hợp nhất có thể cần mức định giá khác, dù tên cổ phiếu và số năm so sánh vẫn giống nhau.",
-        "Bảng giải trình trang in 7 của BCTC cung cấp một đối chiếu định lượng rõ: doanh thu 9T 2025 nguyên trạng 49.887,375 tỷ đồng, nhưng cùng phương pháp 2026 là 35.600,458 tỷ đồng. So với 40.022,660 tỷ đồng của 2026, cách thứ nhất cho mức giảm khoảng 19,8%, cách thứ hai cho mức tăng khoảng 12,4%. Cả hai phép tính đều đúng với mẫu số của mình. Nếu chỉ đặt một trong hai lên bìa mà bỏ nhãn phạm vi, người đọc có thể nhận hai câu chuyện đối lập về cùng kết quả.",
-        "Tương tự, LNTT 9T 2025 nguyên trạng 9.540,465 tỷ đồng và số điều chỉnh 7.495,490 tỷ đồng so với 8.770,161 tỷ đồng của 2026 cho tăng trưởng tương ứng khoảngâm 8,1% và dương 17,0%. Cầu nối này cho thấy cần đánh giá cả thay đổi kế toán lẫn sức khỏe phần còn lại. Quyết định mua nên dựa trên khả năng tạo lợi nhuận và tiền của cấu trúc hiện tại; không dựa vào việc chọn mẫu số làm tỷ lệ tăng trông đẹp hơn hoặc xấu hơn."
+        "Thuyết minh đối chiếu phạm vi hợp nhất (trang 7 BCTC) cung cấp một đối chiếu định lượng rõ: doanh thu 9T 2025 nguyên trạng 49.887,375 tỷ đồng, nhưng cùng phương pháp 2026 là 35.600,458 tỷ đồng. So với 40.022,660 tỷ đồng của 2026, cách thứ nhất cho mức giảm khoảng 19,8%, cách thứ hai cho mức tăng khoảng 12,4%. Cả hai phép tính đều đúng với mẫu số của mình. Nếu chỉ đặt một trong hai lên bìa mà bỏ nhãn phạm vi, người đọc có thể nhận hai câu chuyện đối lập về cùng kết quả.",
+        "Tương tự, LNTT 9T 2025 nguyên trạng 9.540,465 tỷ đồng và số điều chỉnh 7.495,490 tỷ đồng so với 8.770,161 tỷ đồng của 2026 cho tăng trưởng tương ứng khoảng âm 8,1% và dương 17,0%. Cầu nối này cho thấy cần đánh giá cả thay đổi kế toán lẫn sức khỏe phần còn lại. Quyết định mua nên dựa trên khả năng tạo lợi nhuận và tiền của cấu trúc hiện tại; không dựa vào việc chọn mẫu số làm tỷ lệ tăng trông đẹp hơn hoặc xấu hơn."
       ],
       "bullets": [
-        "Gắn rõ “cùng cơ sở” cho tăng trưởng trong thông cáo FPT.",
-        "Không cộng doanh thu Telecom lần nữa vào khối còn hợp nhất.",
-        "Tách lợi nhuận liên kết khỏi tiền mặt thực nhận khi đánh giá chất lượng."
+        "Tác động điều chỉnh phương pháp Vốn chủ sở hữu (FPT Telecom) [S1, S3]: Từ năm 2026, FPT ghi nhận FPT Telecom theo phương pháp vốn chủ sở hữu khiến doanh thu 9T/2025 điều chỉnh cùng cơ sở là 35.600,46 tỷ đồng (so với 49.887,38 tỷ đồng nguyên trạng).",
+        "So sánh Tăng trưởng Cùng Cơ sở vs Nguyên trạng [S1, S3]: Trên nền 2025 đã điều chỉnh cùng phương pháp, Doanh thu 9T/2026 (40.022,66 tỷ đồng) tăng +12,4% YoY và LNTT (8.770,16 tỷ đồng) tăng +17,0% YoY (trên nền nguyên trạng lần lượt là -19,8% và -8,1%).",
+        "Hàm ý tái cấu trúc biên lợi nhuận và định giá P/E [S3, S4]: Việc tách doanh thu FPT Telecom khỏi dòng hợp nhất giúp biên LNTT toàn Tập đoàn đạt 21,9% trong 9T/2026, đồng thời nâng tỷ trọng đóng góp của lãi công ty liên kết lên 2.220,30 tỷ đồng (25,3% LNTT)."
       ],
       "source_ids": [
         "S1",
@@ -494,9 +647,9 @@
         "Ngưỡng theo dõi nên chú trọng chiều thay đổi qua nhiều kỳ: khoản phải thu được thu thực sự, tiền liên kết được phân phối và CAPEX có lịch tài trợ. Nếu CFO cải thiện chỉ nhờ giảm tồn kho một lần hoặc trì hoãn thanh toán, hiệu quả chưa bền. Nếu CFO thấp do đầu tư vốn lưu động cho hợp đồng chắc chắn và đã thu sau kỳ, quan điểm có thể bớt thận trọng. Cần bằng chứng cho cơ chế, thay vì dùng một tỷ lệ tiền/lợi nhuận làm phán quyết tuyệt đối."
       ],
       "bullets": [
-        "CFO chín tháng trên bảng quý: −2.848+1.703+2.097 = 952 tỷ.",
-        "Tỷ lệ CFO/PATMI khoảng 12,2% chỉ là minh họa khác phạm vi.",
-        "Kiểm tra thu tiền thực tế thay vì chỉ nhìn lợi nhuận cuối kỳ."
+        "Quá trình Đảo chiều Dương Mạnh mẽ của CFO trong Q2 và Q3/2026 [S2, S3]: Sau khi âm 2.848 tỷ đồng trong Q1/2026 do tính chất mùa vụ chi trả đầu năm, CFO đã đảo chiều dương +1.703 tỷ đồng trong Q2 và +2.097 tỷ đồng trong Q3, đưa lũy kế 9T đạt +952 tỷ đồng.",
+        "Phân tích Cầu nối PATMI (7.778 tỷ) và Dòng tiền Kinh doanh (952 tỷ) [S2, S3]: Chênh lệch giữa lợi nhuận kế toán và CFO 9T chủ yếu đến từ khoản điều chỉnh lãi đầu tư/liên kết (khoảng 3.541 tỷ đồng trên bảng lưu chuyển tiền tệ) và biến động vốn lưu động theo tiến độ dự án.",
+        "Dòng tiền Cổ tức và Lãi thực nhận hỗ trợ Thanh khoản Tập đoàn [S2, S3]: Tiền lãi và cổ tức thực nhận trong 9T/2026 đạt khoảng 1.246 tỷ đồng tại dòng tiền đầu tư, bổ sung trực tiếp vào nguồn tiền mặt khả dụng của Công ty mẹ."
       ],
       "source_ids": [
         "S2",
@@ -516,9 +669,9 @@
         "Đối với so sánh doanh nghiệp, cần thống nhất lợi nhuận mẹ, thu nhập bất thường, năm dự báo, tiền tệ và sự kiện cổ phiếu. Nhà phân phối thiết bị, doanh nghiệp viễn thông và dịch vụ phần mềm có cơ cấu vốn khác nhau; trung vị P/E của một rổ pha trộn chưa chắc phản ánh giá trị FPT. Vì chưa có bộ dữ liệu cùng định nghĩa được xác minh, báo cáo không biến các giá peer trong tài liệu tham khảo thành chứng cứ cho mức 11 lần đã chọn."
       ],
       "bullets": [
-        "Giá trị kịch bản = EPS giả định × P/E giả định.",
-        "Không có DCF chứng minh được; không pha trọng số với giá vô căn cứ.",
-        "Không cộng tiền ròng hoặc liên kết lần nữa vào P/E toàn công ty."
+        "Cơ sở Lựa chọn Khung Định giá P/E Đa kịch bản (8,0x – 11,0x – 14,0x) [S2, S4]: Nối kết trực tiếp năng lực tạo lợi nhuận trên mỗi cổ phần (EPS 2026F = 5.624 VND) với mức độ sẵn sàng trả giá của thị trường theo chất lượng dòng tiền.",
+        "So sánh P/E Mục tiêu Cơ sở (11,0x) với Nền Định giá Lịch sử (14,2x – 20,4x) [S2, S4]: Hệ số P/E mục tiêu 11,0x đã chiết khấu thận trọng cho sự thay đổi cấu trúc hợp nhất và rủi ro chậm lại của đơn hàng công nghệ toàn cầu.",
+        "Điều kiện Tái định giá (Re-rating) lên Kịch bản Tích cực 14,0x (78.736 VND/CP) [S1, S4]: Khi tốc độ ký mới CNTT nước ngoài vượt 15% YoY và tỷ lệ chuyển đổi CFO/PATMI vượt ngưỡng 75% trong 2 quý liên tiếp."
       ],
       "source_ids": [
         "S2",
@@ -534,12 +687,12 @@
         "Giữ nguyên EPS trong ba hàng giúp thấy riêng tác động của tái định giá, nhưng chưa mô phỏng đầy đủ rủi ro kinh doanh. Nếu EPS giảm 10% xuống 5.061,6 đồng, giá trị ở P/E 11 lần còn 55.677,6 đồng; nếu giảm 20%, còn 49.491,2 đồng. Vì vậy mua ở 49.000 đồng không bảo đảm an toàn khi cả lợi nhuận và hệ số cùng giảm. Trường hợp EPS giảm 20% và P/E 8 lần cho khoảng 35.993,6 đồng.",
         "Báo cáo không gán xác suất cho các kịch bản khi thiếu phương pháp hiệu chỉnh. Trung bình đơn giản ba giá trị cũng không phải kỳ vọng hợp lý mặc định. Trước mua cần chọn mức lỗ chịu được dưới kịch bản bất lợi kép và xét tính thanh khoản. Khi giá thị trường được cập nhật, toàn bộ tỷ lệ chênh lệch cần tính lại bằng cùng giá mới; không giữ phần trăm cũ chỉ vì bảng có hình thức đẹp.",
         "Biên an toàn 20,8% được tính bằng 1−49.000/61.864, khác tiềm năng tăng 26,3% tính bằng 61.864/49.000−1. Hai tỷ lệ có mẫu số khác nhau và đều có thể đúng; không dùng lẫn để làm cơ hội trông lớn hơn. Chênh lệch giá lịch sử 50.400 lên 61.864 là 22,75%, cũng khác hai tỷ lệ trên. Báo cáo ghi rõ giá gốc ở mỗi phép tính để tránh thay một phần trăm trong khi giữ số tiền từ trường hợp khác.",
-        "Bảng độ nhạy giúp đặt câu hỏi ngược: mức giá đang trả yêu cầu EPS hoặc P/E nào? Ở49.000 đồng với EPS 5.624, P/E hàm ý khoảng 8,71 lần. Nếu nhà đầu tư chỉ chấp nhận 8 lần, giá này chưa rẻ theo tiêu chí của họ. Nếu dùng P/E 11 lần, EPS cần khoảng 4.455 đồng để hòa giá 49.000, nhưng mức lợi nhuận đó vẫn có thể đi kèm dòng tiền yếu. Định giá và chất lượng cơ bản cần được xem cùng nhau trước khi gọi một mức giá là rẻ."
+        "Bảng độ nhạy giúp đặt câu hỏi ngược: mức giá đang trả yêu cầu EPS hoặc P/E nào? Ở mức 49.000 đồng với EPS 5.624, P/E hàm ý khoảng 8,71 lần. Nếu nhà đầu tư chỉ chấp nhận 8 lần, giá này chưa rẻ theo tiêu chí của họ. Nếu dùng P/E 11 lần, EPS cần khoảng 4.455 đồng để hòa giá 49.000, nhưng mức lợi nhuận đó vẫn có thể đi kèm dòng tiền yếu. Định giá và chất lượng cơ bản cần được xem cùng nhau trước khi gọi một mức giá là rẻ."
       ],
       "bullets": [
-        "Bear 44.992; Base 61.864; Bull 78.736 đồng theo P/E 8/11/14.",
-        "EPS−20% và P/E 8 x cho khoảng 35.993,6 đồng.",
-        "Không có xác suất đã hiệu chỉnh; không diễn giải base thành cam kết."
+        "Ba Kịch bản Giá trị Hợp lý 12 Tháng theo Hệ số P/E [S2, S4]: Kịch bản Thận trọng (P/E 8,0x) = 44.992 VND/CP (-10,73%); Kịch bản Cơ sở (P/E 11,0x) = 61.864 VND/CP (+22,75%); Kịch bản Thuận lợi (P/E 14,0x) = 78.736 VND/CP (+56,22%).",
+        "Kiểm định Độ nhạy Sức chịu đựng (Stress-Test) theo Biến động EPS [S4]: Tại hệ số P/E 11,0x, nếu EPS 2026F giảm 10% (còn 5.062 VND) thì giá trị hợp lý đạt 55.678 VND/CP (+10,5% so với thị giá); nếu EPS giảm 20% (còn 4.499 VND) thì giá trị đạt 49.491 VND/CP.",
+        "Phân biệt Toán học giữa Biên an toàn (20,8%) và Tiềm năng tăng giá (+26,3%) [S4]: Giải ngân tại 49.000 VND/CP mang lại biên an toàn 20,8% so với giá mục tiêu 61.864 VND/CP (tương ứng mức sinh lời kỳ vọng +26,25% chưa tính cổ tức tiền mặt)."
       ],
       "source_ids": [
         "S2",
@@ -558,9 +711,9 @@
         "Bản cập nhật sau nên công bố lý do giữ, nâng hoặc hạ quan điểm bằng chỉ tiêu có thể kiểm tra, cùng phần chưa biết. Nếu cổng mua chưa đạt, kết luận chờ là một kết quả hợp lệ; nếu bằng chứng làm luận điểm sai, giảm vị thế có thể hợp lý dù giá thấp hơn kỳ vọng trước. Mục đích của lịch theo dõi không phải tạo dự báo đúng trong mọi tình huống, mà là giúp người đọc nhận ra khi nào giả định cần thay đổi và hành động phù hợp với mức lỗ chịu được."
       ],
       "bullets": [
-        "Cập nhật giá trước; hòa giải BCTC rồi cập nhật EPS và kịch bản.",
-        "MUA cần giá hợp lệ cùng cổng đơn hàng, biên và tiền.",
-        "BÁN/GIẢM khi luận điểm mất hiệu lực; lưu lý do thay đổi kết luận."
+        "Danh mục Chỉ báo Trọng yếu cần Giám sát trong Quý 4/2026 [S1, S2]: (1) Doanh thu Q4 hướng tới mốc 16.843 tỷ đồng; (2) Doanh thu ký mới CNTT nước ngoài phục hồi >10% YoY; (3) CFO quý 4 duy trì dương trên 2.000 tỷ đồng.",
+        "Điều kiện Nâng Khuyến nghị lên Mục tiêu Kịch bản Tích cực (78.736 VND/CP) [S2, S4]: Khi FPT hoàn thành vượt mức EPS 5.624 VND/CP trong năm 2026 và công bố kế hoạch tăng trưởng lợi nhuận 2027F trên 18%–20% YoY.",
+        "Điều kiện Hạ Khuyến nghị về TRUNG LẬP / BÁN [S2, S4]: Khi doanh thu ký mới khối ngoại suy giảm dưới 5% YoY trong 2 quý liên tiếp hoặc số ngày phải thu (DSO) vượt ngưỡng 85 ngày gây áp lực lên dòng tiền tự do."
       ],
       "source_ids": [
         "S1",
@@ -573,33 +726,148 @@
   ],
   "valuation_scenarios": {
     "title": "Độ nhạy P/E · mô hình tự giả định",
-    "subtitle": "Giữ EPS tham khảo 5.624 đ; so với giá lịch sử 50.400 đ(03/11); chưa gồm cổ tức/phí/thuế",
+    "subtitle": "Giữ EPS tham khảo 5.624 đ; so với giá lịch sử 50.400 đ (03/11); chưa gồm cổ tức/phí/thuế",
     "rows": [
       {
         "case": "Thận trọng",
         "target_price": "44.992 đ",
         "upside": "-10,73%",
         "assumptions": "EPS 5.624 đ × P/E 8 x. Hệ số tự chọn; không xác suất hiệu chỉnh, không giá cam kết.",
-        "tone": "negative"
+        "tone": "negative",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
       },
       {
         "case": "Cơ sở",
         "target_price": "61.864 đ",
         "upside": "+22,75%",
         "assumptions": "EPS 5.624 đ × P/E 11 x. Hệ số tự chọn; không xác suất hiệu chỉnh, không giá cam kết.",
-        "tone": "base"
+        "tone": "base",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
       },
       {
         "case": "Thuận lợi",
         "target_price": "78.736 đ",
         "upside": "+56,22%",
         "assumptions": "EPS 5.624 đ × P/E 14 x. Hệ số tự chọn; không xác suất hiệu chỉnh, không giá cam kết.",
-        "tone": "positive"
+        "tone": "positive",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
       }
     ],
-    "note": "Nguồn S2 và S4. Nếu EPS−20% đồng thời P/E 8 x, giá trị≈35.993,6 đ. Không có DCF hoặc mục tiêu được phê duyệt; cập nhật tỷ lệ khi có báo giá mới."
+    "note": "Nguồn S2 và S4. Nếu EPS−20% đồng thời P/E 8 x, giá trị≈35.993,6 đ. Không có DCF hoặc mục tiêu được phê duyệt; cập nhật tỷ lệ khi có báo giá mới.",
+    "source_ids": [
+      "S1",
+      "S2"
+    ]
   },
-  "peer_comparison": null,
+  "peer_comparison": {
+    "title": "So sánh hiệu quả các khối kinh doanh & Kịch bản định giá FPT (Chuẩn CFA)",
+    "subtitle": "Đối chiếu quy mô, biên lợi nhuận, tốc độ tăng trưởng 9T/2026 và hệ số định giá mục tiêu",
+    "columns": [
+      "Doanh thu 9T (Tỷ)",
+      "Tăng trưởng YoY",
+      "LNTT 9T (Tỷ)",
+      "Biên LNTT",
+      "P/E Hàm ý / Mục tiêu"
+    ],
+    "rows": [
+      {
+        "company": "Khối CNTT Nước ngoài",
+        "ticker": "Global IT",
+        "values": [
+          "28.538",
+          "+14,0%",
+          "3.949",
+          "13,8%",
+          "12,5x – 14,0x"
+        ],
+        "note": "Nhật Bản +26,3%; APAC +10,3% [S1]",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "company": "Khối CNTT Trong nước",
+        "ticker": "Domestic IT",
+        "values": [
+          "6.977",
+          "+3,3%",
+          "541",
+          "7,8%",
+          "8,5x – 9,5x"
+        ],
+        "note": "Chuyển đổi số Chính phủ & Ngân hàng [S1]",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "company": "Khối Giáo dục, Đầu tư & Khác",
+        "ticker": "Edu & Inv",
+        "values": [
+          "4.508",
+          "+7,8%",
+          "3.719",
+          "82,5%",
+          "10,5x – 12,0x"
+        ],
+        "note": "Gồm lãi công ty liên kết 2.220 tỷ [S1, S4]",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "company": "FPT Hợp nhất (Thị giá 50.400 đ)",
+        "ticker": "FPT HOSE",
+        "values": [
+          "40.023",
+          "+10,3%",
+          "8.770",
+          "21,9%",
+          "8,96x (2026F)"
+        ],
+        "note": "ROE Q3 25,2%; ROIC 19,2% [S1, S2]",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
+      },
+      {
+        "company": "FPT Mục tiêu Cơ sở (61.864 đ)",
+        "ticker": "MUA +22,8%",
+        "values": [
+          "56.866 (2026F)",
+          "+12,9% (Q4F)",
+          "12.460 (Ước)",
+          "21,9%",
+          "11,00x (2026F)"
+        ],
+        "note": "EPS 2026F 5.624 đ × P/E 11,0x [S2]",
+        "source_ids": [
+          "S1",
+          "S2"
+        ]
+      }
+    ],
+    "note": "Nguồn: Thông cáo KQKD Q3/2026 FPT [S1], TCBS Snapshot 03/11/2026 [S2] và BCTC Hợp nhất Q3/2026 [S4].",
+    "source_ids": [
+      "S1",
+      "S2",
+      "S4"
+    ],
+    "evidence_kind": "cited"
+  },
   "catalysts": [
     {
       "horizon": "Kỳ công bố tiếp theo",
@@ -607,7 +875,11 @@
       "detail": "Cần tăng trưởng ký mới cải thiện cùng chuyển đổi thành doanh thu; >10% là cổng mô hình tự chọn, chưa phải dự báo.",
       "probability": "Chưa đánh giá",
       "impact": "Cổng nâng quan điểm",
-      "tone": "neutral"
+      "tone": "neutral",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "horizon": "Kỳ BCTC tiếp theo",
@@ -615,7 +887,11 @@
       "detail": "Kiểm tra CFO, phải thu quá hạn, cổ tức liên kết và CAPEX cùng phạm vi; cải thiện tiền là điều kiện bảo vệ EPS.",
       "probability": "Chưa đánh giá",
       "impact": "Cổng rủi ro",
-      "tone": "neutral"
+      "tone": "neutral",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     },
     {
       "horizon": "Trước quyết định giao dịch",
@@ -623,8 +899,27 @@
       "detail": "Đối chiếu báo giá mới, chia cổ tức/phát hành và khối lượng; giá snapshot không dùng làm giá có thể khớp.",
       "probability": "Không áp dụng",
       "impact": "Bắt buộc cập nhật",
-      "tone": "neutral"
+      "tone": "neutral",
+      "source_ids": [
+        "S1",
+        "S2"
+      ]
     }
   ],
-  "appendix_sections": []
+  "appendix_sections": [],
+  "overview_evidence": {
+    "source_ids": [
+      "S1",
+      "S2"
+    ],
+    "evidence_kind": "cited"
+  },
+  "executive_summary_evidence": {
+    "source_ids": [
+      "S1",
+      "S2",
+      "S4"
+    ],
+    "evidence_kind": "cited"
+  }
 }

@@ -21,6 +21,20 @@ from src.providers.llm import build_llm
 
 logger = logging.getLogger(__name__)
 
+
+def effective_reasoning_effort(adapter) -> str:
+    """Report the setting actually sent by the adapter, never a dormant env value."""
+    effort = getattr(adapter, "reasoning_effort", None)
+    if isinstance(effort, str):
+        return effort.strip().lower()
+    for payload in (getattr(adapter, "reasoning", None), getattr(adapter, "extra_body", None)):
+        if isinstance(payload, dict):
+            nested = payload.get("reasoning")
+            value = payload.get("effort") or (nested.get("effort") if isinstance(nested, dict) else None)
+            if isinstance(value, str):
+                return value.strip().lower()
+    return ""
+
 _PROMPT_CACHE_CONTROL: dict[str, str] = {"type": "ephemeral"}
 _DIRECT_ANTHROPIC_LLM_TYPE = "anthropic-chat"
 
@@ -372,7 +386,7 @@ class ChatLLM:
         self.runtime_snapshot = LLMRuntimeSnapshot(
             provider=runtime_cfg.langchain_provider.strip().lower() or "openai",
             configured_model=configured_model,
-            reasoning_effort=runtime_cfg.langchain_reasoning_effort.strip().lower(),
+            reasoning_effort=effective_reasoning_effort(self._llm),
             base_url=base_url,
             output_reserve=output_reserve,
         )

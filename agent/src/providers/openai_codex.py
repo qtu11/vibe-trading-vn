@@ -720,7 +720,7 @@ class OpenAICodexLLM:
         self.temperature = temperature
         self.timeout = timeout
         self.tools = tools or []
-        self.reasoning_effort = reasoning_effort
+        self.reasoning_effort = reasoning_effort if reasoning_effort and reasoning_effort.lower() != "none" else None
         self.codex_url = validate_codex_base_url(codex_url or get_env_config().llm.openai_codex_base_url)
 
     def bind_tools(self, tools: list[dict[str, Any]]) -> "OpenAICodexLLM":

@@ -502,7 +502,7 @@ class _PolicyMixin:
             self._symbol_for_claim(line, symbol_records) for line, _ in positions
         ]
         declared_observed = {
-            declaration.value
+            (declaration.value, declaration.percent)
             for declaration in block.declarations
             if declaration.role == "observed"
         }
@@ -2384,7 +2384,7 @@ class _PolicyMixin:
         figure: Figure,
         declaration: Declaration,
         symbol: str | None,
-        declared_observed: set[float],
+        declared_observed: set[tuple[float, bool]],
         line: str,
     ) -> list[dict[str, Any]]:
         """A cited figure names a source the reader can see and does not pose as a print.
@@ -2415,19 +2415,6 @@ class _PolicyMixin:
                     "is declared cited but names no source in its note",
                 )
             ]
-        if any(_close(figure.value, value) for value in declared_observed):
-            return [
-                self._figure_issue(
-                    "numeric_claim_conflict",
-                    figure,
-                    "cited",
-                    symbol,
-                    "cited_as_observed",
-                    "is declared cited yet presented as an observed value of this "
-                    "instrument",
-                )
-            ]
-
         content = getattr(self, "_active_content", "") or ""
         cited_ids = source_ids_in(declaration.ref) or source_ids_in(declaration.note)
         visible_text = line
@@ -2442,6 +2429,22 @@ class _PolicyMixin:
             # A table caption is the table's citation: every cited cell in it
             # inherits the id the caption shows.
             cited_ids = source_ids_in(table_text)
+
+        if not cited_ids and any(
+            pct == figure.percent and _close(figure.value, value)
+            for value, pct in declared_observed
+        ):
+            return [
+                self._figure_issue(
+                    "numeric_claim_conflict",
+                    figure,
+                    "cited",
+                    symbol,
+                    "cited_as_observed",
+                    "is declared cited yet presented as an observed value of this "
+                    "instrument",
+                )
+            ]
 
         if cited_ids:
             missing = [source_id for source_id in cited_ids if self.source_by_id(source_id) is None]
@@ -2480,9 +2483,15 @@ class _PolicyMixin:
                         source_ids=list(cited_ids),
                     )
                 ]
-            bracketed = [f"[{source.source_id.casefold()}]" for source in matching_sources]
-            folded_visible = visible_text.casefold()
-            if not any(marker in folded_visible for marker in bracketed):
+            visible = any(
+                re.search(
+                    rf"(?:\[{re.escape(source.source_id)}\]|\|\s*{re.escape(source.source_id)}\s*\||\({re.escape(source.source_id)}\))",
+                    visible_text,
+                    re.IGNORECASE,
+                )
+                for source in matching_sources
+            )
+            if not visible:
                 return [
                     self._figure_issue(
                         "numeric_claim_conflict",

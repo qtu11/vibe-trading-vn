@@ -89,8 +89,11 @@ _DATE_RE = re.compile(
 )
 
 # SHAPE 3 — a line-leading list marker or numbered heading. The punctuation is
-# required, so a line opening with a figure ("1.171 元是收盘价") is untouched.
-_ORDINAL_RE = re.compile(r"(?m)^[^\S\n]*(?:#{1,6}[^\S\n]*)?\d{1,3}[.)、][^\S\n]+")
+# required on plain lines, so a line opening with a figure ("1.171 元是收盘价") is
+# untouched; a Markdown heading ("### 3.1 Hiệu suất giá") is always structural.
+_ORDINAL_RE = re.compile(
+    r"(?m)^[^\S\n]*(?:#{1,6}[^\S\n]+\d{1,3}(?:\.\d{1,3})*[.)、]?[^\S\n]+|(?:#{1,6}[^\S\n]*)?\d{1,3}[.)、][^\S\n]+)"
+)
 
 # SHAPE 5 — a table cell that only numbers its row ("1", "2.", "3)"), and a word
 # inside a cell: two or more letters of any script ("12m mean return", "12个月").
@@ -445,7 +448,7 @@ _DOTTED_DECIMAL_RE = re.compile(
 # own because the same spelling can be a decimal. It is grouping only after the
 # surrounding document has independently established decimal-comma notation.
 _DOTTED_GROUPING_RE = re.compile(
-    r"(?<![\d.,])[+-]?[1-9]\d{0,2}(?:\.\d{3})+(?![\d.,])"
+    r"(?<![\d.,])[+-]?[1-9]\d{0,2}(?:\.\d{3})+(?!(?:\d|[.,]\d))"
 )
 
 # Beside a Vietnamese magnitude the dot is unambiguously a group separator:

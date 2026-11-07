@@ -165,6 +165,116 @@ class RatingBand(BaseModel):
     rule: str = Field(min_length=1, max_length=160)
 
 
+class ChartSeries(DatumEvidence):
+    """One numeric series of a section chart.
+
+    Cited/observed values are matched number by number against the source
+    text collected by tools in this run (see ``reporting.evidence``). There is
+    no free-form "derived" series: calculated lines come from ``line_formula``
+    and are computed by the server, never typed in by the model.
+    """
+
+    label: str = Field(min_length=1, max_length=80)
+    values: list[float] = Field(default_factory=list, max_length=8)
+    unit: str = Field(default="", max_length=35)
+    decimals: int = Field(default=0, ge=0, le=4)
+
+    @field_validator("values")
+    @classmethod
+    def finite_values(cls, values):
+        if any(not math.isfinite(value) for value in values):
+            raise ValueError("Chuỗi biểu đồ không được chứa NaN/Inf")
+        return values
+
+
+ChartFormula = Literal["ratio_to_bars_pct", "share_of_total_pct"]
+
+
+class SectionChart(BaseModel):
+    """A bar (+ optional line) chart whose every point is source-bound or server-computed."""
+
+    title: str = Field(min_length=1, max_length=140)
+    caption: str = Field(default="", max_length=180)
+    categories: list[str] = Field(min_length=2, max_length=8)
+    bars: ChartSeries
+    #: Cited line, or only ``label`` when ``line_formula`` computes the values.
+    line: ChartSeries | None = None
+    #: ``ratio_to_bars_pct``: line = line_numerator / bars x 100 (e.g. margin).
+    #: ``share_of_total_pct``: line = bars / bars[line_base_index] (or sum) x 100.
+    line_formula: ChartFormula | None = None
+    line_numerator: ChartSeries | None = None
+    line_base_index: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def validate_points(self):
+        count = len(self.categories)
+        if len(set(self.categories)) != count:
+            raise ValueError(f"Biểu đồ '{self.title}' trùng nhãn danh mục")
+        cited = {"observed", "cited"}
+        series = [("bars", self.bars), ("line_numerator", self.line_numerator)]
+        if self.line_formula is None:
+            series.append(("line", self.line))
+        for name, item in series:
+            if item is None:
+                continue
+            if len(item.values) != count:
+                raise ValueError(f"Biểu đồ '{self.title}': {name} cần đúng {count} giá trị")
+            if item.evidence_kind not in cited:
+                raise ValueError(
+                    f"Biểu đồ '{self.title}': {name} phải là số liệu có nguồn (cited/observed); "
+                    "số liệu tính toán dùng line_formula"
+                )
+        if self.line_formula is None:
+            if self.line_numerator is not None or self.line_base_index is not None:
+                raise ValueError(f"Biểu đồ '{self.title}': line_numerator/line_base_index cần line_formula")
+            return self
+
+        bars = self.bars.values
+        if self.line_formula == "ratio_to_bars_pct":
+            if self.line_numerator is None:
+                raise ValueError(f"Biểu đồ '{self.title}': ratio_to_bars_pct cần line_numerator")
+            if self.line_numerator.unit.strip().casefold() != self.bars.unit.strip().casefold():
+                raise ValueError(f"Biểu đồ '{self.title}': tử số và cột phải cùng đơn vị")
+            if any(value == 0 for value in bars):
+                raise ValueError(f"Biểu đồ '{self.title}': mẫu số bằng 0")
+            computed = [n / d * 100 for n, d in zip(self.line_numerator.values, bars)]
+            inputs = [self.bars, self.line_numerator]
+            method = f"{self.line_numerator.label} / {self.bars.label} x 100"
+        else:
+            if self.line_numerator is not None:
+                raise ValueError(f"Biểu đồ '{self.title}': share_of_total_pct không dùng line_numerator")
+            if self.line_base_index is not None and self.line_base_index >= count:
+                raise ValueError(f"Biểu đồ '{self.title}': line_base_index ngoài phạm vi")
+            base = bars[self.line_base_index] if self.line_base_index is not None else sum(bars)
+            if base == 0:
+                raise ValueError(f"Biểu đồ '{self.title}': tổng/mẫu số bằng 0")
+            computed = [value / base * 100 for value in bars]
+            inputs = [self.bars]
+            anchor = self.categories[self.line_base_index] if self.line_base_index is not None else "tổng"
+            method = f"{self.bars.label} / {anchor} x 100"
+
+        decimals = self.line.decimals if self.line is not None else 1
+        rounded = [round(value, decimals) for value in computed]
+        if self.line is not None and self.line.values:
+            # A model-typed line is accepted only when it equals the recomputation.
+            tolerance = 0.5 * 10 ** -decimals + 1e-9
+            if len(self.line.values) != count or any(
+                not math.isclose(given, value, rel_tol=0, abs_tol=tolerance)
+                for given, value in zip(self.line.values, computed)
+            ):
+                raise ValueError(f"Biểu đồ '{self.title}': đường tỷ lệ không khớp công thức {self.line_formula}")
+        self.line = ChartSeries(
+            label=self.line.label if self.line is not None else "Tỷ lệ (%)",
+            values=rounded,
+            unit="%",
+            decimals=decimals,
+            evidence_kind="derived",
+            source_ids=list(dict.fromkeys(sid for item in inputs for sid in item.source_ids)),
+            methodology=f"Máy chủ tính: {method}",
+        )
+        return self
+
+
 class NarrativeSection(DatumEvidence):
     """A free-form but structured section for deep analysis (SWOT, industry, ...)."""
 
@@ -173,6 +283,8 @@ class NarrativeSection(DatumEvidence):
     paragraphs: list[str] = Field(default_factory=list)
     bullets: list[str] = Field(default_factory=list)
     page_break_before: bool = False
+    #: Up to two charts built only from numbers collected for this report.
+    charts: list[SectionChart] = Field(default_factory=list, max_length=2)
 
 
 class PeerRow(DatumEvidence):
@@ -340,10 +452,14 @@ class ResearchReport(BaseModel):
                 raise ValueError("price_history phải sắp xếp thời gian và không trùng ngày")
             if max(dates) > self.data_as_of:
                 raise ValueError("Giá tương lai so với data_as_of")
+            if len({(point.unit, point.price_basis) for point in self.price_history}) != 1:
+                raise ValueError("Chuỗi giá phải cùng đơn vị và cơ sở điều chỉnh")
 
         periods = [p.period for p in self.quarterly_results]
         if len(periods) != len(set(periods)):
             raise ValueError("quarterly_results trùng kỳ")
+        if len({point.unit for point in self.quarterly_results}) > 1:
+            raise ValueError("Biểu đồ kết quả theo kỳ phải cùng đơn vị")
 
         if self.demo:
             self.publication_status = "simulated_demo"
@@ -359,7 +475,8 @@ class ResearchReport(BaseModel):
                 if source.status == "verified":
                     source.status = "unverified"
             for path, item in items:
-                if item.evidence_kind in {"observed", "cited"} and not item.source_ids:
+                must_cite = item.evidence_kind in {"observed", "cited"}
+                if must_cite and not item.source_ids:
                     raise ValueError(f"Thiếu source_ids: {path}")
                 if item.evidence_kind in {"derived", "assumption"} and not item.methodology.strip():
                     raise ValueError(f"Thiếu phương pháp/giả định: {path}")
@@ -375,6 +492,10 @@ class ResearchReport(BaseModel):
                     key = path.split(".", 1)[1]
                     if key in item.input_keys:
                         raise ValueError(f"Đầu vào tự tham chiếu: {key}")
+                for dep_key in item.input_keys:
+                    dep = important[dep_key]
+                    if dep.value is None and not dep.source_ids and not dep.input_keys:
+                        raise ValueError(f"Đầu vào '{dep_key}' của {path} chưa có giá trị hoặc nguồn")
 
             for m in self.financial_metrics + self.valuation_metrics:
                 if m.value is not None and m.as_of is None:
@@ -415,6 +536,14 @@ def iter_report_evidence(report: ResearchReport):
                  "analysis_sections", "appendix_sections", "catalysts"):
         for index, item in enumerate(getattr(report, name)):
             yield f"{name}.{getattr(item, 'key', index)}", item
+    for name in ("analysis_sections", "appendix_sections"):
+        for index, section in enumerate(getattr(report, name)):
+            for chart_index, chart in enumerate(section.charts):
+                prefix = f"{name}.{index}.charts.{chart_index}"
+                for part in ("bars", "line_numerator", "line"):
+                    series = getattr(chart, part)
+                    if series is not None:
+                        yield f"{prefix}.{part}", series
     for name in ("financial_table", "peer_comparison", "valuation_scenarios"):
         table = getattr(report, name)
         if table is None:

@@ -95,6 +95,17 @@ def test_daily_volume_bars_do_not_overlap_or_fill_missing_values(chart_capture, 
     assert all(0 < bar.get_width() < 1 for bar in bars)
 
 
+def test_chart_never_compares_adjusted_history_to_a_raw_target(chart_capture, tmp_path):
+    sample = report(demo=False, price_history=[
+        PricePoint(date=date(2026, 11, 4), close=50, unit="VND", price_basis="total_return"),
+        PricePoint(date=date(2026, 11, 5), close=51, unit="VND", price_basis="total_return")],
+        valuation_metrics=[Metric(key="target_price", label="Target", value=100, unit="VND", price_basis="raw")])
+    renderer.create_price_chart(sample, tmp_path / "separate-bases.png")
+    axes = chart_capture[0].axes[0]
+    assert len(axes.lines) == 1
+    assert "điều chỉnh chia tách và cổ tức" in axes.get_title(loc="left")
+
+
 def test_contents_numbers_follow_optional_sections():
     sample = report(
         analysis_sections=[NarrativeSection(heading=f"Chương {i}") for i in range(3)],
@@ -118,6 +129,7 @@ def test_narrative_chapters_honor_page_breaks_and_heading_navigation():
     section = SimpleNamespace(heading="Chương phân tích", subtitle="", paragraphs=["Nội dung"],
                               bullets=[], source_ids=[], page_break_before=True)
     document = renderer.setup_document()
+    # pyrefly: ignore[bad-argument-type]
     renderer.add_narrative_section(document, section, number="06")
     heading = document.paragraphs[0]
     assert heading.paragraph_format.page_break_before is True

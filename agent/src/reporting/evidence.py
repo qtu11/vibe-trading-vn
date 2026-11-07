@@ -9,7 +9,7 @@ import re
 from typing import TYPE_CHECKING
 
 from src.agent.grounding.sources import SourceRecord, canonical_url, numeric_candidates
-from src.reporting.schema import DatumEvidence, Metric, Recommendation, ResearchReport, iter_report_evidence
+from src.reporting.schema import DatumEvidence, Recommendation, ResearchReport, iter_report_evidence
 
 if TYPE_CHECKING:
     from src.agent.grounding.ledger import GroundingLedger
@@ -86,11 +86,17 @@ def _same_symbol(report: ResearchReport, symbol: str) -> bool:
     return report.market.value == "VN_EQUITY" and actual == f"{expected}.VN"
 
 
+_CELL_VALUE_PATH_RE = re.compile(
+    r"^(financial_table|peer_comparison|valuation_scenarios)\.rows\.(\d+)\.values\.(\d+)$"
+)
+
+
 def _values(report: ResearchReport, path: str, item: DatumEvidence):
     if path in {"overview", "executive_summary"}:
         return [getattr(report, path)]
-    if ".values." in path:
-        name, _, row, _, column = path.split(".")
+    cell_match = _CELL_VALUE_PATH_RE.match(path)
+    if cell_match:
+        name, row, column = cell_match.groups()
         return [getattr(report, name).rows[int(row)].values[int(column)]]
     if path.endswith(".note"):
         return [item.note]
@@ -106,19 +112,35 @@ def _values(report: ResearchReport, path: str, item: DatumEvidence):
     return result
 
 
+def _record_rank(record: SourceRecord) -> tuple[int, int, int]:
+    valid = int(bool(record.text_sha256 and record.content_chars and record.cite_allowed))
+    return (valid, len(record.numbers), record.content_chars)
+
+
 def _supports_numbers(report, path, item, records):
     candidates = [number for record in records for number in record.numbers]
     for value in _values(report, path, item):
         if isinstance(value, (float, int)):
+            raw = float(value)
             _, scale = _unit(getattr(item, "unit", ""))
-            number = float(value) * scale
-            tolerance = 0.5 * 10 ** -getattr(item, "decimals", 6) * scale
-            if not any(math.isclose(number, candidate, rel_tol=1e-9, abs_tol=tolerance) for candidate in candidates):
+            base_tol = 0.5 * 10 ** -getattr(item, "decimals", 6)
+            checks = [(raw * scale, base_tol * scale)]
+            if scale != 1.0 and not path.endswith(".market_price"):
+                # Financial tables often declare "Đơn vị: Tỷ đồng" once in the table
+                # header rather than repeating "tỷ" after every cell value.
+                checks.append((raw, base_tol))
+            if not any(
+                math.isclose(target, candidate, rel_tol=1e-9, abs_tol=tol)
+                for target, tol in checks
+                for candidate in candidates
+            ):
                 raise ValueError(f"Số liệu không có trong nội dung nguồn đã thu thập: {path} ({value})")
         elif isinstance(value, str):
             # Reuse the source parser's locale/scale readings for each numeric token.
-            for match in re.finditer(r"(?<![\w])[-+]?\d(?:[\d.,\u00a0]*\d)?", value):
-                readings = numeric_candidates(value[match.start():match.end() + 18])
+            matches = list(re.finditer(r"(?<![\w])[-+]?\d(?:[\d.,\u00a0]*\d)?", value))
+            for index, match in enumerate(matches):
+                end = min(match.end() + 18, matches[index + 1].start() if index + 1 < len(matches) else len(value))
+                readings = numeric_candidates(value[match.start():end])
                 if readings and not any(math.isclose(number, candidate, rel_tol=0.00001, abs_tol=0.005)
                                         for number in readings for candidate in candidates):
                     raise ValueError(f"Số liệu trong văn bản không có trong nguồn đã thu thập: {path} ({match.group()})")
@@ -132,15 +154,39 @@ def validate_report_evidence(
         return ReportEvidenceAudit(report, False, ("Dữ liệu giả lập; không dùng để giao dịch.",))
     warnings = []
     sources = {source.id: source for source in report.sources}
-    snapshots = {canonical_url(record.url): record for record in context.sources} if context else {}
-    by_id = {record.source_id: record for record in context.sources} if context else {}
+    if context is None:
+        if report.recommendation != Recommendation.NOT_RATED:
+            raise ValueError("Chưa có bằng chứng công cụ trong phiên; không thể xuất khuyến nghị mua/bán")
+        for source in report.sources:
+            source.status = "user_supplied" if source.status == "user_supplied" else "unverified"
+        report.publication_status = "draft_unverified"
+        report.recommendation = Recommendation.NOT_RATED
+        for metric in report.financial_metrics + report.valuation_metrics:
+            if metric.key == "market_price":
+                metric.label = "Giá tham chiếu chưa xác minh"
+        return ReportEvidenceAudit(report, False, ("Chưa có bằng chứng công cụ trong phiên; tài liệu chưa được xếp hạng.",))
+
+    snapshots: dict[str, SourceRecord] = {}
+    for record in context.sources:
+        url_key = canonical_url(record.url)
+        if not url_key:
+            continue
+        existing = snapshots.get(url_key)
+        if existing is None or _record_rank(record) >= _record_rank(existing):
+            snapshots[url_key] = record
+    by_id = {record.source_id: record for record in context.sources}
     bound = {}
     for source in report.sources:
         source.status = "user_supplied" if source.status == "user_supplied" else "unverified"
+        source_url = canonical_url(str(source.url or ""))
+        by_url = snapshots.get(source_url) if source_url else None
         record = by_id.get(source.id)
-        if record and canonical_url(record.url) != canonical_url(str(source.url or "")):
-            raise ValueError(f"URL không khớp nội dung nguồn đã thu thập: {source.id}")
-        record = record or snapshots.get(canonical_url(str(source.url or "")))
+        if record and canonical_url(record.url) != source_url:
+            if by_url is None:
+                raise ValueError(f"URL không khớp nội dung nguồn đã thu thập: {source.id}")
+            record = by_url
+        else:
+            record = record or by_url
         if record and record.text_sha256 and record.content_chars and record.cite_allowed:
             bound[source.id] = record
     unbound = set()
@@ -152,7 +198,7 @@ def validate_report_evidence(
             else:
                 _supports_numbers(report, path, item, [bound[sid] for sid in item.source_ids])
     if unbound:
-        warnings.append("Chưa có nội dung nguồn được công cụ thu thập trong phiên: " + ", ".join(sorted(unbound)))
+        raise ValueError("Nguồn chưa được công cụ thu thập trong phiên: " + ", ".join(sorted(unbound)))
 
     metrics = {metric.key: metric for metric in [*report.financial_metrics, *report.valuation_metrics]}
     price = metrics.get("market_price")
@@ -206,7 +252,9 @@ def validate_report_evidence(
         warnings.append("Chưa xác minh được giá theo mã, sàn, đơn vị, thời điểm và cơ sở điều chỉnh; chưa xếp hạng.")
         if price:
             price.label = "Giá tham chiếu chưa xác minh"
-    if not quote_verified or unbound or not basis_matched:
+    if not quote_verified or not basis_matched:
+        if report.recommendation != Recommendation.NOT_RATED:
+            raise ValueError("Chưa đủ giá, nguồn và cơ sở điều chỉnh để xuất khuyến nghị mua/bán")
         report.recommendation = Recommendation.NOT_RATED
     report.publication_status = "draft_unverified"
     return ReportEvidenceAudit(report, quote_verified, tuple(warnings))

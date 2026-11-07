@@ -62,30 +62,41 @@ def validate_and_release(
             else loop._grounding.validate_final_answer(final_content)
         )
         if not validation.valid:
-            # A draft whose only defect is a missing provenance
-            # word (source / currency / symbol suffix) gets the
-            # word appended, not another multi-minute model round.
-            repaired = loop._grounding.repair_provenance(
-                final_content, validation
+            # A draft whose only defect is a missing citation tag or provenance
+            # word (source / currency / symbol suffix) gets it appended, not
+            # another multi-minute model round.
+            candidate_text = final_content
+            candidate_val = validation
+            repaired_vis = loop._grounding.repair_citation_visibility(
+                candidate_text, candidate_val
             )
-            if repaired is not None:
-                # Non-recording: no model round produced this
-                # text, and ``validation_count`` is the
-                # rejected-draft number the user is shown.
-                recheck = loop._grounding.revalidate(repaired)
-                if recheck.valid:
-                    trace.write(
-                        {
-                            "type": "answer_repaired",
-                            "iter": current_iter,
-                            "issues": validation.issues,
-                        }
-                    )
-                    react_trace.append(
-                        {"type": "answer_repaired", "issues": validation.issues}
-                    )
-                    final_content = repaired
-                    validation = recheck
+            if repaired_vis is not None:
+                recheck_vis = loop._grounding.revalidate(repaired_vis)
+                if len(recheck_vis.issues) < len(candidate_val.issues):
+                    candidate_text = repaired_vis
+                    candidate_val = recheck_vis
+            if not candidate_val.valid:
+                repaired_prov = loop._grounding.repair_provenance(
+                    candidate_text, candidate_val
+                )
+                if repaired_prov is not None:
+                    recheck_prov = loop._grounding.revalidate(repaired_prov)
+                    if len(recheck_prov.issues) < len(candidate_val.issues):
+                        candidate_text = repaired_prov
+                        candidate_val = recheck_prov
+            if candidate_val.valid and candidate_text != final_content:
+                trace.write(
+                    {
+                        "type": "answer_repaired",
+                        "iter": current_iter,
+                        "issues": validation.issues,
+                    }
+                )
+                react_trace.append(
+                    {"type": "answer_repaired", "issues": validation.issues}
+                )
+                final_content = candidate_text
+                validation = candidate_val
         if validation.valid:
             # The figures block is the model's declaration to
             # the gate, not answer text.

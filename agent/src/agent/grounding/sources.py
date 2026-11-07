@@ -36,8 +36,8 @@ from src.agent.grounding.identity import _utc_now
 
 # Bounds keep the persisted artifact and the model-facing index small.
 MAX_SOURCES_PER_SESSION = 40
-MAX_SOURCE_TEXT_CHARS = 20_000
-MAX_SOURCE_NUMBERS = 240
+MAX_SOURCE_TEXT_CHARS = 60_000
+MAX_SOURCE_NUMBERS = 2_000
 MAX_SOURCE_EXCERPT_CHARS = 400
 MAX_SOURCE_QUOTES = 3
 MAX_INDEX_ENTRIES = 8
@@ -327,7 +327,12 @@ class SourceRecord:
 # A number token: grouped thousands or plain, optional decimal part. The
 # lookbehind keeps identifiers such as ``Q3`` and ``S1`` from becoming numbers.
 _NUMBER_TOKEN_RE = re.compile(
-    r"(?<![\w.])[-+]?(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d+)?(?![\w])"
+    r"(?<![\w.])[-+\u2212\u2013]?(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d+)?(?![\w])"
+)
+
+_NEGATIVE_CONTEXT_RE = re.compile(
+    r"(?:giảm|sụt(?:\s+giảm)?|thu\s+hẹp|lỗ|âm|down|drop(?:ped)?|fell|fall(?:en)?|decline[ds]?|decrease[ds]?)\s*(?:khoảng\s+|gần\s+|hơn\s+|tới\s+|đến\s+)?$",
+    re.IGNORECASE,
 )
 
 _UNIT_WORDS = (
@@ -358,8 +363,8 @@ def _numeric_variants(token: str) -> set[float]:
     ``1,234.5``), so an ambiguous single separator yields both readings.
     Ambiguity is acceptable here: this is a presence check, not a valuation.
     """
-    sign = -1.0 if token.startswith("-") else 1.0
-    body = token.lstrip("+-").replace("\u00a0", "")
+    sign = -1.0 if token[:1] in {"-", "\u2212", "\u2013"} else 1.0
+    body = token.lstrip("+-\u2212\u2013").replace("\u00a0", "")
     if not body or not any(char.isdigit() for char in body):
         return set()
     if "," in body and "." in body:
@@ -413,6 +418,10 @@ def _scaled_variants(text: str, end: int, value: float) -> set[float]:
     for word, factor in _UNIT_WORDS:
         if tail.startswith(word):
             scaled.add(value * factor)
+            if factor == 1e12:
+                # "45,2 nghìn tỷ" in Vietnamese tables/summaries is routinely
+                # expressed in tỷ (45.200).
+                scaled.add(value * 1e3)
             break
     return scaled
 
@@ -429,10 +438,17 @@ def numeric_candidates(text: str) -> tuple[float, ...]:
     found: list[float] = []
     seen: set[float] = set()
     for match in _NUMBER_TOKEN_RE.finditer(text[:MAX_SOURCE_TEXT_CHARS]):
+        prefix = text[max(0, match.start() - 28) : match.start()]
+        suffix = text[match.end() : match.end() + 4]
+        negated = bool(_NEGATIVE_CONTEXT_RE.search(prefix)) or (
+            prefix.rstrip().endswith("(") and suffix.lstrip(" \t%").startswith(")")
+        )
         for value in _numeric_variants(match.group(0)):
             if not (value == value and abs(value) != float("inf")):
                 continue
             variants = {value} | _scaled_variants(text, match.end(), value)
+            if negated and value > 0:
+                variants |= {-item for item in list(variants)}
             for item in variants:
                 if not math.isfinite(item) or item in seen:
                     continue

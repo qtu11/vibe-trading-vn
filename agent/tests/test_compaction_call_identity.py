@@ -311,12 +311,18 @@ def test_auto_compact_reopens_head_but_preserves_tail_gate(
         monkeypatch.setattr(h.agent.llm, "chat", fail_summary)
     monkeypatch.setattr("src.agent.loop._llm_timeout_seconds", lambda: 1)
 
-    h.agent._auto_compact(h.messages, h.run_dir, h.trace)
+    before = json.dumps(h.messages)
+    compacted = h.agent._auto_compact(h.messages, h.run_dir, h.trace)
 
     assert balance in h.messages
     if degraded:
-        assert "compaction degraded" in h.messages[1]["content"]
-    assert json.loads(h.call({"statement": "income"})["content"])["status"] == "ok"
+        assert not compacted
+        assert json.dumps(h.messages) == before
+        assert h.agent._last_compaction_status["state"] == "failed"
+        assert json.loads(h.call({"statement": "income"})["content"])["skipped"] is True
+    else:
+        assert compacted
+        assert json.loads(h.call({"statement": "income"})["content"])["status"] == "ok"
     assert len(h.tool.calls) == 2, "summary is not original income data; replay must restore it"
     result = h.call({"statement": "balance"})
     assert json.loads(result["content"])["skipped"] is True

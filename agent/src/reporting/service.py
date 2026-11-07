@@ -49,13 +49,13 @@ class ReportJobService:
     ) -> dict[str, Any]:
         """Validate research content, render branded documents, and stage artifacts."""
         if not isinstance(formats, (list, tuple)) or any(not isinstance(f, str) for f in formats):
-            raise ReportJobError("INVALID_FORMAT", "formats must be a list of docx and/or pdf")
+            raise ReportJobError("INVALID_FORMAT", "formats must be a list of docx, pdf and/or pptx")
         fmt_list = [f.lower().strip() for f in formats]
         for f in fmt_list:
             if f not in ("docx", "pdf", "pptx"):
                 raise ReportJobError("INVALID_FORMAT", f"Unsupported report format: {f}")
         if not fmt_list:
-            raise ReportJobError("MISSING_FORMATS", "At least one format (docx or pdf) must be requested")
+            raise ReportJobError("MISSING_FORMATS", "At least one format (docx, pdf or pptx) must be requested")
         if len(fmt_list) != len(set(fmt_list)):
             raise ReportJobError("INVALID_FORMAT", "Report formats must not contain duplicates")
 
@@ -72,6 +72,8 @@ class ReportJobService:
         except ValidationError as exc:
             msg = "; ".join(f"{err['loc']}: {err['msg']}" for err in exc.errors())
             raise ReportJobError("SCHEMA_VALIDATION_FAILED", f"Dữ liệu báo cáo không đúng chuẩn: {msg}") from exc
+        except ValueError as exc:
+            raise ReportJobError("EVIDENCE_VALIDATION_FAILED", str(exc)) from exc
         except Exception as exc:
             raise ReportJobError("INVALID_PAYLOAD", f"Lỗi nạp dữ liệu báo cáo: {exc}") from exc
 
@@ -121,9 +123,12 @@ class ReportJobService:
                 else:
                     artifact_meta["job_id"] = job_id
                     artifacts.append(artifact_meta)
-                    index = self.storage_root / "artifacts"
-                    index.mkdir(exist_ok=True)
-                    (index / f"{artifact_meta['report_id']}.json").write_text(json.dumps({"job_id": job_id}), encoding="utf-8")
+                    try:
+                        index = self.storage_root / "artifacts"
+                        index.mkdir(exist_ok=True)
+                        (index / f"{artifact_meta['report_id']}.json").write_text(json.dumps({"job_id": job_id}), encoding="utf-8")
+                    except OSError:
+                        _LOG.warning("Could not index artifact %s; receipt lookup will scan jobs", artifact_meta["report_id"])
 
             if missing:
                 # A requested format did not exist after rendering. Never report
@@ -169,6 +174,13 @@ class ReportJobService:
         try:
             index = json.loads((self.storage_root / "artifacts" / f"{report_id}.json").read_text(encoding="utf-8"))
             job = self.get_job(index["job_id"])
-            return job if job and any(a["report_id"] == report_id for a in job["artifacts"]) else None
+            if job and any(a["report_id"] == report_id for a in job["artifacts"]):
+                return job
         except (OSError, ValueError, KeyError, TypeError):
-            return None
+            pass
+        # Older receipts predate the artifact index; keep existing chat links usable.
+        for path in self.storage_root.glob("*.json"):
+            job = self.get_job(path.stem)
+            if isinstance(job, dict) and any(isinstance(a, dict) and a.get("report_id") == report_id for a in job.get("artifacts", [])):
+                return job
+        return None

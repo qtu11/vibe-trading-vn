@@ -164,9 +164,7 @@ export function Layout() {
             aria-label="Vibe-Trading"
             className={cn("flex items-center group", collapsed ? "justify-center" : "gap-2.5 max-md:justify-center")}
           >
-            <div className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 via-primary/5 to-transparent p-1.5 ring-1 ring-border/80 group-hover:ring-primary/50 group-hover:scale-105 transition-all shadow-sm">
-              <BrandMark className="h-7 w-7 shrink-0" priority />
-            </div>
+            <BrandMark className="h-8 w-8 shrink-0 group-hover:scale-105 transition-transform" priority />
             {!collapsed && (
               <div className="flex flex-col min-w-0 max-md:hidden">
                 <span className="text-[15px] font-bold tracking-tight text-foreground leading-tight">Vibe-Trading</span>

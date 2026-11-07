@@ -30,6 +30,7 @@ import { ActivityLine } from "@/components/chat/ActivityLine";
 import { LlmUsageCounter } from "@/components/chat/LlmUsageCounter";
 import type { ContextSnapshot } from "@/components/chat/ContextMemoryPanel";
 import { ContextUsageIndicator } from "@/components/chat/ContextUsageIndicator";
+import { ComposerModelControls } from "@/components/chat/ComposerModelControls";
 import { MandateProposalCard } from "@/components/chat/MandateProposalCard";
 import { ScheduledResearchProposalCard } from "@/components/chat/ScheduledResearchProposalCard";
 import { SwarmStatusCard } from "@/components/chat/SwarmStatusCard";
@@ -284,6 +285,7 @@ export function Agent() {
   const streamingText = useAgentStore(s => s.streamingText);
   const status = useAgentStore(s => s.status);
   const sessionId = useAgentStore(s => s.sessionId);
+  const reportPreviewOpen = useReportPreviewStore((state) => state.selection !== null);
   useEffect(() => {
     useReportPreviewStore.getState().close();
     return () => useReportPreviewStore.getState().close();
@@ -1838,7 +1840,7 @@ export function Agent() {
 
   return (
     <div className="relative flex h-full min-w-0 overflow-hidden">
-    <div className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
+    <div className={`flex flex-col flex-1 min-w-0 overflow-hidden h-full ${reportPreviewOpen ? "max-lg:hidden" : ""}`}>
       <ModelRuntimeBar
         settings={llmSettings}
         runtimeProvider={visibleRuntimeIdentity.provider}
@@ -2052,12 +2054,15 @@ export function Agent() {
               onCancelSwarm={handleCancelSwarm}
             />
           </LiveRuntimePanel>
+          <div className="mt-2 flex min-w-0 items-center justify-between gap-2">
+          <ComposerModelControls settings={llmSettings} disabled={status === "streaming"} onChange={setLlmSettings} />
           <ContextUsageIndicator
             key={`${sessionId || "draft"}:${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
             sessionId={sessionId}
             live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined}
             modelKey={`${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
           />
+          </div>
         </div>
       </div>
     </div>

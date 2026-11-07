@@ -1,4 +1,8 @@
-"""Generate the evidence-based FPT deep research draft and check its PDF length."""
+"""Export supplied research for any ticker and verify the requested PDF depth.
+
+The filename is retained for existing scripts. Static inputs are unrated drafts;
+live evidence-bound research is exported through the agent tool instead.
+"""
 
 from __future__ import annotations
 
@@ -14,16 +18,15 @@ from src.tools.report_artifacts import resolve_report_artifact
 
 
 def main(argv: list[str] | None = None) -> int:
-    root = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--template", type=Path, default=root / "src/reporting/templates/fpt_report_deep.json")
-    parser.add_argument("--output-dir", type=Path, default=root.parent / "output/pdf")
+    parser.add_argument("--template", type=Path, required=True, help="ResearchReport JSON for the requested ticker")
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parents[1] / "output/pdf")
     parser.add_argument("--min-pages", type=int, default=24)
     args = parser.parse_args(argv)
     if args.min_pages < 1:
         parser.error("--min-pages must be positive")
     data = json.loads(args.template.read_text(encoding="utf-8"))
-    job = ReportJobService().create_job(data, formats=["docx", "pdf"])
+    job = ReportJobService().create_job(data, formats=["docx", "pdf", "pptx"])
     if job["status"] != "succeeded":
         print(json.dumps(job, ensure_ascii=False, indent=2))
         return 1
@@ -43,8 +46,13 @@ def main(argv: list[str] | None = None) -> int:
     outputs = []
     for path in resolved:
         destination = args.output_dir / path.name
-        shutil.copyfile(path, destination)
-        outputs.append(str(destination.resolve()))
+        try:
+            shutil.copyfile(path, destination)
+            outputs.append(str(destination.resolve()))
+        except PermissionError:
+            alt = destination.with_stem(f"{destination.stem}_draft_{job['job_id'][:8]}")
+            shutil.copyfile(path, alt)
+            outputs.append(str(alt.resolve()))
     print(json.dumps({"job_id": job["job_id"], "publication_status": job["publication_status"],
                       "pdf_pages": pages, "outputs": outputs}, ensure_ascii=False, indent=2))
     return 0
