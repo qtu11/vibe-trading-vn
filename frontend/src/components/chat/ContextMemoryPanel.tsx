@@ -9,7 +9,7 @@ export interface ContextSnapshot {
   session_id?: string; attempt_id?: string;
   initial_selection?: Selection;
   initial_components?: { prompt_profile?: string; system_chars?: number; recalled_memories?: Array<{ title: string; type: string }> };
-  current_prompt?: { estimated_next_request_tokens?: number; last_reported_input_tokens?: number | null; model_window?: number; window_source?: string; window_confidence?: string; model?: string; provider?: string; phase?: "pre_request" | "post_response" | "post_compaction" | "final"; observed_at?: string; prompt_cost_cap?: number; compact_at?: number };
+  current_prompt?: { estimated_next_request_tokens?: number; last_reported_input_tokens?: number | null; model_window?: number; window_source?: string; window_confidence?: string; model?: string; provider?: string; phase?: "pre_request" | "post_response" | "post_compaction" | "final" | "session_preview"; observed_at?: string; prompt_cost_cap?: number; compact_at?: number };
   compaction?: { state: "idle" | "running" | "completed" | "failed" | "skipped"; automatic?: boolean; count?: number; updated_at?: string };
 }
 export interface ContextView {

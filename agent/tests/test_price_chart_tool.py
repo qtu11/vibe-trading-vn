@@ -73,6 +73,7 @@ class TestChartContract:
         assert spec["type"] == "candlestick"
         assert spec["adjustment"] == "split_dividend"
         assert spec["volume_unit"] == "shares"
+        assert spec["retrieved_at"] is None
         assert spec["venue"] == "Vietnam"
         assert spec["range"]["truncated"] is False
         assert spec["bars"][0] == {

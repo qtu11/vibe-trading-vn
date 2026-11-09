@@ -32,7 +32,7 @@ MIRRORED_TOOL_NAMES = (
 
 # Tools that mutate state (is_readonly is not True on the agent side) but are
 # sanctioned sandbox/session writes: Alpha Bench reports, backtest runs, session
-# files, swarm launches, research-goal bookkeeping, selecting which broker
+# files, evidence-bound report exports, swarm launches, research-goal bookkeeping, selecting which broker
 # profile subsequent READS use, and refresh_strategy_evidence (Phase 2, plan
 # D13: rebuilds ONLY the disposable facade-owned evidence cache from local run
 # artifacts — never Alpha Zoo/SDM sources of truth, no network, no credentials)
@@ -45,6 +45,7 @@ KNOWN_MUTATING_MCP_TOOLS = frozenset(
         "add_goal_evidence",
         "alpha_bench",
         "backtest",
+        "export_research_report",
         "refresh_strategy_evidence",
         "adapt_strategy",
         "run_swarm",

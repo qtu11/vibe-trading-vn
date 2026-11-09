@@ -63,7 +63,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
   <tr>
     <td width="33%" valign="top">
       <h4>Chứng khoán Việt Nam</h4>
-      Phân tích bóc tách 4 quý BCTC liên tục cho HOSE, HNX, UPCoM. Xuất bản báo cáo nghiên cứu vốn cổ phần chuẩn CFA 30 trang (Word DOCX/PDF) với 20 biểu đồ combo 2 trục tung tương tác.
+      Nghiên cứu HOSE, HNX, UPCoM từ nguồn dữ liệu đã cấu hình. Xuất dự thảo DOCX/PDF/PPTX có nguồn URL và biểu đồ; luồng nghiên cứu sâu yêu cầu đo PDF tối thiểu 24 trang. Thiếu BCTC hoặc bằng chứng định giá phải được thông báo rõ.
     </td>
     <td width="33%" valign="top">
       <h4>Forex & Vàng (XAUUSD Lab)</h4>
@@ -113,9 +113,9 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
    - Thay thế việc ra quyết định đơn lẻ bằng mạng lưới chuyên viên AI đa nhiệm: Chuyên viên Phân tích Vĩ mô (Macro), Chuyên viên BCTC (Fundamental), Chuyên viên Phân tích Kỹ thuật & SMC (Technical), Giám đốc Quản trị Rủi ro (Risk Manager), Nhà Quản lý Danh mục (Portfolio Manager) và Chuyên viên Thực thi (Execution Agent).
    - Mô hình tranh biện đa chiều (Bull/Bear debate) bắt buộc trước khi đưa ra khuyến nghị phân bổ vốn hoặc giải ngân lệnh.
 
-3. **Engine xuất bản Báo cáo Nghiên cứu Vốn Cổ phần chuẩn CFA & CTCK (VCBS/TCBS/SSI):**
-   - Tự động kết xuất báo cáo Word DOCX và PDF chuyên nghiệp từ 24 đến 30 trang chuyên sâu theo chuẩn thể thức của các tổ chức tài chính lớn.
-   - Tích hợp 20 biểu đồ combo 2 trục tung (dual-axis bar & line chart) trực quan, ma trận bảng phân tích định lượng 3 cột, bảng định giá P/E đa kịch bản (Thận trọng, Cơ sở, Thuận lợi) kèm kiểm định độ nhạy dòng tiền và hộp Miễn trừ trách nhiệm AI pháp lý.
+3. **Engine xuất dự thảo nghiên cứu vốn cổ phần:**
+   - Tool/API nghiên cứu mặc định yêu cầu tối thiểu 24 trang PDF đã đo. File ngắn hơn hoặc chưa đo được trả trạng thái chưa hoàn tất và giữ liên kết tải các file sẵn sàng; cần bổ sung nội dung có bằng chứng để đạt yêu cầu.
+   - Cùng nội dung được xuất ra DOCX, PDF và PPTX, với logo tôm đỏ, bảng, biểu đồ và URL nguồn. Số biểu đồ phụ thuộc dữ liệu đầu vào. Dữ liệu BCTC Việt Nam hiện cần nguồn JSON có provenance trong Data Bridge; báo cáo giữ nhãn dự thảo, chưa được CFA hay tổ chức tài chính nào chứng nhận.
 
 ---
 
@@ -123,7 +123,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 
 | Thị trường | Sàn giao dịch & Sản phẩm | Năng lực phân tích chuyên sâu | Bộ công cụ định lượng | Sản phẩm đầu ra |
 | --- | --- | --- | --- | --- |
-| **Chứng khoán Việt Nam** | HOSE, HNX, UPCoM | Bóc tách 4 quý BCTC, xử lý thay đổi phạm vi hợp nhất, hòa giải so sánh cùng kỳ, rà soát bẫy pha loãng cổ phiếu thưởng | P/E đa kịch bản, P/B ngang ngành, DCF, Reverse DCF, Biên an toàn | Báo cáo phân tích vốn cổ phần CFA 30 trang (Word DOCX & PDF) |
+| **Chứng khoán Việt Nam** | HOSE, HNX, UPCoM | Nghiên cứu BCTC từ nguồn đã cấu hình; cần kiểm chứng kỳ, phạm vi hợp nhất và cơ sở cổ phiếu | P/E, P/B, DCF và Reverse DCF theo đầu vào/giả định được khai báo | Dự thảo DOCX/PDF/PPTX có nguồn; nghiên cứu sâu mặc định yêu cầu PDF ít nhất 24 trang |
 | **Forex & Vàng Quốc tế** | XAUUSD, EURUSD, GBPUSD, USDJPY, CFD | Smart Money Concepts (SMC), Order Block, Fair Value Gap (FVG), Liquidity Sweeps, Đa khung thời gian M1-D1 | Bộ lọc tin vĩ mô thời gian thực (NFP, CPI, Lãi suất Fed), Đo lường rủi ro Max Drawdown | Kịch bản phiên giao dịch (London/NY), Tín hiệu vào lệnh có Stop Loss |
 | **Tiền mã hóa (Crypto)** | BTC, ETH, Altcoins, Hợp đồng Tương lai Vĩnh viễn (Perp) | Funding Rate Heatmap, Open Interest (OI), Liquidation Map, Phân tích đường cong cơ sở Futures vs Spot (Basis Curve) | Mô hình rủi ro Perpetual, On-chain token flow tracker, Định giá quyền chọn crypto | Chiến lược Basis Arbitrage, Cảnh báo đòn bẩy và thanh lý vị thế |
 
@@ -244,38 +244,24 @@ flowchart TB
 
 ### Chi tiết 5 bước vận hành của hệ thống:
 1. **Thu thập & Chuẩn hóa (Ingestion)**: 29 bộ nạp dữ liệu kết nối nguồn dữ liệu lịch sử và thời gian thực, đồng bộ múi giờ và cấu trúc nến OHLCV.
-2. **Khóa bằng chứng kiểm toán (Grounding)**: Mọi dữ kiện tài chính đi qua bộ lọc kiểm toán, gắn mã chứng từ `[S1]`, `[S2]`, kiểm tra tính toàn vẹn ngày tháng và loại bỏ hoàn toàn các thẻ bị ẩn (`omitted※`).
+2. **Kiểm chứng bằng chứng (Grounding)**: Gắn nguồn `[S1]`, `[S2]` với URL đã thu thập. Số bị bác dẫn đến rút đoạn hoặc hàng bảng phụ thuộc và hiện thông báo thiếu dữ liệu. Chart lấy trực tiếp từ kết quả công cụ và giữ nguyên JSON qua bộ lọc số.
 3. **Phân tích Hội đồng Đa tác nhân (Swarm Intelligence)**: Các chuyên viên AI độc lập phân tích theo từng chuyên môn, thực hiện vòng tranh biện đối nghịch (Bull vs Bear) để kiểm tra độ tin cậy của luận điểm đầu tư.
 4. **Tính toán Định lượng & Kiểm định (Quant Verification)**: Chạy các mô hình định giá DCF, P/E, kiểm định giả thuyết trên các engine backtest tương ứng với cơ chế chống rò rỉ dữ liệu tương lai (lookahead-free).
-5. **Xuất bản & Thực thi có bảo vệ (Publishing & Execution)**: Kết xuất báo cáo định dạng CFA hoàn chỉnh hoặc đưa lệnh vào hàng đợi thực thi có giám sát rủi ro (mandate check).
+5. **Xuất tài liệu & Thực thi có bảo vệ (Publishing & Execution)**: Kết xuất dự thảo có bằng chứng; khuyến nghị mua/bán cần giá quan sát phù hợp và giá mục tiêu được kiểm tra. Luồng đặt lệnh riêng phải qua mandate/risk gate.
 
 ---
 
 ## 4. Mẫu kết quả phân tích thực tế (Real-World Case Studies)
 
-### Case Study 1: Báo cáo Phân tích Vốn Cổ phần FPT HOSE (30 trang chuẩn CFA)
-Hệ thống kết xuất báo cáo hoàn chỉnh phục vụ nhà đầu tư tổ chức với đầy đủ các cấu phần:
+### Case Study 1: Phát lại và sửa lỗi số/chart của phiên MBB
 
-<p align="center">
-  <img src="assets/baocaomau.png" width="800" alt="Báo cáo phân tích mẫu FPT chuẩn CFA"/>
-</p>
+Phiên ghi nhận ngày 07/11/2026 có kết quả công cụ chứa 53 nến tuần, nhưng bộ lọc số đã sửa `range.returned: 53` thành `(đã lược※)`, làm JSON chart hỏng. Bản sửa giữ chính xác payload công cụ, rút các nhận định thiếu bằng chứng và hiển thị cảnh báo thiếu BCTC.
 
+![Chart MBB phát lại từ dữ liệu đã ghi nhận](artifacts/ui-review/mbb-chart-replay-desktop.png)
 
-* **Tệp báo cáo xuất bản kiểm chứng thực tế**: [VIBE_Research_FPT_20261107_CFA.pdf](output/pdf/VIBE_Research_FPT_20261107_CFA.pdf) (Bản PDF 30 trang đầy đủ 20 biểu đồ combo 2 trục tung, bảng định giá P/E đa kịch bản và chứng từ kiểm toán).
-* **Tóm tắt luận điểm đầu tư**: Khuyến nghị **MUA**, Giá mục tiêu **121,909 VND/CP** (+20.6% upside so với thị giá đóng cửa 101,100 VND).
-* **Bảng định giá P/E đa kịch bản**:
+Đây là phát lại dữ liệu lịch sử để kiểm tra renderer. Các giá FPT, kịch bản định giá và khuyến nghị MUA trong bản README cũ không có bằng chứng đủ để coi là thông tin hiện tại; liên kết PDF cũ cũng không tồn tại trong checkout này, nên đã được gỡ. Xem [biên bản số liệu/chart](docs/CHAT_NUMBERS_CHART_AUDIT_2026-11-08.md) và [receipt phát lại](artifacts/chart-replay-mbb/receipt.json).
 
-| Kịch bản | Tăng trưởng DT | LNST dự phóng | EPS pha loãng | P/E mục tiêu | Giá mục tiêu | Tiềm năng |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Thận trọng** | 15.0% | 9,850 tỷ VND | 6,750 VND | 16.0x | 108,000 VND | +6.8% |
-| **Cơ sở** | **18.5%** | **10,250 tỷ VND** | **7,020 VND** | **17.4x** | **121,909 VND** | **+20.6%** |
-| **Thuận lợi** | 22.0% | 10,800 tỷ VND | 7,400 VND | 18.2x | 135,000 VND | +33.5% |
-
-* **Hệ thống 20 biểu đồ combo 2 trục tung**:
-  - Doanh thu & Tăng trưởng doanh thu Khối Công nghệ thông tin nước ngoài (Nhật Bản, APAC, Châu Âu, Mỹ).
-  - Biên lợi nhuận gộp & Biên lợi nhuận ròng giai đoạn 2021 - 2025 theo từng quý.
-  - Tỷ giá JPY/VND và tác động phòng ngừa rủi ro tỷ giá đối với doanh thu xuất khẩu phần mềm.
-* **Hộp Miễn trừ trách nhiệm AI pháp lý**: Đặt ở cuối trang báo cáo, nêu rõ kết quả phân tích được thực hiện tự động bởi hệ thống AI hỗ trợ ra quyết định và không cấu thành lời mời chào mua bán chứng khoán trực tiếp.
+Các tình huống tiếp theo là ví dụ phương pháp cần đối chiếu dữ liệu gốc, không phải bằng chứng rằng mọi nguồn đang khả dụng hoặc tính năng đã được nghiệm thu toàn bộ.
 
 ### Case Study 2: Phân tích Cổ phiếu Ngân hàng Techcombank (TCB HOSE)
 * **Xử lý bẫy pha loãng**: Tự động nhận diện đợt phát hành cổ phiếu thưởng tỷ lệ 1:1 (3.54 tỷ cổ phiếu mới), cập nhật số lượng cổ phiếu lưu hành đạt 7,085 triệu cổ phiếu và vốn điều lệ đạt 70,450 tỷ VND, ngăn chặn lỗi sai lệch EPS lịch sử.
@@ -629,12 +615,12 @@ Giao diện dòng lệnh tương tác (TUI) cung cấp hệ thống điều ph�
 
 ## 9. Giao thức MCP (Model Context Protocol)
 
-Kết nối bất kỳ máy khách tương thích MCP nào qua giao thức stdio để truy cập 87 công cụ phân tích tài chính, backtest và tình báo thị trường.
+Kết nối bất kỳ máy khách tương thích MCP nào qua giao thức stdio để truy cập 89 công cụ phân tích tài chính, backtest và tình báo thị trường.
 
 <details>
-<summary><b>Tất cả 87 công cụ MCP</b> (87)</summary>
+<summary><b>Tất cả 89 công cụ MCP</b> (89)</summary>
 
-**Danh sách 87 công cụ MCP (87):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `paper_trade_step`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `adapt_strategy`, `refresh_strategy_evidence`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_southbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `export_research_report`, `vietnam_research`, `vietnam_comparables`, `crypto_basis_curve`, `crypto_derivatives`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `get_fund_nav`, `get_cn_macro_series`, `get_cn_announcements`, `search_broker_reports`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`
+**Danh sách 89 công cụ MCP (89):** `list_skills`, `load_skill`, `start_research_goal`, `get_research_goal`, `add_goal_evidence`, `update_research_goal_status`, `backtest`, `paper_trade_step`, `factor_analysis`, `alpha_zoo`, `alpha_bench`, `analyze_options`, `analyze_options_payoff`, `pattern_recognition`, `read_url`, `read_document`, `web_search`, `parallel_web_search`, `concurrent_scraper`, `write_file`, `read_file`, `read_run_artifact`, `list_strategies`, `query_strategies`, `get_strategy_evidence`, `adapt_strategy`, `refresh_strategy_evidence`, `trading_connections`, `trading_select_connection`, `trading_check`, `trading_account`, `trading_positions`, `trading_orders`, `trading_quote`, `trading_history`, `list_swarm_presets`, `run_swarm`, `get_market_data`, `get_fund_flow`, `get_dragon_tiger`, `get_northbound_flow`, `get_southbound_flow`, `get_margin_trading`, `get_block_trades`, `get_shareholder_count`, `get_lockup_expiry`, `get_sector_info`, `get_research_reports`, `get_stock_news`, `get_sec_filings`, `export_research_report`, `vietnam_research`, `vietnam_comparables`, `crypto_basis_curve`, `crypto_derivatives`, `get_financial_statements`, `get_options_chain`, `get_stock_profile`, `screen_market`, `search_symbol`, `get_macro_series`, `get_fund_nav`, `get_cn_macro_series`, `get_cn_announcements`, `search_broker_reports`, `iwencai_search`, `qveris_search`, `qveris_inspect`, `qveris_execute`, `get_institutional_holdings`, `etf_holdings`, `prediction_market`, `research_papers`, `quantlib_call`, `cashflow_performance`, `orderbook_depth`, `sentiment`, `technical_indicators`, `get_fundamentals`, `get_swarm_status`, `get_run_result`, `list_runs`, `reap_stale_runs`, `retry_run`, `analyze_trade_journal`, `extract_shadow_strategy`, `run_shadow_backtest`, `render_shadow_report`, `scan_shadow_signals`
 
 </details>
 
@@ -647,7 +633,7 @@ Vibe-Trading/
 ├── agent/                          # Backend (Python)
 │   ├── cli/                        # CLI package — interactive TUI + subcommands
 │   ├── api_server.py               # FastAPI server — runs, sessions, upload, swarm, SSE
-│   ├── mcp_server.py               # MCP server — 87 tools for OpenClaw / Claude Desktop
+│   ├── mcp_server.py               # MCP server — 89 tools for OpenClaw / Claude Desktop
 │   │
 │   ├── src/
 │   │   ├── agent/                  # ReAct agent core
@@ -662,7 +648,7 @@ Vibe-Trading/
 │   │   ├── memory/                 # Cross-session persistent memory
 │   │   │   └── persistent.py       #   file-based memory (~/.vibe-trading/memory/)
 │   │   │
-│   │   ├── tools/                  # 121 auto-discovered agent tools
+│   │   ├── tools/                  # 123 auto-discovered agent tools
 │   │   │   ├── backtest_tool.py    #   run backtests
 │   │   │   ├── remember_tool.py    #   cross-session memory (save/recall/forget)
 │   │   │   ├── skill_writer_tool.py #  skill CRUD (save/patch/delete/file)

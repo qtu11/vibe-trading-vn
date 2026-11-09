@@ -105,10 +105,10 @@ def test_summary_chunks_preserve_oversized_message_as_labeled_fragments() -> Non
     assert "".join(fragments) == raw
 
 
-def test_auto_compact_folds_all_head_chunks_and_preserves_empty_update(
+def test_auto_compact_folds_all_head_chunks(
     tmp_path: Path,
 ) -> None:
-    """Every head marker reaches a summary call and empty updates keep state."""
+    """Every head marker reaches a summary call before context is replaced."""
     markers = [f"__HEAD_MESSAGE_{index:02d}__" for index in range(6)]
     head_messages = [
         {
@@ -124,7 +124,7 @@ def test_auto_compact_folds_all_head_chunks_and_preserves_empty_update(
         {"role": "assistant", "content": "tail filler " + ("u" * 29_900)},
     ]
     messages = [{"role": "system", "content": "system prompt"}, *head_messages, *tail_messages]
-    llm = _CompactionLLM(["summary-0", "", "summary-2"])
+    llm = _CompactionLLM(["summary-0", "summary-1", "summary-2"])
     agent = _build_agent(llm)
     trace = TraceWriter(tmp_path / "trace")
 
@@ -138,9 +138,7 @@ def test_auto_compact_folds_all_head_chunks_and_preserves_empty_update(
     assert llm.prompts[1].startswith("Update the existing summary")
     assert llm.prompts[2].startswith("Update the existing summary")
     assert "summary-0" in llm.prompts[1]
-    # The second response was empty; its predecessor must still be supplied to
-    # the third fold and remain available after compaction.
-    assert "summary-0" in llm.prompts[2]
+    assert "summary-1" in llm.prompts[2]
     assert agent._previous_summary == "summary-2"
 
     for marker in markers:
@@ -151,3 +149,26 @@ def test_auto_compact_folds_all_head_chunks_and_preserves_empty_update(
     ]
     assert len(compact_entries) == 1
     assert compact_entries[0]["summary_chunks"] == len(llm.prompts)
+
+
+def test_empty_summary_fold_preserves_every_input_and_previous_checkpoint(tmp_path: Path) -> None:
+    messages = [{"role": "system", "content": "system"}, *[
+        {"role": "user", "content": f"head-{index} " + "x" * 29_900}
+        for index in range(8)
+    ]]
+    original = [message.copy() for message in messages]
+    llm = _CompactionLLM(["incomplete update", "", "must not be called"])
+    agent = _build_agent(llm)
+    agent._previous_summary = "previous successful handoff"
+    trace = TraceWriter(tmp_path / "trace")
+    checkpoint = trace.dir_path / "compaction_state.json"
+    checkpoint.write_text('{"summary":"previous successful handoff"}', encoding="utf-8")
+    try:
+        assert agent._auto_compact(messages, tmp_path, trace, iteration=7) is False
+    finally:
+        trace.close()
+    assert len(llm.prompts) == 2
+    assert messages == original
+    assert agent._previous_summary == "previous successful handoff"
+    assert json.loads(checkpoint.read_text(encoding="utf-8"))["summary"] == agent._previous_summary
+    assert agent._last_compaction_status["reason"] == "empty_summary"

@@ -47,6 +47,7 @@ AGENT_DIR = Path(__file__).resolve().parents[1]
 
 READMES = (
     "README.md",
+    "README_en.md",
     "README_zh.md",
     "README_ja.md",
     "README_ko.md",
@@ -388,8 +389,8 @@ def test_the_slash_table_is_the_router(name: str) -> None:
     # Scoped to the TUI table: the IM-channels section further down has its own
     # slash table (``/new``, ``/pairing list``) for a different command set.
     lines = _read(name).splitlines()
-    first = next(i for i, l in enumerate(lines) if l.startswith("| `/help`"))
-    last = next(i for i, l in enumerate(lines) if l.startswith("| `/quit`"))
+    first = next(i for i, line in enumerate(lines) if line.startswith("| `/help`"))
+    last = next(i for i, line in enumerate(lines) if line.startswith("| `/quit`"))
     rows = [line.split("`")[1].lstrip("/") for line in lines[first:last + 1]]
     expected = [command.name for command in SLASH_COMMANDS]
 
@@ -532,7 +533,7 @@ def test_the_skill_category_table_matches_the_frontmatter() -> None:
         counts[key] = counts.get(key, 0) + 1
 
     # Table labels are Title Case with spaces; frontmatter is kebab-case.
-    rows = re.findall(r"^\| ([A-Z][A-Za-z ]+) \| (\d+) \| `", _read("README.md"), re.M)
+    rows = re.findall(r"^\| (?:\*\*)?([A-Z][A-Za-z ]+?)(?:\*\*)? \| (\d+) \| `", _read("README.md"), re.M)
     assert rows, "README.md: skill category table not found"
 
     for label, stated in rows:
@@ -658,7 +659,7 @@ def test_every_registered_source_appears_in_the_data_sources_table(readme: str) 
     from backtest.loaders.registry import LOADER_REGISTRY, _ensure_registered
 
     _ensure_registered()
-    rows = [l for l in _read(readme).splitlines() if l.startswith("| `")]
+    rows = [line for line in _read(readme).splitlines() if line.startswith("| `")]
     table = " ".join(rows)
     missing = sorted(n for n in LOADER_REGISTRY if f"`{n}`" not in table)
     assert not missing, f"{readme}: sources missing from the Data Sources table: {missing}"

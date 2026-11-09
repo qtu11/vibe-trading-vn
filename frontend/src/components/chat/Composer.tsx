@@ -19,7 +19,7 @@ import {
   Loader2,
   Paperclip,
   Plus,
-  Send,
+  ArrowUp,
   Square,
   Target,
   Users,
@@ -342,7 +342,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
       )}
       <LiveRuntimeControl />
 
-      <div data-composer-frame className="relative rounded-[20px] border border-border/70 bg-background px-3 py-2 sm:px-3.5 sm:py-2.5 shadow-sm transition-all focus-within:border-border/90 focus-within:ring-1 focus-within:ring-border/40">
+      <div data-composer-frame className="relative rounded-[22px] border border-black/[0.08] dark:border-white/[0.09] bg-[#f4f4f6] dark:bg-[#1f1f23] px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-[0_4px_20px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_24px_rgba(0,0,0,0.35)] transition-all focus-within:border-[#3b82f6]/60 focus-within:ring-1 focus-within:ring-[#3b82f6]/25">
           {/* Prompt Textarea */}
           <textarea
             ref={inputRef}
@@ -389,16 +389,16 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             aria-label={t("agent.messageInputLabel")}
             aria-readonly={streaming}
             className={[
-              "min-h-[40px] w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-sm leading-relaxed outline-none max-h-40",
-              "placeholder:text-muted-foreground/45 focus:outline-none selection:bg-primary/20",
+              "min-h-[42px] w-full resize-none overflow-y-auto bg-transparent px-1 py-1 text-[13.5px] leading-relaxed outline-none max-h-40",
+              "placeholder:text-muted-foreground/45 focus:outline-none selection:bg-[#3b82f6]/25",
               streaming ? "cursor-not-allowed text-muted-foreground/70" : "text-foreground",
             ].join(" ")}
             readOnly={streaming}
           />
 
-        <div data-composer-toolbar className="flex min-w-0 items-center gap-1.5">
+        <div data-composer-toolbar className="flex min-w-0 items-center gap-2">
           {/* Options / Upload Menu Button */}
-          <div className="relative shrink-0" ref={uploadMenuRef}>
+          <div className="relative shrink-0 flex items-center gap-2" ref={uploadMenuRef}>
             <button
               ref={uploadMenuTriggerRef}
               type="button"
@@ -410,13 +410,12 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-200 disabled:opacity-40 shrink-0 ${
                 showUploadMenu
                   ? "bg-muted text-foreground rotate-45"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground active:scale-95"
+                  : "text-muted-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.08] hover:text-foreground active:scale-95"
               }`}
               title={t("agent.moreOptions")}
             >
               <Plus className="h-4 w-4 transition-transform duration-200" />
             </button>
-
             {showUploadMenu && (
               <div
                 id="agent-more-options-menu"
@@ -446,6 +445,12 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
                 </button>
 
                 <div className="border-t border-white/[0.06] my-1" />
+
+                {showExport && <button type="button" role="menuitem" disabled={!canExport}
+                  onClick={() => { setShowUploadMenu(false); onExport(); }}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-foreground hover:bg-muted disabled:opacity-40 sm:hidden">
+                  <Download className="h-4 w-4" />{t("agent.exportChat")}
+                </button>}
 
                 <button
                   type="button"
@@ -557,7 +562,7 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             <button
               type="button"
               onClick={onCancel}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-80"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-white transition-all hover:bg-[#1d4ed8] active:scale-95 shadow-sm"
               title={t("agent.stopGeneration")}
               aria-label={t("agent.stopGeneration")}
             >
@@ -567,12 +572,11 @@ export const Composer = memo(forwardRef<ComposerHandle, Props>(function Composer
             <button
               type="submit"
               disabled={uploading || (goalComposerActive ? !input.trim() : (!input.trim() && attachments.length === 0))}
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-opacity hover:opacity-80 disabled:opacity-25"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#2563eb] text-white transition-all hover:bg-[#1d4ed8] active:scale-95 disabled:opacity-30 disabled:hover:bg-[#2563eb] shadow-sm"
               title={t("agent.send")}
               aria-label={t("agent.send")}
             >
-              <Send className="h-3.5 w-3.5" />
-              
+              <ArrowUp className="h-4 w-4 stroke-[2.5]" />
             </button>
           )}
         </div>

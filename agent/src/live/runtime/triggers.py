@@ -124,6 +124,30 @@ MARKET_SPECS: Mapping[str, _MarketSpec] = {
         close_time=time(0, 0),
         always_open=True,
     ),
+    "vn_equity": _MarketSpec(
+        tz="Asia/Ho_Chi_Minh",
+        open_time=time(9, 0),
+        close_time=time(15, 0),
+        weekdays=_WEEKDAYS_MON_FRI,
+    ),
+    "hk_equity": _MarketSpec(
+        tz="Asia/Hong_Kong",
+        open_time=time(9, 30),
+        close_time=time(16, 0),
+        weekdays=_WEEKDAYS_MON_FRI,
+    ),
+    "cn_equity": _MarketSpec(
+        tz="Asia/Shanghai",
+        open_time=time(9, 30),
+        close_time=time(15, 0),
+        weekdays=_WEEKDAYS_MON_FRI,
+    ),
+    "forex_metals": _MarketSpec(
+        tz="UTC",
+        open_time=time(0, 0),
+        close_time=time(23, 59),
+        weekdays=_WEEKDAYS_MON_FRI,
+    ),
 }
 
 

@@ -19,6 +19,7 @@ import pytest
 
 from src.tools import run_artifact_tool
 from src.tools.run_artifact_tool import RunArtifactTool, read_run_artifact
+from tests.symlink_support import symlink_or_skip
 
 EQUITY_ROWS = 3821
 EQUITY_COLUMNS = ["date", "equity", "cash", "drawdown"]
@@ -217,7 +218,7 @@ def test_run_dir_outside_allowed_roots_rejected(
 def test_symlink_escape_rejected(run_dir: Path, tmp_path: Path) -> None:
     secret = tmp_path / "secret.csv"
     secret.write_text("a\n1\n", encoding="utf-8")
-    (run_dir / "artifacts" / "trades.csv").symlink_to(secret)
+    symlink_or_skip(run_dir / "artifacts" / "trades.csv", secret)
     env = json.loads(read_run_artifact(str(run_dir), "trades"))
     assert env["ok"] is False
 
@@ -296,7 +297,7 @@ def test_manifest_symlink_entry_escaping_run_dir_refused(
 ) -> None:
     secret = tmp_path / "secret.csv"
     secret.write_text("a\n1\n", encoding="utf-8")
-    (run_dir / "artifacts" / "link.csv").symlink_to(secret)
+    symlink_or_skip(run_dir / "artifacts" / "link.csv", secret)
     _write_run_card(run_dir, [_manifest_entry(run_dir, "artifacts/link.csv")])
     env = json.loads(read_run_artifact(str(run_dir), "artifacts/link.csv"))
     assert env["ok"] is False

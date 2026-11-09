@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Chart unavailable: no complete OHLC candles were retrieved. No candles have been estimated.",
+    "legacyUnavailable": "This saved chart cannot be reconstructed because its candle data was partially redacted. Ask again to generate a fresh chart from observed market data.",
+    "historicalNote": "Historical candles on the adjustment basis above; these are not a live last-trade quote.",
+    "sourceLink": "Data source ↗",
+    "sourceUrlUnavailable": "Source URL was not supplied by the data provider",
+    "retrievedAt": "Retrieved: {{value}}",
+    "volumeUnit": "Volume unit: {{value}}",
+    "volumeUnavailable": "Volume is unavailable for some candles; missing values are not zero.",
     "noPriceData": "No price data for this symbol yet",
     "noCorrelationData": "Pick at least two symbols to compare",
     "correlationUndefined": "undefined (no price variation in window)",
@@ -1916,7 +1924,8 @@
     "timeoutHint": "Timed out. Simplify the strategy or use fewer assets.",
     "apiFailedHint": "API request failed. Try again shortly.",
     "executionFailedHint": "Execution failed. Try again.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "legacyWithheld": "Some figures in this older answer could not be verified and were withheld. Ask again for a fresh answer with sources and a chart."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

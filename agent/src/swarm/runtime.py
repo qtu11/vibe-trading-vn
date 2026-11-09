@@ -402,10 +402,10 @@ class SwarmRuntime:
 
         # Orphaned run recovery after server restart
         try:
-            run = self._store.get_run(run_id)
-            if run is not None and run.status in (SwarmRunStatus.running, SwarmRunStatus.pending):
-                run.status = SwarmRunStatus.cancelled
-                self._store.save_run(run)
+            run = self._store.load_run(run_id)
+            if run is not None and run.status in (RunStatus.running, RunStatus.pending):
+                run.status = RunStatus.cancelled
+                self._store.update_run(run)
                 return True
         except Exception as exc:
             logger.warning("Failed to cancel orphaned run %s: %s", run_id, exc)

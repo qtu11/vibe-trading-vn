@@ -65,7 +65,7 @@ def test_report_service_validation_rejection(tmp_path):
 def test_export_research_report_tool(tmp_path):
     sample = load_sample_report()
     tool = ExportResearchReportTool()
-    output_str = tool.execute(sample, formats=["docx", "pdf"])
+    output_str = tool.execute(sample, formats=["docx", "pdf"], minimum_pages=1)
     receipt = json.loads(output_str)
 
     assert receipt["ok"] is True

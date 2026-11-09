@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Chưa thể vẽ biểu đồ: chưa lấy được nến OHLC đầy đủ. Không tự ước lượng dữ liệu nến.",
+    "legacyUnavailable": "Không thể dựng lại biểu đồ đã lưu vì dữ liệu nến đã bị lược một phần. Hãy hỏi lại để tạo biểu đồ mới từ dữ liệu thị trường đã quan sát.",
+    "historicalNote": "Nến lịch sử theo cơ sở điều chỉnh ghi trên; đây không phải giá giao dịch trực tiếp.",
+    "sourceLink": "Nguồn dữ liệu ↗",
+    "sourceUrlUnavailable": "Nhà cung cấp chưa trả về URL nguồn",
+    "retrievedAt": "Thời điểm lấy: {{value}}",
+    "volumeUnit": "Đơn vị khối lượng: {{value}}",
+    "volumeUnavailable": "Chưa có khối lượng cho một số nến; dữ liệu thiếu không được xem là 0.",
     "noPriceData": "Chưa có dữ liệu về giá cho biểu tượng này",
     "noCorrelationData": "Chọn ít nhất hai biểu tượng để so sánh",
     "correlationUndefined": "không xác định (không có biến thể giá trong cửa sổ)",
@@ -1916,7 +1924,8 @@
     "timeoutHint": "Đã hết thời gian. Đơn giản hóa chiến lược hoặc sử dụng ít tài sản hơn.",
     "apiFailedHint": "Yêu cầu API không thành công. Hãy thử lại ngay.",
     "executionFailedHint": "Việc thực thi không thành công. Hãy thử lại.",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "legacyWithheld": "Một phần số liệu trong câu trả lời cũ này chưa được xác minh nên đã được ẩn. Hãy hỏi lại để nhận câu trả lời mới có nguồn và biểu đồ."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

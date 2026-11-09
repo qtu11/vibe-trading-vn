@@ -19,10 +19,10 @@ def _write_original(path: Path, content: str, root: Path) -> None:
         raise ValueError('Result artifact escapes workspace')
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with path.open('x', encoding='utf-8') as stream:
-            stream.write(content)
+        with path.open('xb') as stream:
+            stream.write(content.encode('utf-8'))
     except FileExistsError:
-        if path.read_text(encoding='utf-8') != content:
+        if path.read_bytes() != content.encode('utf-8'):
             raise ValueError('Existing result artifact was modified')
 
 
@@ -93,7 +93,7 @@ def deliver_tool_result(result: str, run_dir: str | Path | None, registry) -> st
         payload = None
         is_json = False
     root = Path(run_dir).resolve()
-    digest = hashlib.sha256(result.encode()).hexdigest()
+    digest = hashlib.sha256(result.encode('utf-8')).hexdigest()
     folder = root / 'tool-results' / digest
     path = folder / ('result.json' if is_json else 'result.txt')
     try:

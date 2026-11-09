@@ -139,11 +139,14 @@ def test_auto_compact_handoff_summary_is_reintroduced_as_user_message(
         {"role": "user", "content": "earlier context"},
         {"role": "user", "content": "large recent context " + ("x" * 100_000)},
     ]
+    active_request = messages[-1]
 
     try:
-        agent._auto_compact(messages, tmp_path / "run", trace, iteration=1)
+        assert agent._auto_compact(messages, tmp_path / "run", trace, iteration=1)
     finally:
         trace.close()
 
     assert messages[-1]["role"] == "user"
-    assert "Continue from the summary above" in messages[-1]["content"]
+    assert messages[-1] is active_request
+    handoff = next(message for message in messages if "Continue from the summary above" in message.get("content", ""))
+    assert handoff["role"] == "user"

@@ -26,6 +26,10 @@ def test_parse_response_keeps_provider_reported_model() -> None:
 
 class _EmptyRegistry:
     _tools = {}
+    tool_names = []
+
+    def get(self, name):
+        return self._tools.get(name)
 
     def get_definitions(self):
         return []
@@ -39,7 +43,7 @@ def test_runtime_metadata_is_frozen_at_construction_with_model_override(
     monkeypatch.setenv("LANGCHAIN_MODEL_NAME", "deepseek-configured")
     monkeypatch.setenv("LANGCHAIN_REASONING_EFFORT", "high")
     reset_env_config()
-    monkeypatch.setattr(chat_module, "build_llm", lambda **kwargs: object())
+    monkeypatch.setattr(chat_module, "build_llm", lambda **kwargs: SimpleNamespace(reasoning_effort="high"))
 
     llm = ChatLLM(model_name="explicit-model-override")
 

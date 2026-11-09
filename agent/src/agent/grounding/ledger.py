@@ -125,6 +125,8 @@ class GroundingLedger(
         self._identities: dict[str, IdentityRecord] = {}
         self._evidence: list[EvidenceRecord] = []
         self._init_sources()
+        # Only exact chart payloads copied from successful first-party tools.
+        self._trusted_chart_payloads: set[str] = set()
         self._tool_failures: list[dict[str, Any]] = []
         self._analysis_completed: list[dict[str, Any]] = []
         self._analysis_metrics: list[dict[str, Any]] = []
@@ -302,6 +304,7 @@ class GroundingLedger(
         payload = _json_object(result)
         if not success:
             self._record_tool_failure(tool_name, call_id, result)
+            self._tool_failures[-1]["symbols"] = self._extract_symbol_arguments(arguments)
             if tool_name == _RESOLVER_TOOL:
                 self._finish_failed_resolution(arguments, call_id)
             elif tool_name == "get_market_data" and payload is not None and payload.get("_unresolved"):

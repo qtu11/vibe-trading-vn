@@ -96,14 +96,19 @@ export function DistributionChart({
       }],
     });
 
-    const ro = new ResizeObserver(() => chart.resize());
+    let frameId = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => chart.resize());
+    });
     ro.observe(ref.current!);
     return () => {
+      cancelAnimationFrame(frameId);
       ro.disconnect();
       chart.dispose();
     };
   }, [samples, markerValue, markerLabel, bandFrom, bandTo, bandLabel, dark]);
 
-  if (samples.length === 0) return null;
+  if (!samples || samples.length === 0) return null;
   return <div ref={ref} style={{ height }} />;
 }

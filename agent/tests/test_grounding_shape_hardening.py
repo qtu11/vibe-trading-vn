@@ -592,8 +592,8 @@ def test_a_cut_figure_is_also_cut_where_a_code_fence_restates_it(tmp_path: Path)
     assert ledger.figures_removed == 3
 
 
-def test_a_malformed_block_is_dropped_and_the_draft_is_cut_as_usual(tmp_path: Path) -> None:
-    """An unreadable declaration used to force the canned fallback."""
+def test_a_malformed_row_does_not_discard_other_valid_declarations(tmp_path: Path) -> None:
+    """An unreadable stop must not erase a valid, declared proposed entry."""
     ledger = _ledger(tmp_path)
     draft = HDR + " 建议买入价 0.65 元，止损 2.50 元。" + _block(HDR_ROW, "0.65 | proposed | entry", "2.50 is my stop")
 
@@ -603,10 +603,9 @@ def test_a_malformed_block_is_dropped_and_the_draft_is_cut_as_usual(tmp_path: Pa
 
     assert released is not None
     assert "最新收盘 0.666 元" in released
-    # Without the block, 0.65 is an observed claim like any other and is cut too.
-    assert "0.65" not in released and "2.50" not in released
+    assert "0.65" in released and "2.50" not in released
     assert "figures" not in released and "observed" not in released
-    assert "※ 略去 2 处" in released
+    assert "※ 略去 1 处" in released
 
 
 def test_a_malformed_line_with_nothing_to_cut_releases_the_checked_text(tmp_path: Path) -> None:

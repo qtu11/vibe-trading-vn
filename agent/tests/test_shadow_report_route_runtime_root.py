@@ -68,7 +68,7 @@ def test_rendered_report_is_readable_through_the_route(monkeypatch, tmp_path) ->
     with _client() as client:
         response = client.get(f"/shadow-reports/{profile.shadow_id}?format=html")
         assert response.status_code == 200
-        assert response.text == Path(rendered["html_path"]).read_text(encoding="utf-8")
+        assert response.content == Path(rendered["html_path"]).read_bytes()
         assert profile.profile_text in response.text
         if rendered["pdf_path"]:
             response = client.get(f"/shadow-reports/{profile.shadow_id}?format=pdf")

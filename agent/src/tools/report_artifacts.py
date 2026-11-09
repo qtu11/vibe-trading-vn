@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from zipfile import BadZipFile, ZipFile
+from xml.etree import ElementTree
+
+from pypdf import PdfReader
 
 from src.config.paths import get_runtime_root
 
@@ -23,11 +29,11 @@ def reports_root() -> Path:
 
 
 def publish_report_artifact(path: Path, format: str | None = None) -> dict[str, Any]:
-    """Stage an actual PDF or DOCX report and return its opaque download handle.
+    """Stage a readable PDF, DOCX or PPTX report and return its opaque download handle.
 
     Args:
         path: Successful report output, not a model-supplied download path.
-        format: Optional format tag ('pdf' or 'docx'). Inferred from extension if None.
+        format: Optional format tag ('pdf', 'docx' or 'pptx'). Inferred from extension if None.
 
     Returns:
         Metadata for the staged file, including sha256 checksum and size.
@@ -50,6 +56,34 @@ def publish_report_artifact(path: Path, format: str | None = None) -> dict[str, 
             raise ValueError("The generated report is not a valid PDF")
         if fmt in ("docx", "pptx") and not header.startswith(b"PK\x03\x04"):
             raise ValueError(f"The generated report is not a valid {fmt.upper()} document")
+    if fmt == "pdf":
+        try:
+            with path.open("rb") as stream:
+                document = PdfReader(stream, strict=True)
+                if document.is_encrypted or not 1 <= len(document.pages) <= 2000:
+                    raise ValueError("PDF must contain 1 to 2000 unencrypted pages")
+        except Exception as exc:
+            raise ValueError("The generated report is not a readable PDF") from exc
+    if fmt in ("docx", "pptx"):
+        core, content_type, root_tag = (
+            ("word/document.xml", "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+             "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}document") if fmt == "docx" else
+            ("ppt/presentation.xml", "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+             "{http://schemas.openxmlformats.org/presentationml/2006/main}presentation")
+        )
+        try:
+            with ZipFile(path) as package:
+                if any(package.getinfo(name).file_size > 32 * 1024 * 1024 for name in ("[Content_Types].xml", core)):
+                    raise ValueError("Document XML exceeds the report size limit")
+                types = ElementTree.fromstring(package.read("[Content_Types].xml"))
+                document = ElementTree.fromstring(package.read(core))
+                if document.tag != root_tag or not any(
+                    item.get("PartName") == f"/{core}" and item.get("ContentType") == content_type
+                    for item in types
+                ):
+                    raise ValueError("Document package type does not match the requested format")
+        except (BadZipFile, KeyError, ElementTree.ParseError) as exc:
+            raise ValueError(f"The generated report is not a valid {fmt.upper()} package") from exc
 
     # Compute sha256 and size
     hasher = hashlib.sha256()
@@ -65,7 +99,7 @@ def publish_report_artifact(path: Path, format: str | None = None) -> dict[str, 
     destination = directory / path.name
     shutil.copyfile(path, destination)
 
-    return {
+    artifact_meta = {
         "report_id": report_id,
         "download_url": f"/api/reports/{report_id}",
         "filename": path.name,
@@ -73,6 +107,35 @@ def publish_report_artifact(path: Path, format: str | None = None) -> dict[str, 
         "sha256": sha256,
         "size_bytes": size_bytes,
     }
+
+    # Auto-index into report_jobs so chat previews and artifact job endpoints resolve immediately
+    try:
+        report_jobs_root = get_runtime_root() / "report_jobs"
+        now_iso = datetime.now(timezone.utc).isoformat()
+        synthetic_job = {
+            "job_id": report_id,
+            "status": "succeeded",
+            "formats": [fmt],
+            "artifacts": [{**artifact_meta, "job_id": report_id}],
+            "error": None,
+            "publication_status": "draft_unverified",
+            "warnings": [],
+            "created_at": now_iso,
+            "updated_at": now_iso,
+        }
+        report_jobs_root.mkdir(parents=True, exist_ok=True)
+        (report_jobs_root / f"{report_id}.json").write_text(
+            json.dumps(synthetic_job, ensure_ascii=False), encoding="utf-8"
+        )
+        index_dir = report_jobs_root / "artifacts"
+        index_dir.mkdir(exist_ok=True)
+        (index_dir / f"{report_id}.json").write_text(
+            json.dumps({"job_id": report_id}), encoding="utf-8"
+        )
+    except OSError:
+        pass
+
+    return artifact_meta
 
 
 def publish_pdf(path: Path) -> dict[str, str]:

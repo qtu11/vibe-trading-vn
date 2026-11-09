@@ -190,7 +190,7 @@ def test_credential_fallback_map_matches_provider_catalog() -> None:
 def test_env_example_default_matches_provider_registry():
     agent_root = Path(__file__).resolve().parents[1]
     assignments = dict(line.split("=", 1) for line in
-                       (agent_root / ".env.example").read_text().splitlines()
+                       (agent_root / ".env.example").read_text(encoding="utf-8").splitlines()
                        if line.startswith(("LANGCHAIN_PROVIDER=", "LANGCHAIN_MODEL_NAME=")))
     providers = json.loads((agent_root / "src/providers/llm_providers.json").read_text())
     provider = next(p for p in providers if p["name"] == assignments["LANGCHAIN_PROVIDER"])
@@ -236,7 +236,7 @@ def test_openrouter_suggests_current_flash_without_switching_default():
 def test_documented_direct_deepseek_pair_matches_registry():
     import re
 
-    text = (Path(__file__).resolve().parents[1] / ".env.example").read_text()
+    text = (Path(__file__).resolve().parents[1] / ".env.example").read_text(encoding="utf-8")
     headers = list(re.finditer(r"(?m)^# --- DeepSeek ---.*$", text))
     assert len(headers) == 1
     block = re.split(r"(?m)^# --- ", text[headers[0].end():], maxsplit=1)[0]

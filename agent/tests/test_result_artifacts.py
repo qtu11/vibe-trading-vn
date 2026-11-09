@@ -1,6 +1,7 @@
 """Large observations remain usable without resending or refetching them."""
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,6 +17,7 @@ from src.swarm.models import SwarmAgentSpec, SwarmTask
 from src.tools.read_file_tool import ReadFileTool
 import src.swarm.worker as worker
 from tests.test_agent_loop_deterministic_cache import _drive
+from tests.symlink_support import symlink_or_skip
 
 
 @pytest.fixture(autouse=True)
@@ -47,7 +49,7 @@ def test_complete_json_and_every_readable_part(tmp_path):
     receipt = json.loads(delivered)
     assert receipt['_provenance']['source'] == 'fixture'
     artifact = receipt['_result_file']
-    original = Path(artifact['path']).read_text()
+    original = Path(artifact['path']).read_text(encoding='utf-8')
     assert 'fixture-private-key' not in original + delivered
     parsed = json.loads(original)
     assert parsed['AAPL'] == json.loads(raw)['AAPL']
@@ -63,6 +65,20 @@ def test_complete_json_and_every_readable_part(tmp_path):
     assert deliver_tool_result(raw, tmp_path, registry) == delivered
 
 
+def test_artifact_hash_matches_saved_utf8_bytes_and_multiline_parts(tmp_path):
+    raw = 'Báo cáo 中文\n' * TOOL_RESULT_LIMIT
+    receipt = json.loads(deliver_tool_result(raw, tmp_path, registry_with_reader()))
+    artifact = receipt['_result_file']
+    saved = Path(artifact['path']).read_bytes()
+    assert saved == raw.encode('utf-8')
+    assert hashlib.sha256(saved).hexdigest() == artifact['sha256']
+    parts = [Path(artifact['parts_dir'], f'{index}.txt').read_bytes()
+             for index in range(1, artifact['part_count'] + 1)]
+    assert b''.join(parts) == saved
+    Path(artifact['path']).write_bytes(saved.replace(b'\n', b'\r\n'))
+    assert '_result_file' not in deliver_tool_result(raw, tmp_path, registry_with_reader())
+
+
 @pytest.mark.parametrize('failure', ['no_reader', 'write_failure', 'symlink', 'modified'])
 def test_unavailable_artifact_is_not_claimed(tmp_path, monkeypatch, failure):
     registry = registry_with_reader()
@@ -75,10 +91,10 @@ def test_unavailable_artifact_is_not_claimed(tmp_path, monkeypatch, failure):
     elif failure == 'symlink':
         outside = tmp_path.parent / f'{tmp_path.name}-outside'
         outside.mkdir()
-        (tmp_path / 'tool-results').symlink_to(outside, target_is_directory=True)
+        symlink_or_skip(tmp_path / 'tool-results', outside, target_is_directory=True)
     else:
         receipt = json.loads(deliver_tool_result(large_result(), tmp_path, registry))
-        Path(receipt['_result_file']['path']).write_text('changed by another writer')
+        Path(receipt['_result_file']['path']).write_text('changed by another writer', encoding='utf-8')
     result = deliver_tool_result(large_result(), tmp_path, registry)
     assert 'TRUNCATED:' in result
     assert '_result_file' not in result
@@ -86,7 +102,7 @@ def test_unavailable_artifact_is_not_claimed(tmp_path, monkeypatch, failure):
     if failure == 'symlink':
         assert not list(outside.iterdir())
     if failure == 'modified':
-        assert Path(receipt['_result_file']['path']).read_text() == 'changed by another writer'
+        assert Path(receipt['_result_file']['path']).read_text(encoding='utf-8') == 'changed by another writer'
 
 
 class _LargeResult(BaseTool):
@@ -116,7 +132,7 @@ def test_main_fresh_and_cached_results_use_same_complete_file(tmp_path):
     assert tool.calls == 1
     paths = [json.loads(message['content'])['_result_file']['path'] for message in messages]
     assert len(set(paths)) == 1
-    assert len(json.loads(Path(paths[0]).read_text())['AAPL']['data']) == 800
+    assert len(json.loads(Path(paths[0]).read_text(encoding='utf-8'))['AAPL']['data']) == 800
 
 
 def test_worker_model_can_recover_complete_result(tmp_path, monkeypatch):
@@ -131,7 +147,7 @@ def test_worker_model_can_recover_complete_result(tmp_path, monkeypatch):
                 return LLMResponse(tool_calls=[ToolCallRequest(
                     id='large', name='large_result_probe', arguments={})])
             receipt = json.loads(next(m['content'] for m in messages if m['role'] == 'tool'))
-            data = json.loads(Path(receipt['_result_file']['path']).read_text())
+            data = json.loads(Path(receipt['_result_file']['path']).read_text(encoding='utf-8'))
             assert data['AAPL']['data'][-1]['close'] == 799.125
             assert data['AAPL']['truncated'] is True
             return LLMResponse(content='The requested source observations are available in full, with source sampling retained. ' * 5)

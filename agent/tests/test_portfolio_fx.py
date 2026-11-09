@@ -22,6 +22,19 @@ def test_build_rates_anchors_on_usd() -> None:
     }
 
 
+def test_vnd_rate_is_only_present_when_explicitly_observed() -> None:
+    with pytest.raises(PortfolioContractError, match='VND'):
+        to_usd(Decimal('2540000'), 'VND', RATES)
+    rates = build_rates(Decimal('7'), Decimal('8'), Decimal('25000'))
+    assert to_usd(Decimal('2500000'), 'VND', rates) == Decimal('100')
+
+
+@pytest.mark.parametrize('bad', [Decimal('0'), Decimal('-1'), Decimal('NaN'), Decimal('Infinity')])
+def test_explicit_vnd_rate_must_be_valid(bad: Decimal) -> None:
+    with pytest.raises(PortfolioContractError, match='USD/VND'):
+        build_rates(Decimal('7'), Decimal('8'), bad)
+
+
 @pytest.mark.parametrize(
     "bad",
     [Decimal("0"), Decimal("-1"), Decimal("NaN"), Decimal("Infinity")],
@@ -70,11 +83,12 @@ def test_account_total_converts_a_valid_iso_currency_when_rated() -> None:
     assert total == Decimal("1000")
 
 
-def test_parse_settings_rejects_valid_iso_display_currency_without_production_rate() -> (
+@pytest.mark.parametrize('currency', ['KRW', 'VND'])
+def test_parse_settings_rejects_valid_iso_display_currency_without_production_rate(currency) -> (
     None
 ):
-    with pytest.raises(ValueError, match="KRW.*no production FX rate"):
-        parse_settings({"display_currency": "KRW", "sources": []})
+    with pytest.raises(ValueError, match=f"{currency}.*no production FX rate"):
+        parse_settings({"display_currency": currency, "sources": []})
 
 
 def test_parse_settings_accepts_rateable_display_currency() -> None:

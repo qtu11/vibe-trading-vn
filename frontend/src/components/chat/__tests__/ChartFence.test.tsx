@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MarkdownContent } from "../MessageBubble";
+import { MarkdownContent, MessageBubble } from "../MessageBubble";
 
 vi.mock("@/lib/echarts", () => ({
   echarts: {
@@ -50,5 +50,11 @@ describe("chart fences in an answer", () => {
     const code = screen.getByText("print('hello')");
     expect(code.tagName).toBe("CODE");
     expect(code.className).not.toContain("language-chart");
+  });
+
+  it("renders chart fences after a persisted answer is loaded", async () => {
+    render(<MessageBubble msg={{ id: "saved-answer", type: "answer", timestamp: 1, content: "Historical evidence.\n\n```chart\n" + chartSpec() + "\n```" }} />);
+    expect(await screen.findByText(/FPT\.VN · Vietnam · VND/)).toBeInTheDocument();
+    expect(document.querySelector("figure")).not.toBeNull();
   });
 });

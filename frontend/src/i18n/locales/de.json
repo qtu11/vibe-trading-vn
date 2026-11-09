@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Diagramm nicht verfügbar: Es wurden keine vollständigen OHLC-Kerzen abgerufen. Es wurden keine Kerzen geschätzt.",
+  "legacyUnavailable": "Dieses gespeicherte Diagramm konnte nicht rekonstruiert werden, weil ein Teil der Kerzendaten geschwärzt wurde. Stelle die Frage erneut, um ein neues Diagramm aus beobachteten Marktdaten zu erzeugen.",
+    "historicalNote": "Historische Kerzen auf der oben genannten Bereinigungsbasis; keine Echtzeitkurse des letzten Handels.",
+    "sourceLink": "Datenquelle ↗",
+    "sourceUrlUnavailable": "Der Datenanbieter hat keine Quell-URL bereitgestellt",
+    "retrievedAt": "Abgerufen: {{value}}",
+    "volumeUnit": "Volumeneinheit: {{value}}",
+    "volumeUnavailable": "Für einige Kerzen fehlt das Volumen; fehlende Werte sind nicht null.",
     "noPriceData": "Noch keine Kursdaten für dieses Symbol",
     "noCorrelationData": "Wählen Sie mindestens zwei Symbole zum Vergleichen",
     "correlationUndefined": "undefiniert (keine Preisbewegung im Zeitraum)",
@@ -1916,7 +1924,8 @@
     "timeoutHint": "Zeitüberschreitung. Strategie vereinfachen oder weniger Assets verwenden.",
     "apiFailedHint": "API-Anfrage fehlgeschlagen. Kurz erneut versuchen.",
     "executionFailedHint": "Ausführung fehlgeschlagen. Erneut versuchen.",
-    "retry": "Erneut versuchen"
+    "retry": "Erneut versuchen",
+    "legacyWithheld": "Einige Zahlen in dieser älteren Antwort konnten nicht verifiziert werden und wurden ausgeblendet. Stelle die Frage erneut, um eine neue Antwort mit Quellen und Diagramm zu erhalten."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

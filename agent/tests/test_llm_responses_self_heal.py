@@ -53,8 +53,10 @@ _TOOL = {
 def _forget_healed_models() -> Iterator[None]:
     """The memory is process-wide; no test may inherit another's entry."""
     llm_mod._RESPONSES_REQUIRED.clear()
+    llm_mod._REASONING_EFFORT_UNSUPPORTED.clear()
     yield
     llm_mod._RESPONSES_REQUIRED.clear()
+    llm_mod._REASONING_EFFORT_UNSUPPORTED.clear()
 
 
 def _refusal(model: str) -> httpx.Response:
@@ -212,7 +214,7 @@ def test_a_refusal_naming_responses_is_retried_there_with_the_tools() -> None:
     assert sent["tools"] == [{"type": "function", **_TOOL["function"]}]
     assert "messages" not in sent and sent["input"], "the Responses request uses `input`"
     assert "reasoning_effort" not in sent, "no effort was configured; none is invented"
-    assert "gpt-5.6-terra" in llm_mod._RESPONSES_REQUIRED
+    assert len(llm_mod._RESPONSES_REQUIRED) == 1
 
 
 def test_the_model_is_remembered_so_the_next_call_skips_the_refusal() -> None:
@@ -266,7 +268,7 @@ def test_a_model_whose_chat_endpoint_accepts_tools_is_left_alone() -> None:
     assert llm_mod._RESPONSES_REQUIRED == set()
 
 
-def test_an_unrelated_400_is_raised_untouched_and_nothing_is_remembered() -> None:
+def test_unknown_effort_field_retries_once_without_switching_transport() -> None:
     def unknown_field(request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             400,
@@ -285,8 +287,60 @@ def test_an_unrelated_400_is_raised_untouched_and_nothing_is_remembered() -> Non
         with pytest.raises(Exception, match="Unrecognized request argument"):
             llm.invoke("hi")
 
-    assert endpoint.paths == ["/v1/chat/completions"], "a gateway's unknown-field error is not rerouted"
+    assert endpoint.paths == ["/v1/chat/completions"] * 2
+    assert endpoint.bodies[0]["reasoning_effort"] == "high"
+    assert "reasoning_effort" not in endpoint.bodies[1]
     assert llm_mod._RESPONSES_REQUIRED == set()
+
+
+def test_effort_rejection_does_not_disable_another_endpoints_same_model() -> None:
+    def refusal(request):
+        return httpx.Response(400, json={"error": {"message": "Unsupported parameter: reasoning_effort"}})
+    rejected = _Endpoint("shared-model", chat=refusal)
+    accepted = _Endpoint("shared-model", chat=lambda request: _chat_ok("shared-model"))
+    with httpx.Client(transport=httpx.MockTransport(rejected)) as client:
+        with pytest.raises(Exception, match="Unsupported parameter"):
+            _adapter(client, "shared-model", base_url="https://reject.invalid/v1", reasoning_effort="high").invoke("hi")
+    with httpx.Client(transport=httpx.MockTransport(accepted)) as client:
+        _adapter(client, "shared-model", base_url="https://accept.invalid/v1", reasoning_effort="high").invoke("hi")
+    assert accepted.bodies[0]["reasoning_effort"] == "high"
+
+
+def test_responses_rejection_does_not_reroute_another_endpoints_same_model() -> None:
+    rejected = _Endpoint("shared-model")
+    accepted = _Endpoint("shared-model", chat=lambda request: _chat_ok("shared-model"))
+    with httpx.Client(transport=httpx.MockTransport(rejected)) as client:
+        _adapter(client, "shared-model", base_url="https://responses.invalid/v1").bind_tools([_TOOL]).invoke("hi")
+    with httpx.Client(transport=httpx.MockTransport(accepted)) as client:
+        _adapter(client, "shared-model", base_url="https://chat.invalid/v1").bind_tools([_TOOL]).invoke("hi")
+    assert accepted.paths == ["/v1/chat/completions"]
+
+
+def test_invalid_effort_value_is_not_silently_changed_to_provider_default() -> None:
+    endpoint = _Endpoint("house-model", chat=lambda request: httpx.Response(400, json={"error": {"message": "Invalid value for reasoning_effort: ultra. Supported values are low, medium, high."}}))
+    with httpx.Client(transport=httpx.MockTransport(endpoint)) as client:
+        with pytest.raises(Exception, match="Invalid value"):
+            _adapter(client, "house-model", reasoning_effort="high").invoke("hi")
+    assert endpoint.paths == ["/v1/chat/completions"]
+    assert llm_mod._REASONING_EFFORT_UNSUPPORTED == set()
+
+
+def test_runtime_metadata_stops_claiming_rejected_effort(monkeypatch) -> None:
+    import src.providers.chat as chat_module
+
+    def chat(request):
+        if "reasoning_effort" in json.loads(request.content):
+            return httpx.Response(400, json={"error": {"message": "Unsupported parameter: reasoning_effort"}})
+        return _chat_ok("house-model")
+
+    endpoint = _Endpoint("house-model", chat=chat)
+    with httpx.Client(transport=httpx.MockTransport(endpoint)) as client:
+        adapter = _adapter(client, "house-model", reasoning_effort="high")
+        monkeypatch.setattr(chat_module, "build_llm", lambda **kwargs: adapter)
+        llm = chat_module.ChatLLM()
+        assert llm.runtime_snapshot.reasoning_effort == "high"
+        adapter.invoke("hi")
+        assert llm.runtime_snapshot.reasoning_effort == ""
 
 
 def test_a_refusal_on_the_responses_route_itself_is_not_retried_forever() -> None:

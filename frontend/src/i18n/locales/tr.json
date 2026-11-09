@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Grafik kullanılamıyor: eksiksiz OHLC mumları alınamadı. Hiçbir mum tahmin edilmedi.",
+    "legacyUnavailable": "Bu kayıtlı grafik yeniden oluşturulamıyor çünkü mum verilerinin bir kısmı düzenlenmişti. Gözlemlenen piyasa verilerinden yeni bir grafik oluşturmak için yeniden sorun.",
+    "historicalNote": "Yukarıdaki düzeltme esasına göre geçmiş mumlardır; canlı son işlem fiyatı değildir.",
+    "sourceLink": "Veri kaynağı ↗",
+    "sourceUrlUnavailable": "Veri sağlayıcısı kaynak URL'sini sunmadı",
+    "retrievedAt": "Alınma zamanı: {{value}}",
+    "volumeUnit": "Hacim birimi: {{value}}",
+    "volumeUnavailable": "Bazı mumların hacmi mevcut değil; eksik değerler sıfır değildir.",
     "noPriceData": "Bu sembol için henüz fiyat verisi yok",
     "noCorrelationData": "Karşılaştırmak için en az iki sembol seçin",
     "correlationUndefined": "tanımsız (pencerede fiyat değişimi yok)",
@@ -1876,7 +1884,8 @@
     "timeoutHint": "Zaman aşımı. Stratejiyi sadeleştirin veya daha az varlık kullanın.",
     "apiFailedHint": "API isteği başarısız. Kısa süre sonra yeniden deneyin.",
     "executionFailedHint": "Çalıştırma başarısız. Yeniden deneyin.",
-    "retry": "Yeniden dene"
+    "retry": "Yeniden dene",
+    "legacyWithheld": "Bu eski yanıttaki bazı rakamlar doğrulanamadığı için gizlendi. Kaynak ve grafik içeren yeni bir yanıt için yeniden sorun."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

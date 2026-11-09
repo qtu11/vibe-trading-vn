@@ -35,6 +35,10 @@ _AGENT_DIR = Path(__file__).resolve().parent.parent.parent
 # "none" is an explicit value direct OpenAI needs to allow function tools on
 # gpt-5.6-* models; a provider with its own levels lists them in llm_providers.json.
 DEFAULT_REASONING_EFFORTS = ("none", "low", "medium", "high", "max")
+# OpenAI-compatible gateways behind the credential vault most commonly accept
+# these three. A gateway that rejects the field is remembered by the adapter and
+# the request is retried without it, so offering the control is never fatal.
+CUSTOM_REASONING_EFFORTS = ("low", "medium", "high")
 
 
 class LLMProviderOption(BaseModel):
@@ -327,10 +331,19 @@ def _supported_reasoning_efforts(provider: LLMProviderOption, model: str, base_u
     levels = list(provider.reasoning_efforts)
     if provider.auth_type == "claude_cli":
         return levels  # The CLI's model-list response narrows these per model.
-    if (provider.name == "custom" or not normalize_endpoint(base_url)
-            or normalize_endpoint(base_url) != normalize_endpoint(provider.default_base_url)):
+    if provider.name == "custom":
+        return levels
+
+    valid_base_urls = {normalize_endpoint(provider.default_base_url)}
+    for opt in getattr(provider, "base_url_options", []) or []:
+        valid_base_urls.add(normalize_endpoint(opt))
+
+    if not normalize_endpoint(base_url) or normalize_endpoint(base_url) not in valid_base_urls:
         return []
+
     if provider.name == "openai-codex":
+        return [level for level in levels if level != "none"]
+    if provider.name in ("opencode", "opencode-zen", "opencode-go"):
         return [level for level in levels if level != "none"]
     if provider.name == "anthropic":
         if not llm._anthropic_supports_effort(model):
@@ -482,10 +495,10 @@ def _build_llm_settings_response(
 
         active = next((p for p in CustomProviderStore().list_public() if p["active"]), None)
         active_model = active["model"] if active else env_values.get("LANGCHAIN_MODEL_NAME", "")
-        active_url = active["base_url"] if active else ""
+        active_url = active["base_url"] if active else env_values.get("OPENAI_BASE_URL", "")
         provider = LLMProviderOption(name="custom", label="Custom (credential vault)",
             api_key_env=None, base_url_env="OPENAI_BASE_URL", default_model=active_model,
-            default_base_url=active_url, auth_type="credential_vault", reasoning_efforts=[])
+            default_base_url=active_url, auth_type="credential_vault", reasoning_efforts=list(CUSTOM_REASONING_EFFORTS))
         env_values = {**env_values, "LANGCHAIN_MODEL_NAME": active_model, "OPENAI_BASE_URL": active_url}
         api_key_configured, api_key_hint = bool(active and active["api_key_configured"]), None
         options = [*LLM_PROVIDERS, provider]
@@ -806,7 +819,7 @@ def register_settings_routes(
                 raise HTTPException(status_code=400, detail="Edit and test a custom provider in the provider manager before activating it")
             provider = LLMProviderOption(name="custom", label="Custom (credential vault)", api_key_env=None,
                 base_url_env="OPENAI_BASE_URL", default_model=active["model"], default_base_url=active["base_url"],
-                auth_type="credential_vault", reasoning_efforts=[])
+                auth_type="credential_vault", reasoning_efforts=list(CUSTOM_REASONING_EFFORTS))
         if provider is None:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported LLM provider"

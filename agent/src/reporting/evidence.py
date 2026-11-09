@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import ast
 from datetime import datetime, timedelta, timezone
 import math
 import re
@@ -146,6 +147,79 @@ def _supports_numbers(report, path, item, records):
                     raise ValueError(f"Số liệu trong văn bản không có trong nguồn đã thu thập: {path} ({match.group()})")
 
 
+def _validate_rating_target(target, metrics):
+    """A rated calculated target must recompute from its declared metric inputs."""
+    from src.agent.grounding.policies import _evaluate_formula
+
+    checked = set()
+
+    def metric_dimension(metric):
+        unit, _ = _unit(metric.unit)
+        if unit in {"%", "X", "1", "LẦN"}:
+            return {}
+        if not re.fullmatch(r"[A-Z][A-Z0-9]*(?:/[A-Z][A-Z0-9]*)?", unit):
+            raise ValueError(f"Đơn vị định giá chưa được khai báo rõ hoặc chưa hỗ trợ: {metric.key}")
+        numerator, _, denominator = unit.partition("/")
+        result = {numerator: 1}
+        if denominator:
+            result[denominator] = result.get(denominator, 0) - 1
+        return {name: power for name, power in result.items() if power}
+
+    def formula_dimension(node):
+        if isinstance(node, ast.Name):
+            return metric_dimension(metrics[node.id])
+        if isinstance(node, ast.Constant):
+            return {}
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.UAdd, ast.USub)):
+            return formula_dimension(node.operand)
+        if isinstance(node, ast.BinOp):
+            left, right = formula_dimension(node.left), formula_dimension(node.right)
+            if isinstance(node.op, (ast.Add, ast.Sub)):
+                if left != right:
+                    raise ValueError("Công thức định giá cộng/trừ các đầu vào khác đơn vị")
+                return left
+            if isinstance(node.op, (ast.Mult, ast.Div)):
+                result = dict(left)
+                for name, power in right.items():
+                    result[name] = result.get(name, 0) + power * (1 if isinstance(node.op, ast.Mult) else -1)
+                return {name: power for name, power in result.items() if power}
+        raise ValueError("Công thức định giá có phép toán chưa hỗ trợ")
+
+    def calculate(metric):
+        unit, scale = _unit(metric.unit)
+        if metric.value is None:
+            raise ValueError(f"Đầu vào định giá chưa có giá trị: {metric.key}")
+        canonical = metric.value * scale / (100 if unit == "%" else 1)
+        if metric.evidence_kind != "derived" or metric.key in checked:
+            return canonical
+        expression = metric.methodology.replace("×", "*").replace("÷", "/").replace("−", "-")
+        try:
+            tree = ast.parse(expression, mode="eval")
+        except (SyntaxError, ValueError, RecursionError) as exc:
+            raise ValueError("Giá mục tiêu tính toán cần công thức theo input_keys trước khi xếp hạng") from exc
+        names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        if not names or names != set(metric.input_keys):
+            raise ValueError("Công thức định giá phải dùng đúng các input_keys đã khai báo")
+        if any(isinstance(node, ast.Constant) and (isinstance(node.value, bool) or node.value not in (0, 1))
+               for node in ast.walk(tree)):
+            raise ValueError("Hệ số định giá phải là metric giả định có giải thích, không phải hằng số ẩn")
+        values = {name: calculate(metrics[name]) for name in names}
+        if formula_dimension(tree.body) != metric_dimension(metric):
+            raise ValueError(f"Đơn vị kết quả định giá không khớp công thức: {metric.key}")
+        for name in sorted(names, key=len, reverse=True):
+            expression = re.sub(r"\b" + re.escape(name) + r"\b", lambda _match, value=values[name]: repr(value), expression)
+        evaluated = _evaluate_formula(expression)
+        if evaluated is None or not math.isclose(evaluated[0], canonical,
+                rel_tol=0, abs_tol=0.5 * 10 ** -metric.decimals * scale / (100 if unit == "%" else 1)):
+            raise ValueError(f"Giá trị định giá không khớp công thức: {metric.key}")
+        checked.add(metric.key)
+        return canonical
+
+    if target.evidence_kind == "assumption":
+        raise ValueError("Giá mục tiêu giả định chưa được tính toán; không thể xuất khuyến nghị mua/bán")
+    calculate(target)
+
+
 def validate_report_evidence(
     report: ResearchReport, context: ReportEvidenceContext | None = None,
 ) -> ReportEvidenceAudit:
@@ -256,5 +330,7 @@ def validate_report_evidence(
         if report.recommendation != Recommendation.NOT_RATED:
             raise ValueError("Chưa đủ giá, nguồn và cơ sở điều chỉnh để xuất khuyến nghị mua/bán")
         report.recommendation = Recommendation.NOT_RATED
+    if report.recommendation != Recommendation.NOT_RATED:
+        _validate_rating_target(target, metrics)
     report.publication_status = "draft_unverified"
     return ReportEvidenceAudit(report, quote_verified, tuple(warnings))

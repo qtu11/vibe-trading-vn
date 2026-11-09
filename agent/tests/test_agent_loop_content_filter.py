@@ -250,7 +250,7 @@ def test_auto_compact_summary_hard_deadline(
     702s on one summary call: the httpx timeout only bounds time-between-bytes
     and LangChain ignores a per-call config timeout, so without a hard
     deadline the whole run stalls. The summary now runs in a daemon thread
-    joined with the LLM timeout; on expiry compaction degrades to truncation.
+    joined with the LLM timeout; on expiry the original context is retained.
     """
     import time
 
@@ -284,15 +284,22 @@ def test_auto_compact_summary_hard_deadline(
     ]
     trace_dir = tmp_path / "compact_trace"
     trace = TraceWriter(trace_dir)
+    original = [message.copy() for message in messages]
 
     start = time.monotonic()
-    agent._auto_compact(messages, trace_dir, trace, focus_topic="", iteration=1)
+    try:
+        compacted = agent._auto_compact(messages, trace_dir, trace, focus_topic="", iteration=1)
+    finally:
+        trace.close()
     elapsed = time.monotonic() - start
 
     assert llm.chat_calls == 1, "summary thread must have started"
     assert elapsed < 3, f"wall-clock deadline did not fire: {elapsed:.1f}s"
-    reconstructed = " ".join(str(m.get("content", "")) for m in messages)
-    assert "compaction degraded" in reconstructed
+    assert compacted is False
+    assert messages == original
+    assert agent._last_compaction_status["reason"] == "summary_timeout"
+    failures = [event for event in TraceWriter.read(trace_dir) if event["type"] == "compact_failed"]
+    assert len(failures) == 1 and failures[0]["preserved_context"] is True
 
 
 class _RatioFilterLoopLLM:

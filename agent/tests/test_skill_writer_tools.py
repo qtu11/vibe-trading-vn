@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from tests.symlink_support import symlink_or_skip
 
 from src.tools.skill_writer_tool import (
     SaveSkillTool,
@@ -349,7 +350,7 @@ def test_auxiliary_operations_refuse_symlink_into_forbidden_sibling(tmp_path, ac
     skill = tmp_path / "demo"
     (skill / "private").mkdir(parents=True)
     (skill / "private/data").write_text("original")
-    (skill / "assets").symlink_to(skill / "private", target_is_directory=True)
+    symlink_or_skip(skill / "assets", skill / "private", target_is_directory=True)
     with patch("src.tools.skill_writer_tool.USER_SKILLS_DIR", tmp_path):
         result = json.loads(SkillFileTool().execute(action=action, skill_name="demo", path="assets/data", content="poison"))
     assert result["status"] == "error"

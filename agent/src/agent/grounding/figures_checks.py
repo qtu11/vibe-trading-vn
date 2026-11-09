@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.agent.grounding.figures import FiguresBlock, _lines_with_offsets
+from src.agent.grounding.figures import FiguresBlock, _fenced_blocks, _lines_with_offsets
 from src.agent.grounding.identity import _scan_symbols
 from src.agent.grounding.registry import grounding_check
 
@@ -46,6 +46,21 @@ def _figures_block_malformed(ledger: Any, content: str) -> list[dict[str, Any]]:
 
 
 @grounding_check(
+    name="chart-observed-payload", phase="answer", order=1,
+    code="chart_not_observed",
+    description="A chart must match the current run's observed first-party payload.",
+)
+def _chart_observed_payload(ledger: Any, content: str) -> list[dict[str, Any]]:
+    return [
+        {"code": "chart_not_observed", "value": None, "role": None,
+         "span": [start, end], "reason": "untrusted_chart_payload",
+         "message": "Chart data was not returned by this run's market tools; fetch an observed chart or remove it."}
+        for start, end, info, (body_start, body_end) in _fenced_blocks(content)
+        if info == "chart" and content[body_start:body_end].strip() not in ledger._trusted_chart_payloads
+    ]
+
+
+@grounding_check(
     name="unsourced-symbol-figures", phase="answer", order=0,
     code="unsourced_symbol_figures",
     description=(
@@ -76,7 +91,7 @@ def _unsourced_symbol_figures(ledger: Any, content: str) -> list[dict[str, Any]]
             match = block.match(figure.value, figure.percent, figure.digits)
             if match is not None and match.role == "cited":
                 return True
-            return bool(ledger._table_cited_sources(figure))
+            return bool(ledger._visible_cited_sources(figure))
 
         if all(_cited(figure) for figure in carried):
             continue

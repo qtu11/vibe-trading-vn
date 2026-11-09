@@ -1,7 +1,14 @@
+import importlib.util
+
 import numpy as np
 import pandas as pd
 import pytest
 from src.quantlib.timeseries import fit_ornstein_uhlenbeck
+
+pytestmark = pytest.mark.skipif(
+    importlib.util.find_spec("statsmodels") is None,
+    reason="the optional 'statsmodels' package is not installed",
+)
 
 
 def test_ou_only_fits_adjacent_observed_pairs():

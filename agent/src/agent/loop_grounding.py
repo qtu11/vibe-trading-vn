@@ -7,10 +7,12 @@ The loop receives an explicit decision about whether to continue iterating.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from typing import TYPE_CHECKING
 
 from src.agent.loop_streaming import TurnStream
 from src.agent.trace import TraceWriter
+from src.agent.answer_charts import append_observed_charts
 
 if TYPE_CHECKING:
     from src.agent.loop import AgentLoop
@@ -55,7 +57,12 @@ def validate_and_release(
     Returns:
         Updated correction state; retry requests the loop's next iteration.
     """
+    final_content = append_observed_charts(final_content, getattr(loop, "_answer_charts", {}))
     if loop._grounding is not None:
+        loop._grounding._trusted_chart_payloads = {
+            json.dumps(chart, ensure_ascii=False, separators=(",", ":"))
+            for chart in list(getattr(loop, "_answer_charts", {}).values())[:3]
+        }
         validation = (
             loop._grounding.revalidate(final_content)
             if forced_grounding_release
@@ -67,6 +74,11 @@ def validate_and_release(
             # another multi-minute model round.
             candidate_text = final_content
             candidate_val = validation
+            repaired_refs = loop._grounding.repair_unique_field_refs(candidate_text, candidate_val)
+            if repaired_refs is not None:
+                recheck_refs = loop._grounding.revalidate(repaired_refs)
+                if len(recheck_refs.issues) < len(candidate_val.issues):
+                    candidate_text, candidate_val = repaired_refs, recheck_refs
             repaired_vis = loop._grounding.repair_citation_visibility(
                 candidate_text, candidate_val
             )
@@ -84,23 +96,28 @@ def validate_and_release(
                     if len(recheck_prov.issues) < len(candidate_val.issues):
                         candidate_text = repaired_prov
                         candidate_val = recheck_prov
-            if candidate_val.valid and candidate_text != final_content:
+            if candidate_text != final_content:
+                repair_type = "answer_repaired" if candidate_val.valid else "answer_partially_repaired"
                 trace.write(
                     {
-                        "type": "answer_repaired",
+                        "type": repair_type,
                         "iter": current_iter,
                         "issues": validation.issues,
+                        "remaining_issues": len(candidate_val.issues),
                     }
                 )
                 react_trace.append(
-                    {"type": "answer_repaired", "issues": validation.issues}
+                    {"type": repair_type, "issues": validation.issues,
+                     "remaining_issues": len(candidate_val.issues)}
                 )
                 final_content = candidate_text
                 validation = candidate_val
         if validation.valid:
             # The figures block is the model's declaration to
             # the gate, not answer text.
-            final_content = validation.released_text
+            final_content = loop._grounding.surface_data_gaps(
+                loop._grounding.link_collected_sources(validation.released_text)
+            )
         if not validation.valid:
             if not forced_grounding_release:
                 trace.write_text_entry(
@@ -263,7 +280,10 @@ def validate_and_release(
                 # Stripping the block also trims the blank lines
                 # the stream already showed before its fence.
                 shown = shown.rstrip()
-            if final_content.startswith(shown) and len(final_content) > len(shown):
+            if not final_content.startswith(shown):
+                loop._emit("stream_reset", {"iter": current_iter, "reason": "grounding_repaired"})
+                loop._emit("text_delta", {"delta": final_content, "iter": current_iter})
+            elif len(final_content) > len(shown):
                 loop._emit(
                     "text_delta",
                     {"delta": final_content[len(shown):], "iter": current_iter},

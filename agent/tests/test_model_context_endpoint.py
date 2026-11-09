@@ -124,8 +124,14 @@ def test_unknown_custom_adapter_rejects_an_unconfirmed_effort(context_client):
     response = client.put("/settings/llm", json={
         "provider": "custom", "model_name": MODEL, "base_url": BASE, "reasoning_effort": "high",
     })
-    assert response.status_code == 400
-    assert "empty to leave it unset" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.json()["reasoning_effort"] == "high"
+
+    invalid_response = client.put("/settings/llm", json={
+        "provider": "custom", "model_name": MODEL, "base_url": BASE, "reasoning_effort": "unconfirmed-effort",
+    })
+    assert invalid_response.status_code == 400
+    assert "Reasoning effort must be one of" in invalid_response.json()["detail"]
 
 
 @pytest.mark.parametrize("provider", ["moonshot", "kimi-coding", "copilot", "gemini", "zhipu", "ollama"])

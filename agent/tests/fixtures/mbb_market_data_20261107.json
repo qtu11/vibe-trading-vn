@@ -1,0 +1,523 @@
+{
+  "MBB.VN": [
+    {
+      "trade_date": "2026-08-17T00:00:00",
+      "open": 20000.0,
+      "high": 20200.0,
+      "low": 19900.0,
+      "close": 19900.0,
+      "volume": 7655700.0
+    },
+    {
+      "trade_date": "2026-08-18T00:00:00",
+      "open": 19900.0,
+      "high": 20050.0,
+      "low": 19850.0,
+      "close": 19950.0,
+      "volume": 7081200.0
+    },
+    {
+      "trade_date": "2026-08-19T00:00:00",
+      "open": 19950.0,
+      "high": 20000.0,
+      "low": 19850.0,
+      "close": 19950.0,
+      "volume": 5046400.0
+    },
+    {
+      "trade_date": "2026-08-20T00:00:00",
+      "open": 20000.0,
+      "high": 20350.0,
+      "low": 20000.0,
+      "close": 20300.0,
+      "volume": 10904100.0
+    },
+    {
+      "trade_date": "2026-08-21T00:00:00",
+      "open": 20300.0,
+      "high": 20850.0,
+      "low": 20100.0,
+      "close": 20850.0,
+      "volume": 15698000.0
+    },
+    {
+      "trade_date": "2026-08-24T00:00:00",
+      "open": 21050.0,
+      "high": 21200.0,
+      "low": 20750.0,
+      "close": 20750.0,
+      "volume": 11070400.0
+    },
+    {
+      "trade_date": "2026-08-25T00:00:00",
+      "open": 20750.0,
+      "high": 20950.0,
+      "low": 20650.0,
+      "close": 20650.0,
+      "volume": 10212100.0
+    },
+    {
+      "trade_date": "2026-08-26T00:00:00",
+      "open": 20650.0,
+      "high": 21200.0,
+      "low": 20500.0,
+      "close": 21050.0,
+      "volume": 18747100.0
+    },
+    {
+      "trade_date": "2026-08-27T00:00:00",
+      "open": 21050.0,
+      "high": 21200.0,
+      "low": 20850.0,
+      "close": 21050.0,
+      "volume": 7612900.0
+    },
+    {
+      "trade_date": "2026-08-28T00:00:00",
+      "open": 21050.0,
+      "high": 21050.0,
+      "low": 20850.0,
+      "close": 21050.0,
+      "volume": 8679400.0
+    },
+    {
+      "trade_date": "2026-08-31T00:00:00",
+      "open": 21050.0,
+      "high": 21050.0,
+      "low": 21050.0,
+      "close": 21050.0,
+      "volume": 0.0
+    },
+    {
+      "trade_date": "2026-09-01T00:00:00",
+      "open": 21050.0,
+      "high": 21050.0,
+      "low": 21050.0,
+      "close": 21050.0,
+      "volume": 0.0
+    },
+    {
+      "trade_date": "2026-09-02T00:00:00",
+      "open": 21050.0,
+      "high": 21050.0,
+      "low": 21050.0,
+      "close": 21050.0,
+      "volume": 0.0
+    },
+    {
+      "trade_date": "2026-09-03T00:00:00",
+      "open": 21000.0,
+      "high": 21000.0,
+      "low": 20600.0,
+      "close": 20600.0,
+      "volume": 11654500.0
+    },
+    {
+      "trade_date": "2026-09-04T00:00:00",
+      "open": 20600.0,
+      "high": 20850.0,
+      "low": 20550.0,
+      "close": 20550.0,
+      "volume": 8857700.0
+    },
+    {
+      "trade_date": "2026-09-07T00:00:00",
+      "open": 20550.0,
+      "high": 20650.0,
+      "low": 20100.0,
+      "close": 20200.0,
+      "volume": 14138400.0
+    },
+    {
+      "trade_date": "2026-09-08T00:00:00",
+      "open": 20200.0,
+      "high": 20250.0,
+      "low": 20100.0,
+      "close": 20150.0,
+      "volume": 7453700.0
+    },
+    {
+      "trade_date": "2026-09-09T00:00:00",
+      "open": 20150.0,
+      "high": 20150.0,
+      "low": 20150.0,
+      "close": 20150.0,
+      "volume": 0.0
+    },
+    {
+      "trade_date": "2026-09-10T00:00:00",
+      "open": 20200.0,
+      "high": 20250.0,
+      "low": 20050.0,
+      "close": 20100.0,
+      "volume": 6900700.0
+    },
+    {
+      "trade_date": "2026-09-11T00:00:00",
+      "open": 20000.0,
+      "high": 20050.0,
+      "low": 19750.0,
+      "close": 19750.0,
+      "volume": 18351700.0
+    },
+    {
+      "trade_date": "2026-09-14T00:00:00",
+      "open": 19750.0,
+      "high": 19950.0,
+      "low": 19600.0,
+      "close": 19700.0,
+      "volume": 16345400.0
+    },
+    {
+      "trade_date": "2026-09-15T00:00:00",
+      "open": 19750.0,
+      "high": 20150.0,
+      "low": 19750.0,
+      "close": 20000.0,
+      "volume": 15925500.0
+    },
+    {
+      "trade_date": "2026-09-16T00:00:00",
+      "open": 20050.0,
+      "high": 20300.0,
+      "low": 20000.0,
+      "close": 20300.0,
+      "volume": 9098600.0
+    },
+    {
+      "trade_date": "2026-09-17T00:00:00",
+      "open": 20150.0,
+      "high": 20550.0,
+      "low": 20100.0,
+      "close": 20550.0,
+      "volume": 16498200.0
+    },
+    {
+      "trade_date": "2026-09-18T00:00:00",
+      "open": 20550.0,
+      "high": 20600.0,
+      "low": 19900.0,
+      "close": 19900.0,
+      "volume": 16843700.0
+    },
+    {
+      "trade_date": "2026-09-21T00:00:00",
+      "open": 20150.0,
+      "high": 20200.0,
+      "low": 19900.0,
+      "close": 20200.0,
+      "volume": 13897400.0
+    },
+    {
+      "trade_date": "2026-09-22T00:00:00",
+      "open": 20150.0,
+      "high": 20200.0,
+      "low": 19950.0,
+      "close": 20100.0,
+      "volume": 9661200.0
+    },
+    {
+      "trade_date": "2026-09-23T00:00:00",
+      "open": 20100.0,
+      "high": 20200.0,
+      "low": 20000.0,
+      "close": 20000.0,
+      "volume": 8858000.0
+    },
+    {
+      "trade_date": "2026-09-24T00:00:00",
+      "open": 20000.0,
+      "high": 20100.0,
+      "low": 19850.0,
+      "close": 19850.0,
+      "volume": 8475200.0
+    },
+    {
+      "trade_date": "2026-09-25T00:00:00",
+      "open": 19900.0,
+      "high": 20100.0,
+      "low": 19850.0,
+      "close": 19900.0,
+      "volume": 7854300.0
+    },
+    {
+      "trade_date": "2026-09-28T00:00:00",
+      "open": 19900.0,
+      "high": 20000.0,
+      "low": 19600.0,
+      "close": 19800.0,
+      "volume": 9922600.0
+    },
+    {
+      "trade_date": "2026-09-29T00:00:00",
+      "open": 19750.0,
+      "high": 19800.0,
+      "low": 19500.0,
+      "close": 19600.0,
+      "volume": 9381700.0
+    },
+    {
+      "trade_date": "2026-09-30T00:00:00",
+      "open": 19650.0,
+      "high": 19800.0,
+      "low": 19550.0,
+      "close": 19650.0,
+      "volume": 6955000.0
+    },
+    {
+      "trade_date": "2026-10-01T00:00:00",
+      "open": 19700.0,
+      "high": 19800.0,
+      "low": 19550.0,
+      "close": 19550.0,
+      "volume": 7572900.0
+    },
+    {
+      "trade_date": "2026-10-02T00:00:00",
+      "open": 19550.0,
+      "high": 19650.0,
+      "low": 19100.0,
+      "close": 19100.0,
+      "volume": 11976700.0
+    },
+    {
+      "trade_date": "2026-10-05T00:00:00",
+      "open": 19100.0,
+      "high": 19300.0,
+      "low": 19100.0,
+      "close": 19150.0,
+      "volume": 9210200.0
+    },
+    {
+      "trade_date": "2026-10-06T00:00:00",
+      "open": 19150.0,
+      "high": 19200.0,
+      "low": 18850.0,
+      "close": 19200.0,
+      "volume": 17320700.0
+    },
+    {
+      "trade_date": "2026-10-07T00:00:00",
+      "open": 19150.0,
+      "high": 19250.0,
+      "low": 19050.0,
+      "close": 19100.0,
+      "volume": 9984300.0
+    },
+    {
+      "trade_date": "2026-10-08T00:00:00",
+      "open": 19100.0,
+      "high": 19150.0,
+      "low": 18900.0,
+      "close": 18900.0,
+      "volume": 11116900.0
+    },
+    {
+      "trade_date": "2026-10-09T00:00:00",
+      "open": 18800.0,
+      "high": 19150.0,
+      "low": 18650.0,
+      "close": 19050.0,
+      "volume": 14094300.0
+    },
+    {
+      "trade_date": "2026-10-12T00:00:00",
+      "open": 19050.0,
+      "high": 19250.0,
+      "low": 19000.0,
+      "close": 19150.0,
+      "volume": 9895100.0
+    },
+    {
+      "trade_date": "2026-10-13T00:00:00",
+      "open": 19150.0,
+      "high": 19150.0,
+      "low": 19000.0,
+      "close": 19050.0,
+      "volume": 6577800.0
+    },
+    {
+      "trade_date": "2026-10-14T00:00:00",
+      "open": 19050.0,
+      "high": 19450.0,
+      "low": 19000.0,
+      "close": 19350.0,
+      "volume": 15849800.0
+    },
+    {
+      "trade_date": "2026-10-15T00:00:00",
+      "open": 19300.0,
+      "high": 20100.0,
+      "low": 19300.0,
+      "close": 19900.0,
+      "volume": 32621600.0
+    },
+    {
+      "trade_date": "2026-10-16T00:00:00",
+      "open": 19900.0,
+      "high": 20000.0,
+      "low": 19800.0,
+      "close": 19850.0,
+      "volume": 10919400.0
+    },
+    {
+      "trade_date": "2026-10-19T00:00:00",
+      "open": 19900.0,
+      "high": 19950.0,
+      "low": 19600.0,
+      "close": 19700.0,
+      "volume": 12029200.0
+    },
+    {
+      "trade_date": "2026-10-20T00:00:00",
+      "open": 19700.0,
+      "high": 19750.0,
+      "low": 19500.0,
+      "close": 19650.0,
+      "volume": 7650000.0
+    },
+    {
+      "trade_date": "2026-10-21T00:00:00",
+      "open": 19700.0,
+      "high": 20000.0,
+      "low": 19700.0,
+      "close": 20000.0,
+      "volume": 12130800.0
+    },
+    {
+      "trade_date": "2026-10-22T00:00:00",
+      "open": 20000.0,
+      "high": 20050.0,
+      "low": 19750.0,
+      "close": 19900.0,
+      "volume": 7779000.0
+    },
+    {
+      "trade_date": "2026-10-23T00:00:00",
+      "open": 19800.0,
+      "high": 19900.0,
+      "low": 19650.0,
+      "close": 19800.0,
+      "volume": 10901100.0
+    },
+    {
+      "trade_date": "2026-10-26T00:00:00",
+      "open": 19800.0,
+      "high": 19850.0,
+      "low": 19550.0,
+      "close": 19550.0,
+      "volume": 9779700.0
+    },
+    {
+      "trade_date": "2026-10-27T00:00:00",
+      "open": 19600.0,
+      "high": 19700.0,
+      "low": 19500.0,
+      "close": 19650.0,
+      "volume": 4839900.0
+    },
+    {
+      "trade_date": "2026-10-28T00:00:00",
+      "open": 19650.0,
+      "high": 19700.0,
+      "low": 19500.0,
+      "close": 19700.0,
+      "volume": 7607600.0
+    },
+    {
+      "trade_date": "2026-10-29T00:00:00",
+      "open": 19700.0,
+      "high": 19800.0,
+      "low": 19550.0,
+      "close": 19700.0,
+      "volume": 7234600.0
+    },
+    {
+      "trade_date": "2026-10-30T00:00:00",
+      "open": 19600.0,
+      "high": 19600.0,
+      "low": 19300.0,
+      "close": 19300.0,
+      "volume": 9473400.0
+    },
+    {
+      "trade_date": "2026-11-02T00:00:00",
+      "open": 19300.0,
+      "high": 19300.0,
+      "low": 18600.0,
+      "close": 18750.0,
+      "volume": 23936700.0
+    },
+    {
+      "trade_date": "2026-11-03T00:00:00",
+      "open": 18800.0,
+      "high": 18900.0,
+      "low": 18550.0,
+      "close": 18900.0,
+      "volume": 20614600.0
+    },
+    {
+      "trade_date": "2026-11-04T00:00:00",
+      "open": 18900.0,
+      "high": 19300.0,
+      "low": 18700.0,
+      "close": 19250.0,
+      "volume": 19527900.0
+    },
+    {
+      "trade_date": "2026-11-05T00:00:00",
+      "open": 19400.0,
+      "high": 19600.0,
+      "low": 19350.0,
+      "close": 19500.0,
+      "volume": 11586100.0
+    },
+    {
+      "trade_date": "2026-11-06T00:00:00",
+      "open": 19000.0,
+      "high": 19350.0,
+      "low": 19000.0,
+      "close": 19250.0,
+      "volume": 12496300.0
+    }
+  ],
+  "_provenance": {
+    "MBB.VN": {
+      "source": "yahoo",
+      "requested_source": "auto",
+      "detected_source": "yahoo",
+      "fallback_used": false,
+      "currency_conversion": "none",
+      "volume_unit": null,
+      "adjustment": "split_dividend",
+      "quote_currency": "VND",
+      "price_unit": "VND",
+      "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/MBB.VN?interval=1d&events=div%2Csplits&period1=1759276800&period2=1794096000",
+      "retrieved_at": "2026-11-07T16:32:43.998885+00:00",
+      "quote_observation": {
+        "symbol": "MBB.VN",
+        "exchange": "HOSE",
+        "value": 19250.0,
+        "unit": "VND",
+        "scale": 1,
+        "observed_at": "2026-11-06T07:45:13+00:00",
+        "price_basis": "raw",
+        "data_role": "last_trade",
+        "provider": "yahoo",
+        "source_url": "https://query1.finance.yahoo.com/v8/finance/chart/MBB.VN?interval=1d&events=div%2Csplits&period1=1759276800&period2=1794096000",
+        "retrieved_at": "2026-11-07T16:32:43.998885+00:00"
+      },
+      "first_bar_date": "2025-10-01T00:00:00",
+      "last_bar_date": "2026-11-06T00:00:00",
+      "data_kind": "historical_bars",
+      "price_warning": "OHLC bars may be adjusted and are not live quotes; use the dated raw quote_observation when available."
+    }
+  },
+  "_capture": {
+    "session_id": "2f39362dae24",
+    "run_id": "20261107_233205_66_258497",
+    "call_id": "call-d9c26c34-dac8-11f1-8b40-0d59d067b37c-0-0",
+    "raw_result_sha256": "388c4631ac7329acc28aa55e046a6e544330eb1be6917bdb66c0b5d173054062",
+    "description": "Actual Yahoo tool result captured 2026-11-07; last 60 historical bars only. No live request or model call in this replay."
+  }
+}

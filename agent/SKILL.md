@@ -1,7 +1,7 @@
 ---
 name: vibe-trading
 version: 0.1.18
-description: Professional finance research toolkit — backtesting (11 engines + benchmark comparison panel), factor analysis, Alpha Zoo (478 pre-built alphas across qlib158/alpha101/gtja191/academic/fundamental), options pricing, 90 finance skills, 30 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 29 market-data sources (tushare, yfinance, okx, binance, akshare, baostock, tencent, mootdx, ccxt, futu, mt5, tickerall, local, eastmoney, sina, stooq, yahoo, pykrx, india_broker, qveris, longbridge, nobitex, wallex, plus optional-key finnhub/alphavantage/tiingo/fmp/gildata).
+description: Professional finance research toolkit — backtesting (11 engines + benchmark comparison panel), factor analysis, Alpha Zoo (478 pre-built alphas across qlib158/alpha101/gtja191/academic/fundamental), options pricing, 91 finance skills, 31 multi-agent swarm teams, Trade Journal analyzer, and Shadow Account (extract → backtest → render) across 29 market-data sources (tushare, yfinance, okx, binance, akshare, baostock, tencent, mootdx, ccxt, futu, mt5, tickerall, local, eastmoney, sina, stooq, yahoo, pykrx, india_broker, qveris, longbridge, nobitex, wallex, plus optional-key finnhub/alphavantage/tiingo/fmp/gildata).
 dependencies:
   python: ">=3.11"
   pip:
@@ -23,7 +23,7 @@ mcp:
 
 # Vibe-Trading
 
-Professional finance research toolkit with AI-powered backtesting (11 engines), multi-agent teams, 90 specialized skills, the **Alpha Zoo** (478 pre-built quantitative alphas across qlib158 / alpha101 / gtja191 / academic / fundamental with one-line CLI benchmarking), and the Shadow Account loop — extract your implicit trading rules from a journal, backtest them across A股/港股/美股/crypto, then see where they would have served you better.
+Professional finance research toolkit with AI-powered backtesting (11 engines), multi-agent teams, 91 specialized skills, the **Alpha Zoo** (478 pre-built quantitative alphas across qlib158 / alpha101 / gtja191 / academic / fundamental with one-line CLI benchmarking), and the Shadow Account loop — extract your implicit trading rules from a journal, backtest them across A股/港股/美股/crypto, then see where they would have served you better.
 
 ## Setup
 
@@ -53,7 +53,7 @@ Add to your agent's MCP config:
 
 ### API Key Requirements
 
-Core research MCP tools work with zero API keys for HK/US/Canada/crypto. After `pip install`, backtesting, market data, factor analysis, options pricing, chart patterns, web search, document reading, trade journal analysis, shadow-account extraction/backtest/report, the Alpha Zoo (478 pre-built alphas), and all 90 skills are ready to use. IBKR tools require a local TWS / IB Gateway session; `run_swarm` requires an LLM key.
+Core research MCP tools work with zero API keys for HK/US/Canada/crypto. After `pip install`, backtesting, market data, factor analysis, options pricing, chart patterns, web search, document reading, trade journal analysis, shadow-account extraction/backtest/report, the Alpha Zoo (478 pre-built alphas), and all 91 skills are ready to use. IBKR tools require a local TWS / IB Gateway session; `run_swarm` requires an LLM key.
 
 | Feature | Key needed | When |
 |---------|-----------|------|
@@ -98,7 +98,7 @@ Example workflow:
 4. Use `backtest()` to run and get metrics (Sharpe, return, drawdown, etc.)
 
 ### Multi-Agent Swarm Teams
-30 pre-built agent teams for complex research:
+31 pre-built agent teams for complex research:
 - **Investment Committee**: bull/bear debate → risk review → PM decision
 - **Global Equities Desk**: A-share + HK/US + crypto → global strategist
 - **Crypto Trading Desk**: funding/basis + liquidation + flow → risk manager
@@ -120,7 +120,7 @@ One-line cross-sectional IC / IR / alive-reversed-dead categorisation across fiv
 
 Each alpha ships with `__alpha_meta__` (formula LaTeX + theme + universe + warmup + columns required), guarded by an AST purity gate + 300-row lookahead sentinel test. Use the `vibe-trading alpha {list,show,bench,compare,export-manifest}` CLI, the `/alpha/*` REST routes (browser at `/alpha-zoo`), or compose multi-factor signals via `ZooSignalEngine.from_zoo(...)`.
 
-### Finance Skills (90)
+### Finance Skills (91)
 Comprehensive knowledge base covering:
 - Technical analysis (candlestick, Elliott wave, Ichimoku, SMC, harmonic, chanlun)
 - Quantitative methods (factor research, ML strategy, pair trading, multi-factor)
@@ -133,11 +133,11 @@ Comprehensive knowledge base covering:
 
 Use `load_skill(name)` to access full methodology docs with code templates.
 
-## Available MCP Tools (82)
+## Available MCP Tools (87)
 
 | Tool | Description | API Key |
 |------|-------------|---------|
-| `list_skills` | List all 90 finance skills | None |
+| `list_skills` | List all 91 finance skills | None |
 | `load_skill` | Load full skill documentation | None |
 | `start_research_goal` | Create an auditable research goal | None |
 | `get_research_goal` | Read the current research goal | None |
@@ -164,6 +164,11 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `get_research_reports` | Sell-side analyst research reports | None* |
 | `get_stock_news` | Market & company news headlines | None* |
 | `get_sec_filings` | SEC EDGAR filings (10-K/10-Q/8-K, etc.) | None |
+| `export_research_report` | Export evidence-bound branded research drafts as DOCX/PDF/PPTX; writes private runtime artifacts | None |
+| `vietnam_research` | Read configured local curated VN statement evidence; contents remain unverified | Local dataset config |
+| `vietnam_comparables` | Compare caller-supplied VN peers with declared evidence and price/share basis | None |
+| `crypto_basis_curve` | Compute a basis curve from supplied spot/dated-futures quotes; no price fetch or orders | None |
+| `crypto_derivatives` | Read public Binance USDT-perpetual OI/funding history or a configured local archive; no capture writes | None |
 | `get_financial_statements` | Income / balance / cash-flow statements | None* |
 | `get_options_chain` | Options chain (strikes, IV, OI, Greeks) | None* |
 | `get_stock_profile` | Valuation, analyst estimates & institutional holdings (US/HK) | None |
@@ -213,7 +218,7 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 | `etf_holdings` | ETF look-through — SEC N-PORT (US) and full-book A-share fund reports | None |
 | `prediction_market` | Event-contract search/market/history as labelled implied probability | None |
 | `research_papers` | arXiv + OpenAlex search/read with source-anchored claim extraction | None |
-| `quantlib_call` | Pure-compute finance math — 308 functions across 24 quantlib modules | None |
+| `quantlib_call` | Pure-compute finance math — 310 functions across 24 quantlib modules | None |
 | `cashflow_performance` | XIRR / MOIC / DPI / TVPI / TWR / Modified Dietz over dated cash flows | None |
 | `orderbook_depth` | Crypto L2 ladder — spread bps, depth imbalance, impact cost | None |
 | `sentiment` | Local lexicon text scoring + crypto Fear & Greed Index | None |
@@ -228,7 +233,7 @@ Use `load_skill(name)` to access full methodology docs with code templates.
 pip install vibe-trading-ai
 ```
 
-That's it — no API keys needed for HK/US/Canada/crypto markets. Start using `backtest`, `get_market_data`, `analyze_options`, `analyze_trade_journal`, `extract_shadow_strategy`, `web_search`, the **Alpha Zoo** (`vibe-trading alpha bench --zoo gtja191 --universe csi300 --period 2018-2025`), and all 90 skills immediately.
+That's it — no API keys needed for HK/US/Canada/crypto markets. Start using `backtest`, `get_market_data`, `analyze_options`, `analyze_trade_journal`, `extract_shadow_strategy`, `web_search`, the **Alpha Zoo** (`vibe-trading alpha bench --zoo gtja191 --universe csi300 --period 2018-2025`), and all 91 skills immediately.
 
 ## Loading Tools from External MCP Servers
 

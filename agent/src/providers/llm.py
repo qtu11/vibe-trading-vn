@@ -398,6 +398,12 @@ if ChatOpenAI is not None:
             )
             return get_provider_capabilities(self._vibe_provider, str(model))
 
+        def _rejection_scope(self) -> tuple[str, str, str]:
+            from src.providers.model_metadata import normalize_endpoint
+
+            endpoint = self.openai_api_base or getattr(self.root_client, "base_url", "")
+            return (self._vibe_provider or "", normalize_endpoint(str(endpoint)), self.model_name)
+
         @staticmethod
         def _extract_tool_call_thought_signature(tool_call: Any) -> Optional[str]:
             if not isinstance(tool_call, dict):
@@ -615,7 +621,7 @@ if ChatOpenAI is not None:
             """
             if not _is_anthropic_temperature_unsupported_error(exc):
                 return False
-            model = str(self.model_name)
+            model = self.model_name
             if model not in _ANTHROPIC_TEMPERATURE_UNSUPPORTED:
                 logger.info(
                     "Model %s rejects `temperature`; retrying without it "
@@ -627,7 +633,7 @@ if ChatOpenAI is not None:
 
         def _use_responses_api(self, payload: dict) -> bool:  # type: ignore[override]
             """Route a model whose chat endpoint refused tools to /v1/responses."""
-            if str(self.model_name) in _RESPONSES_REQUIRED:
+            if self._rejection_scope() in _RESPONSES_REQUIRED:
                 return True
             return super()._use_responses_api(payload)
 
@@ -644,8 +650,8 @@ if ChatOpenAI is not None:
             """
             if not _is_responses_required_error(exc):
                 return False
-            model = str(self.model_name)
-            if model in _RESPONSES_REQUIRED or self.use_responses_api is True:
+            model = self.model_name
+            if self._rejection_scope() in _RESPONSES_REQUIRED or self.use_responses_api is True:
                 return False
             logger.warning(
                 "Model %s refuses function tools on /v1/chat/completions with a "
@@ -654,7 +660,7 @@ if ChatOpenAI is not None:
                 "it up front.",
                 model,
             )
-            _RESPONSES_REQUIRED.add(model)
+            _RESPONSES_REQUIRED.add(self._rejection_scope())
             return True
 
         def _recoverable_rejection(self, exc: BaseException) -> bool:
@@ -664,14 +670,41 @@ if ChatOpenAI is not None:
             every later request, is shaped differently: without ``temperature``
             (#1223) or on ``/v1/responses`` (#1473).
             """
-            return self._remember_temperature_unsupported(exc) or self._remember_responses_required(exc)
+            return (
+                self._remember_temperature_unsupported(exc)
+                or self._remember_responses_required(exc)
+                or self._remember_reasoning_effort_unsupported(exc)
+            )
+
+        def _remember_reasoning_effort_unsupported(self, exc: BaseException) -> bool:
+            """Record a gateway that rejects ``reasoning_effort``; report a one-shot retry.
+
+            Custom OpenAI-compatible endpoints are offered an effort control
+            without a prior allowlist entry, so a strict gateway may answer 400
+            for the unknown field. The model is remembered in
+            ``_REASONING_EFFORT_UNSUPPORTED`` and later requests omit the field.
+            """
+            if not _is_reasoning_effort_unsupported_error(exc):
+                return False
+            model = self.model_name
+            if self._rejection_scope() in _REASONING_EFFORT_UNSUPPORTED:
+                return False
+            if not getattr(self, "reasoning_effort", None):
+                return False
+            logger.warning(
+                "Endpoint rejects `reasoning_effort` for %s; retrying without it "
+                "and omitting it for subsequent calls.",
+                model,
+            )
+            _REASONING_EFFORT_UNSUPPORTED.add(self._rejection_scope())
+            return True
 
         def _stream(self, *args: Any, **kwargs: Any) -> Iterator[Any]:
             """Route Responses streams through the mapping-compatible adapter."""
             if self._use_responses_api({**kwargs, **self.model_kwargs}):
                 cloned = copy(self)
                 cloned.root_client = _ResponsesSyncClient(self.root_client)
-                inner = super(ChatOpenAIWithReasoning, cloned)._stream(*args, **kwargs)
+                inner = super(__class__, cloned)._stream(*args, **kwargs)
             else:
                 inner = self._stream_with_usage_fallback(*args, **kwargs)
             # The 400 arrives before the first chunk, so restarting the stream
@@ -693,7 +726,7 @@ if ChatOpenAI is not None:
             # stream_usage=True is set at build time so streamed calls report
             # real token counts (issue #1224); an endpoint that rejects
             # stream_options is remembered and retried without it.
-            model = str(self.model_name)
+            model = self.model_name
             if model in _STREAM_USAGE_UNSUPPORTED:
                 yield from super()._stream(*args, stream_usage=False, **kwargs)
                 return
@@ -716,7 +749,7 @@ if ChatOpenAI is not None:
             # stream_usage=True is set at build time so streamed calls report
             # real token counts (issue #1224); an endpoint that rejects
             # stream_options is remembered and retried without it.
-            model = str(self.model_name)
+            model = self.model_name
             if model in _STREAM_USAGE_UNSUPPORTED:
                 async for chunk in super()._astream(
                     *args, stream_usage=False, **kwargs
@@ -743,7 +776,7 @@ if ChatOpenAI is not None:
             if self._use_responses_api({**kwargs, **self.model_kwargs}):
                 cloned = copy(self)
                 cloned.root_async_client = _ResponsesAsyncClient(self.root_async_client)
-                inner = super(ChatOpenAIWithReasoning, cloned)._astream(*args, **kwargs)
+                inner = super(__class__, cloned)._astream(*args, **kwargs)
             else:
                 inner = self._astream_with_usage_fallback(*args, **kwargs)
             # The 400 arrives before the first chunk, so restarting the stream
@@ -800,8 +833,11 @@ if ChatOpenAI is not None:
                 if "max_completion_tokens" in payload:
                     payload["max_tokens"] = payload.pop("max_completion_tokens")
             # Models that rejected `temperature` before omit it up front (#1223).
-            if str(self.model_name) in _ANTHROPIC_TEMPERATURE_UNSUPPORTED:
+            if self.model_name in _ANTHROPIC_TEMPERATURE_UNSUPPORTED:
                 payload.pop("temperature", None)
+            # Gateways that rejected `reasoning_effort` before omit it up front.
+            if self._rejection_scope() in _REASONING_EFFORT_UNSUPPORTED:
+                payload.pop("reasoning_effort", None)
             if "messages" in payload:
                 messages = super()._convert_input(input_).to_messages()
                 caps = self._capabilities()
@@ -836,7 +872,7 @@ if ChatOpenAI is not None:
                 merged: dict[str, Any] = (
                     dict(existing_headers) if isinstance(existing_headers, Mapping) else {}
                 )
-                present = {str(name).lower() for name in merged}
+                present = {name.lower() for name in merged}
                 for name, value in session_headers.items():
                     if name.lower() not in present:
                         merged[name] = value
@@ -1092,7 +1128,29 @@ def _is_stream_usage_unsupported_error(exc: BaseException) -> bool:
 # request is retried on /v1/responses instead, where the effort travels as
 # ``reasoning.effort``. Membership is populated on that first refusal and reused
 # process-wide so later calls skip the failed request.
-_RESPONSES_REQUIRED: set[str] = set()
+_RESPONSES_REQUIRED: set[tuple[str, str, str]] = set()
+
+
+_REASONING_EFFORT_UNSUPPORTED: set[tuple[str, str, str]] = set()
+
+
+def _is_reasoning_effort_unsupported_error(exc: BaseException) -> bool:
+    """Return True when a gateway rejects the ``reasoning_effort`` field itself.
+
+    A refusal that points at ``/v1/responses`` is handled by the Responses
+    retry instead, so it is excluded here.
+    """
+    message = str(getattr(exc, "message", "") or exc).lower()
+    if "reasoning_effort" not in message or "/v1/responses" in message:
+        return False
+    # A rejected value must surface; only a rejected field permits omission.
+    return bool(re.search(
+        r"(?:unknown|unrecognized|unexpected|unsupported|not supported)\s+"
+        r"(?:request\s+)?(?:argument|parameter|field)(?:\s+(?:supplied|provided))?"
+        r"\s*[:=]?\s*[\"'`]?reasoning_effort\b"
+        r"|\breasoning_effort[\"'`]*\s+(?:is\s+)?(?:not supported|unsupported)\b",
+        message,
+    ))
 
 
 def _is_responses_required_error(exc: BaseException) -> bool:
@@ -1766,7 +1824,7 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
             if (
                 effort
                 and not use_responses_api
-                and _sends_top_level_reasoning_effort(caps)
+                and (provider == "custom" or _sends_top_level_reasoning_effort(caps))
             )
             else None
         ),
@@ -1789,16 +1847,21 @@ def build_llm(*, model_name: Optional[str] = None, callbacks: Any = None) -> Any
         # Imported here: the guard needs httpx/httpcore/anyio, and the
         # background-tool lifecycle checks import this module without them.
         from src.providers.endpoint_guard import build_public_only_clients, proxy_applies
-    if provider == "custom" and (disable_proxy or not proxy_applies(creds["base_url"])):
-        # A saved custom endpoint is re-checked on every connection, so a
-        # host that re-resolves to a private address later is refused.
-        sync_client, async_client = build_public_only_clients()
-        kwargs["http_client"] = sync_client
-        kwargs["http_async_client"] = async_client
-        kwargs["vibe_owned_http_clients"] = (sync_client, async_client)
+
+        if disable_proxy or not proxy_applies(creds["base_url"]):
+            # A saved custom endpoint is re-checked on every connection, so a
+            # host that re-resolves to a private address later is refused.
+            sync_client, async_client = build_public_only_clients()
+            kwargs["http_client"] = sync_client
+            kwargs["http_async_client"] = async_client
+            kwargs["vibe_owned_http_clients"] = (sync_client, async_client)
     elif disable_proxy:
         sync_client, async_client = _build_proxy_free_http_clients()
         kwargs["http_client"] = sync_client
         kwargs["http_async_client"] = async_client
         kwargs["vibe_owned_http_clients"] = (sync_client, async_client)
+    if ChatOpenAIWithReasoning is None:
+        raise RuntimeError(
+            "ChatOpenAIWithReasoning is unavailable because langchain-openai is not installed"
+        )
     return ChatOpenAIWithReasoning(**kwargs)

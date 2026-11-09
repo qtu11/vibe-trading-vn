@@ -104,12 +104,14 @@ def test_summary_usage_obeys_goal_budget_without_stopping_funded_work(
     agent, llm = _agent(tmp_path)
 
     def compact(messages, run_dir, trace, iteration, current_iter):
-        messages[:] = _messages()
-        agent._auto_compact(messages, run_dir, trace, iteration=current_iter)
+        # The loop checks both the initial context and the assembled request.
+        if not llm.chat.called:
+            messages[:] = _messages()
+            agent._auto_compact(messages, run_dir, trace, iteration=current_iter)
 
     monkeypatch.setattr(agent, "_compact_to_budget", compact)
     result = agent.run("Summarize the earlier work.", session_id="summary-cost")
-    assert result["status"] == status
+    assert result["status"] == status, result.get("reason")
     assert llm.chat.call_count == summary_calls
     assert llm.stream_chat.call_count == agent_calls
     updated = store.get_goal(goal.goal_id)
@@ -117,17 +119,20 @@ def test_summary_usage_obeys_goal_budget_without_stopping_funded_work(
     assert updated.turns_used == 1
 
 
-def test_failed_summary_without_timeout_reports_unknown_usage(tmp_path, monkeypatch):
+def test_failed_summary_without_timeout_preserves_context_and_reports_unknown_usage(tmp_path, monkeypatch):
     events = []
     agent, llm = _agent(tmp_path, lambda kind, data: events.append((kind, data)))
     llm.chat.side_effect = RuntimeError("Provider disconnected")
     monkeypatch.setattr("src.agent.loop._llm_timeout_seconds", lambda: 0)
     trace = TraceWriter(tmp_path)
+    messages = _messages()
+    original = [message.copy() for message in messages]
     try:
-        with pytest.raises(RuntimeError, match="Provider disconnected"):
-            agent._auto_compact(_messages(), tmp_path, trace, iteration=7)
+        assert agent._auto_compact(messages, tmp_path, trace, iteration=7) is False
     finally:
         trace.close()
+    assert messages == original
+    assert agent._last_compaction_status["reason"] == "summary_provider_error"
     assert ("llm_usage_unavailable", {
         "iter": 7, "usage_event_index": 1, "purpose": "compaction",
     }) in events

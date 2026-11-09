@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
+
+import pytest
 
 from src.channels.websocket import WebSocketChannel
 from src.channelsui.websocket_logging import websockets_server_logger
@@ -16,6 +19,7 @@ def test_websockets_server_logger_is_a_logger_not_a_factory():
     assert isinstance(websockets_server_logger, logging.Logger)
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="asyncio Unix sockets are unsupported on Windows")
 def test_websocket_channel_starts_on_a_unix_socket():
     from src.channels.bus.queue import MessageBus
 

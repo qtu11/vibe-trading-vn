@@ -576,10 +576,10 @@ export const api = {
       return value.pages;
     });
   },
-  exportReportJob: (report: Record<string, unknown>, formats: ReportFormat[] = ["docx", "pdf", "pptx"], runId?: string) =>
+  exportReportJob: (report: Record<string, unknown>, formats: ReportFormat[] = ["docx", "pdf", "pptx"], runId?: string, minimumPages = 24) =>
     request<ReportEngineJob>("/api/reports/jobs", {
       method: "POST",
-      body: JSON.stringify({ report, formats, run_id: runId }),
+      body: JSON.stringify({ report, formats, run_id: runId, minimum_pages: minimumPages }),
     }).then((job) => {
       if (!validReportJob(job)) throw new Error("Dữ liệu báo cáo không hợp lệ");
       return job;

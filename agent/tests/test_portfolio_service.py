@@ -914,7 +914,7 @@ def test_a_pinned_read_hides_a_snapshot_that_includes_a_disabled_source(tmp_path
     assert service.analysis_context(snapshot_id=snapshot["snapshot_id"]) is None
 
 
-@pytest.mark.parametrize("old_version", [1, 3])
+@pytest.mark.parametrize("old_version", [1, 3, 4])
 def test_a_pinned_read_refuses_a_snapshot_valued_under_another_contract(tmp_path, old_version):
     service, _ = _pinned_service(tmp_path, "300")
     snapshot = service.refresh()

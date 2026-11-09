@@ -149,11 +149,27 @@ def test_fx_http_shape_date_and_eur_then_coherent_cache(tmp_path, monkeypatch):
     snapshot = instance.refresh()
     assert seen == ["https://api.frankfurter.app/latest?from=USD&to=CNY,HKD,EUR"]
     assert snapshot["fx"]["as_of"] == NOW.date().isoformat()
+    assert set(snapshot['fx']['rates']) == {'USD', 'CNY', 'HKD', 'EUR'}
     payload["rates"]["EUR"] = -1
     cached = instance.refresh()
     assert cached["fx"]["stale"]
     assert cached["fx"]["rates"] == snapshot["fx"]["rates"]
     assert cached["fx"]["fetched_at"] == snapshot["fx"]["fetched_at"]
+
+
+def test_legacy_frankfurter_cache_does_not_reuse_the_invented_vnd_rate(tmp_path):
+    instance, _ = service(tmp_path)
+    instance.store.save_fx_quote({
+        'rates': {'USD': '1', 'CNY': '7', 'HKD': '8', 'EUR': '0.9', 'VND': '25400'},
+        'fetched_at': NOW.isoformat(), 'as_of': NOW.date().isoformat(),
+        'source': 'Frankfurter v1 reference rates',
+    })
+    def unavailable():
+        raise RuntimeError('offline fixture')
+    instance._fx_fetcher = unavailable
+    quote, stale = instance._rates()
+    assert stale is True
+    assert set(quote.rates) == {'USD', 'CNY', 'HKD', 'EUR'}
 
 
 def test_http_import_settings_refresh_and_rebalance_use_same_store(tmp_path, monkeypatch):

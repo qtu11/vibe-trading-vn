@@ -44,6 +44,9 @@ class ExportResearchReportTool(BaseTool):
                     "executive_summary_evidence attribute their prose. market_price requires as_of, "
                     "observed_at, unit and price_basis matching get_market_data.quote_observation; "
                     "historical adjusted closes cannot substitute for the latest raw trade."
+                    " For a rated calculated target_price, methodology must be an arithmetic expression "
+                    "using exactly its input_keys (for example eps * target_pe); declare chosen coefficients "
+                    "as assumption metrics with methodology. The server recomputes the target before accepting a rating."
                 ),
             },
             "formats": {
@@ -52,11 +55,25 @@ class ExportResearchReportTool(BaseTool):
                 "default": ["docx", "pdf", "pptx"],
                 "description": "Download formats. Defaults to DOCX, PDF and PPTX.",
             },
+            "minimum_pages": {"type": "integer", "minimum": 1, "maximum": 2000, "default": 24,
+                              "description": "Minimum verified PDF pages for this deep research report; defaults to 24. Insufficient evidenced analysis returns partial status, never padded text."},
         },
         "required": ["report"],
     }
 
-    def execute(self, report: dict[str, Any] | str, formats: list[str] | None = None) -> str:
+    def execute(
+        self,
+        report: dict[str, Any] | str,
+        formats: list[str] | None = None,
+        minimum_pages: int = 24,
+        **kwargs: Any,
+    ) -> str:
+        # The agent loop normalizes every call by injecting the active ``run_dir``
+        # (see ``_normalize_tool_run_dir``). That keyword is transport metadata,
+        # not report input. A signature that rejected it made this tool fail on
+        # *every* call, which silently pushed the agent back to the plain
+        # Markdown PDF writer: a 7-page ReportLab dump instead of the branded
+        # research document. Accept and ignore host-injected keywords.
         if isinstance(report, str):
             try:
                 report_dict = json.loads(report)
@@ -74,7 +91,7 @@ class ExportResearchReportTool(BaseTool):
 
             ledger = current_grounding.get()
             evidence_context = from_grounding_ledger(ledger) if ledger is not None else None
-            job = service.create_job(report_data=report_dict, formats=requested_formats, evidence_context=evidence_context)
+            job = service.create_job(report_data=report_dict, formats=requested_formats, evidence_context=evidence_context, minimum_pages=minimum_pages)
             download_links = [
                 {"format": art["filename"].split(".")[-1], "filename": art["filename"], "url": art["download_url"]}
                 for art in job["artifacts"]
@@ -87,6 +104,8 @@ class ExportResearchReportTool(BaseTool):
                 "artifacts": job["artifacts"],
                 "download_links": download_links,
                 "warnings": job.get("warnings", []),
+                "minimum_pages": job.get("minimum_pages"),
+                "pdf_pages": job.get("pdf_pages"),
                 "error": job.get("error"),
                 "fence": f'```report_artifact\n{{"type": "report_artifact", "job_id": "{job["job_id"]}"}}\n```',
             }

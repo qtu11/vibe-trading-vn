@@ -8,7 +8,8 @@ import { useReportPreviewStore } from "@/stores/reportPreview";
 const FORMATS: ReportFormat[] = ["docx", "pdf", "pptx"];
 
 export function ReportPreviewPanel() {
-  const selection = useReportPreviewStore((state) => state.selection);
+  const selected = useReportPreviewStore((state) => state.selection);
+  const selection = selected && !("sourceUrl" in selected) ? selected : null;
   const close = useReportPreviewStore((state) => state.close);
   const [job, setJob] = useState<ReportEngineJob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);

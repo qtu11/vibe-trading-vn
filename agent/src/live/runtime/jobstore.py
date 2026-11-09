@@ -27,6 +27,7 @@ import json
 import logging
 import os
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,6 +41,33 @@ _RUNTIME_SUBDIR = "runtime"
 #: Schema version of the persisted store envelope. Bump on breaking changes so
 #: a future loader can branch instead of mis-parsing an old layout.
 _SCHEMA_VERSION = 1
+
+
+def _replace_with_retry(source: Path, target: Path, attempts: int = 6) -> None:
+    """Rename ``source`` over ``target``, retrying a transient Windows lock.
+
+    On Windows a concurrent reader (the scheduler loading the store, an
+    antivirus scanner) can hold the target open without ``FILE_SHARE_DELETE``,
+    which makes ``os.replace`` fail with ``PermissionError`` even though
+    nothing is wrong with either file. The rename is atomic when it happens,
+    so retrying the same rename is safe: the temp file is still complete.
+
+    Args:
+        source: The fully written temp file to rename.
+        target: The path the store must end up at.
+        attempts: How many times to try the rename.
+
+    Raises:
+        OSError: The last rename error, when every attempt failed.
+    """
+    for attempt in range(attempts):
+        try:
+            os.replace(source, target)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.02 * (attempt + 1))
 
 
 class CorruptJobStoreError(RuntimeError):
@@ -157,7 +185,7 @@ class JobStore:
                         raise OSError("job store write made no progress")
                     remaining = remaining[written:]
                 os.fsync(handle.fileno())
-            os.replace(tmp, target)
+            _replace_with_retry(tmp, target)
             self._fsync_dir(target.parent)
         finally:
             tmp.unlink(missing_ok=True)

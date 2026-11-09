@@ -17,13 +17,18 @@ import pytest
 
 from backtest.loaders.akshare_loader import (
     DataLoader,
-    _is_a_share,
     _is_etf_listed,
     _is_forex,
-    _is_hk,
-    _is_us,
 )
 from tests.loader_contract import assert_loader_contract
+
+
+@pytest.fixture(autouse=True)
+def forex_symbol_map(monkeypatch):
+    """Keep unit routing independent of the optional AKShare installation."""
+    monkeypatch.setitem(sys.modules, 'akshare.forex.cons', SimpleNamespace(
+        symbol_market_map={'EURUSD': 'fixture-market'},
+    ))
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +178,44 @@ def fake_akshare(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 
 
 class TestRouting:
+    @pytest.mark.parametrize('code', ['EUR/USD', 'USD/ZZZ', 'FPT.VN', 'BTC-USDT', 'AAPL', '600519.BAD'])
+    def test_unsupported_symbol_cannot_fall_through_to_a_shares(self, fake_akshare, monkeypatch, code):
+        monkeypatch.setitem(sys.modules, 'akshare.forex.cons', None)
+        assert DataLoader()._fetch_one(code, '2024-01-01', '2024-12-31', '1D') is None
+        fake_akshare.stock_zh_a_hist.assert_not_called()
+        fake_akshare.forex_hist_em.assert_not_called()
+
+    def test_bare_six_digit_mainland_code_remains_supported(self, fake_akshare):
+        frame = DataLoader()._fetch_one('600519', '2024-01-01', '2024-12-31', '1D')
+        assert frame is not None
+        fake_akshare.stock_zh_a_hist.assert_called_once_with(
+            symbol='600519', period='daily', start_date='20240101', end_date='20241231', adjust='qfq',
+        )
+
+    def test_unsupported_vietnam_symbol_reaches_the_next_provider(self, fake_akshare, monkeypatch):
+        from src.market_data import fetch_market_data
+        monkeypatch.setattr('backtest.loaders.akshare_loader.cached_loader_fetch',
+                            lambda **kwargs: kwargs['fetch']())
+
+        class Serving:
+            name = 'yahoo'
+
+            def fetch(self, codes, start, end, interval='1D'):
+                assert codes == ['FPT.VN']
+                frame = _stub_etf_response().set_index('date')
+                frame.index.name = 'trade_date'
+                frame.attrs['quote_currency'] = 'VND'
+                return {'FPT.VN': frame}
+
+        result = fetch_market_data(
+            codes=['FPT.VN'], start_date='2024-01-01', end_date='2024-12-31', source='akshare',
+            loader_resolver=lambda source: DataLoader if source == 'akshare' else Serving,
+            fallback_chain_provider=lambda source: ['yahoo'], include_provenance=True,
+        )
+        assert result['_provenance']['FPT.VN']['source'] == 'yahoo'
+        assert result['_provenance']['FPT.VN']['fallback_used'] is True
+        fake_akshare.stock_zh_a_hist.assert_not_called()
+
     def test_etf_routes_to_fund_etf_hist_sina(self, fake_akshare: SimpleNamespace) -> None:
         loader = DataLoader()
         df = loader._fetch_one("518880.SH", "2024-01-01", "2024-12-31", "1D")

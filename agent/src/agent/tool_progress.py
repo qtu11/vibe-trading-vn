@@ -124,6 +124,33 @@ class ToolProgress:
                 # publication timestamps and all page/source content intact.
                 observation_payload.pop("memory_cached", None)
                 observation_payload.pop("cache_age_seconds", None)
+            elif (
+                is_readonly
+                and name == "parallel_web_search"
+                and isinstance(observation_payload, dict)
+                and isinstance(observation_payload.get("results"), list)
+            ):
+                # The multi-engine envelope echoes the query, the expanded
+                # query list, and the measured latency. None of those are
+                # evidence: re-running the same search returns the same hits
+                # with a different latency number, which would look like new
+                # information every time. The hits themselves stay in.
+                observation_payload.pop("primary_query", None)
+                observation_payload.pop("all_queries", None)
+                observation_payload.pop("latency_ms", None)
+            elif (
+                is_readonly
+                and name == "concurrent_scraper"
+                and isinstance(observation_payload, dict)
+            ):
+                # The scraper envelope carries a latency measurement and the
+                # per-URL fetch diagnostics. A repeated scrape of the same
+                # pages changes both without changing the evidence.
+                token_stats = observation_payload.get("token_stats")
+                if isinstance(token_stats, dict):
+                    token_stats.pop("latency_ms", None)
+                observation_payload.pop("fetch_errors", None)
+                observation_payload.pop("reader_fallback_failures", None)
             result = json.dumps(observation_payload, sort_keys=True, ensure_ascii=False)
         except (ValueError, TypeError):
             pass

@@ -41,6 +41,8 @@ import {
 } from "@/components/chat/Composer";
 import { GoalPanel } from "@/components/chat/GoalPanel";
 import { ReportPreviewPanel } from "@/components/chat/ReportPreviewPanel";
+import { SourceBrowserPanel } from "@/components/chat/SourceBrowserPanel";
+import { sourceReferencesMarkdown, sourceResolutionMarkdown } from "@/lib/sourceEvidence";
 import { useReportPreviewStore } from "@/stores/reportPreview";
 import {
   LiveActionChip,
@@ -237,13 +239,15 @@ function goalContinuePrompt(snapshot: GoalSnapshot): string {
 
 /* ---------- Component ---------- */
 export function Agent() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const listRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<ComposerHandle>(null);
   const liveRuntimeRef = useRef<LiveRuntimePanelHandle>(null);
   const goalOpenRequestRef = useRef(0);
+  const goalSnapshotRequestRef = useRef(0);
   const sseSessionRef = useRef<string | null>(null);
+  const sseConnectionRef = useRef<object | null>(null);
   const prevSseStatusRef = useRef<string>("disconnected");
   const genRef = useRef(0);
   const pendingGoalSessionRef = useRef<string | null>(null);
@@ -433,12 +437,12 @@ export function Agent() {
     if (!attempt || !content.trim()) return;
     act().addMessage({
       id: `partial_${attempt.attemptId}`,
-      type: "answer",
-      content,
+      type: "error",
+      content: `${i18n.language.startsWith("vi") ? "Phản hồi chưa hoàn tất và chưa được kiểm chứng đầy đủ." : "The partial response is incomplete and has not been fully verified."}\n\n${content}`,
       meta: { partialAttemptId: attempt.attemptId },
       timestamp: Date.now(),
     });
-  }, []);
+  }, [i18n.language]);
 
   const markBackgroundCompletion = useCallback((
     completedSessionId: string,
@@ -537,10 +541,12 @@ export function Agent() {
     window.clearTimeout(historyScrollTimerRef.current);
     disconnect();
     sseSessionRef.current = null;
+    sseConnectionRef.current = null;
   }, [cancelPendingStreamFlush, disconnect]);
 
   const loadGoalSnapshot = useCallback(async (sid?: string | null) => {
     const targetSession = sid || act().sessionId;
+    const request = ++goalSnapshotRequestRef.current;
     goalOpenRequestRef.current = 0;
     if (!targetSession) {
       setGoalSnapshot(null);
@@ -548,10 +554,10 @@ export function Agent() {
     }
     try {
       const snapshot = await api.getGoal(targetSession);
-      if (act().sessionId !== targetSession) return;
+      if (act().sessionId !== targetSession || goalSnapshotRequestRef.current !== request) return;
       setGoalSnapshot(snapshot);
     } catch (error) {
-      if (act().sessionId !== targetSession) return;
+      if (act().sessionId !== targetSession || goalSnapshotRequestRef.current !== request) return;
       if (error instanceof ApiError && error.status === 404) {
         setGoalSnapshot(null);
       } else {
@@ -560,11 +566,13 @@ export function Agent() {
     }
   }, []);
 
-  const loadSessionMessages = useCallback(async (sid: string, gen: number) => {
+  const loadSessionMessages = useCallback(async (sid: string, gen: number, completedAttemptId?: string) => {
+    const currentRequest = () => genRef.current === gen && (!completedAttemptId
+      || !act().activity || act().activity?.attemptId === completedAttemptId);
     setHistoryError(null);
     try {
       const msgs = await api.getSessionMessages(sid);
-      if (genRef.current !== gen) return;
+      if (!currentRequest()) return;
       // Every assistant turn owns a run directory, so most of these are plain
       // replies. Request all previews up front rather than one per message.
       const previews = new Map<string, Promise<RunPreview | null>>();
@@ -572,7 +580,7 @@ export function Agent() {
         const meta = m.metadata as Record<string, unknown> | undefined;
         const runId = meta?.run_id as string | undefined;
         const metrics = meta?.metrics as Record<string, number> | undefined;
-        if (m.role !== "user" && runId && !hasStoredMetrics(metrics) && !previews.has(runId)) {
+        if (m.role !== "user" && (!meta?.status || meta.status === "completed") && runId && !hasStoredMetrics(metrics) && !previews.has(runId)) {
           previews.set(runId, api.getRunPreview(runId).catch(() => null));
         }
       }
@@ -640,6 +648,8 @@ export function Agent() {
             meta: displayPrompt.meta,
             timestamp: ts,
           });
+        } else if (meta?.status && meta.status !== "completed") {
+          agentMsgs.push({ id: m.message_id, type: "error", content: m.content, elapsed_ms: elapsedMs, timestamp: assistantTs, sources, meta: { partialAttemptId: m.linked_attempt_id || undefined } });
         } else if (runId) {
           // Show text answer first (if non-empty), then chart card
           if (m.content && m.content !== "Strategy execution completed.") {
@@ -657,7 +667,7 @@ export function Agent() {
           agentMsgs.push({ id: m.message_id, type: "answer", content: m.content, elapsed_ms: elapsedMs, timestamp: assistantTs, forexTradePlan: parseForexTradePlan(meta?.forex_trade_plan), sources });
         }
       }
-      if (genRef.current !== gen) return;
+      if (!currentRequest()) return;
       // A background session's SSE stream disconnects the moment you navigate
       // away (doDisconnect() in the session-switch effect), so the
       // session_completed event that would normally clear streamingSessionId
@@ -696,17 +706,17 @@ export function Agent() {
       setRuntimeIdentity(latestRuntimeIdentity ?? {});
       scheduleHistoryScroll();
     } catch (error) {
-      if (genRef.current !== gen) return;
+      if (!currentRequest()) return;
       setRuntimeIdentity({});
       act().setSessionLoading(false);
       setHistoryError(error instanceof Error ? error.message : t("settings.unknownError"));
     }
   }, [scheduleHistoryScroll, t]);
 
-  const refreshSessionMessages = useCallback(async (sid: string) => {
+  const refreshSessionMessages = useCallback(async (sid: string, completedAttemptId?: string) => {
     const gen = genRef.current + 1;
     genRef.current = gen;
-    await loadSessionMessages(sid, gen);
+    await loadSessionMessages(sid, gen, completedAttemptId);
   }, [loadSessionMessages]);
 
   const syncCompletedAttempt = useCallback(async (sid: string, attemptId?: string) => {
@@ -721,10 +731,11 @@ export function Agent() {
           act().clearStreamingSession(sid);
           markBackgroundCompletion(sid, attemptId);
           if (act().sessionId !== sid) return true;
+          if (act().activity && act().activity?.attemptId !== attemptId) return true;
           clearStreamingView();
           act().setStatus("idle");
           useAgentStore.setState({ toolCalls: [], activity: null });
-          await refreshSessionMessages(sid);
+          await refreshSessionMessages(sid, attemptId);
           return true;
         }
       } catch {
@@ -742,6 +753,9 @@ export function Agent() {
     replayAttemptSeenRef.current = false;
     disconnect();
     sseSessionRef.current = sid;
+    const connection = {};
+    sseConnectionRef.current = connection;
+    const currentConnection = () => sseConnectionRef.current === connection && act().sessionId === sid;
 
     const touch = () => { lastEventRef.current = Date.now(); };
     const identifyActivity = (
@@ -779,7 +793,7 @@ export function Agent() {
       return true;
     };
 
-    connect(api.sseUrl(sid, { replay: "active" }), {
+    const handlers: Parameters<typeof connect>[1] = {
       text_delta: (d) => {
         touch();
         replayAttemptSeenRef.current = true;
@@ -1103,6 +1117,7 @@ export function Agent() {
         // Show RunCompleteCard when the turn produced backtest metrics or a shadow report
         if (runId) {
           const card = runCardFields(await api.getRunPreview(runId).catch(() => null));
+          if (!currentConnection()) return;
           if (card || shadowId) {
             s.addMessage({
               id: "", type: "run_complete", content: "", runId,
@@ -1153,7 +1168,8 @@ export function Agent() {
           archiveActivity("failed");
         }
         clearStreamingView();
-        act().addMessage({ id: "", type: "error", content: String(d.error || "Execution failed"), timestamp: Date.now() });
+        useAgentStore.setState((state) => ({ messages: state.messages.filter((message) => message.meta?.partialAttemptId !== attemptId) }));
+        act().addMessage({ id: "", type: "error", content: String(d.summary || d.error || "Execution failed"), sources: parseSourceCitations(d.sources), meta: { partialAttemptId: attemptId }, timestamp: Date.now() });
         act().setStatus("idle");
         scrollToBottom();
       },
@@ -1191,6 +1207,10 @@ export function Agent() {
           archiveActivity("stopped");
         }
         clearStreamingView();
+        if (typeof d.summary === "string" && d.summary) {
+          useAgentStore.setState((state) => ({ messages: state.messages.filter((message) => message.meta?.partialAttemptId !== attemptId) }));
+          act().addMessage({ id: "", type: "error", content: d.summary, sources: parseSourceCitations(d.sources), meta: { partialAttemptId: attemptId }, timestamp: Date.now() });
+        }
         act().setStatus("idle");
         scrollToBottom();
       },
@@ -1323,7 +1343,17 @@ export function Agent() {
 
       heartbeat: () => {},
       reconnect: (d) => { act().setSseStatus("reconnecting", Number(d.attempt ?? 0)); },
-    });
+    };
+    connect(api.sseUrl(sid, { replay: "active" }), Object.fromEntries(Object.entries(handlers).map(([kind, handler]) => [kind, (data: Record<string, unknown>) => {
+      if (!currentConnection()) return;
+      const incomingAttempt = typeof data.attempt_id === "string" ? data.attempt_id : "";
+      const currentAttempt = act().activity?.attemptId;
+      if (incomingAttempt && currentAttempt && currentAttempt !== incomingAttempt && (
+        (!currentAttempt.startsWith("pending-") && kind !== "attempt.started" && kind !== "attempt.created")
+        || act().messages.some((message) => message.meta?.activity?.attemptId === incomingAttempt)
+      )) return;
+      return handler(data);
+    }])));
   }, [
     archiveActivity,
     cancelPendingStreamFlush,
@@ -1465,23 +1495,11 @@ export function Agent() {
     return () => clearInterval(timer);
   }, [archiveActivity, flushPendingStreamUpdate, persistPartialAnswer, status, t]);
 
-  const ensureGoalSession = useCallback(async (title: string): Promise<string> => {
-    let sid = act().sessionId;
-    if (sid) return sid;
-    const session = await api.createSession(title.slice(0, 50));
-    sid = session.session_id;
-    pendingGoalSessionRef.current = sid;
-    act().setSessionId(sid);
-    setSearchParams({ session: sid }, { replace: true });
-    setupSSE(sid);
-    return sid;
-  }, [setSearchParams, setupSSE]);
-
   const runPrompt = useCallback(async (
     prompt: string,
     attachments: ComposerAttachment[] = [],
   ) => {
-    if ((!prompt.trim() && attachments.length === 0) || status === "streaming") return;
+    if ((!prompt.trim() && attachments.length === 0) || act().status === "streaming") return;
     const finalPrompt = buildChatPrompt(prompt, attachments, Boolean(swarmPreset));
     const limit = goalComposerActive ? MAX_GOAL_CHARS : MAX_MESSAGE_CHARS;
     if (promptExceedsLimit(goalComposerActive ? prompt : finalPrompt, limit)) {
@@ -1492,9 +1510,24 @@ export function Agent() {
     clearStreamingView();
 
     if (goalComposerActive) {
+      const pendingAttemptId = `pending-${crypto.randomUUID()}`;
+      let requestSid = act().sessionId;
+      act().startActivity(pendingAttemptId);
+      act().setStatus("streaming");
       try {
-        const sid = await ensureGoalSession(prompt);
+        let sid = requestSid;
+        if (!sid) {
+          const session = await api.createSession(prompt.slice(0, 50));
+          if (act().sessionId !== requestSid || act().activity?.attemptId !== pendingAttemptId) return;
+          sid = session.session_id;
+          requestSid = sid;
+          pendingGoalSessionRef.current = sid;
+          act().setSessionId(sid);
+          setSearchParams({ session: sid }, { replace: true });
+        }
         const snapshot = await api.createGoal(sid, { objective: prompt });
+        if (act().sessionId !== sid || act().activity?.attemptId !== pendingAttemptId) return;
+        goalSnapshotRequestRef.current += 1;
         goalOpenRequestRef.current += 1;
         setGoalSnapshot(snapshot);
         setGoalComposerActive(false);
@@ -1507,16 +1540,16 @@ export function Agent() {
           meta: { goalMode: true, requestText: kickoff },
           timestamp: Date.now(),
         });
-        act().startActivity(`pending-${Date.now()}`);
-        act().setStatus("streaming");
         forceScrollToBottom();
         setupSSE(sid);
         const sent = await api.sendMessage(sid, kickoff);
-        if (act().activity?.attemptId.startsWith("pending-")) {
+        if (act().sessionId !== sid) return;
+        if (act().activity?.attemptId === pendingAttemptId) {
           act().setActivityAttemptId(sent.attempt_id);
-        }
+        } else if (act().activity?.attemptId !== sent.attempt_id) return;
         void syncCompletedAttempt(sid, sent.attempt_id);
       } catch (error) {
+        if (act().sessionId !== requestSid || act().activity?.attemptId !== pendingAttemptId) return;
         if (act().activity) archiveActivity("failed");
         act().setStatus("idle");
         const message = error instanceof Error ? error.message : t('agent.failedToStartGoal');
@@ -1546,27 +1579,33 @@ export function Agent() {
       meta: Object.keys(messageMeta).length > 0 ? messageMeta : undefined,
       timestamp: Date.now(),
     });
-    act().startActivity(`pending-${Date.now()}`);
+    const pendingAttemptId = `pending-${crypto.randomUUID()}`;
+    act().startActivity(pendingAttemptId);
     act().setStatus("streaming");
     forceScrollToBottom();
 
+    let requestSid = act().sessionId;
     try {
-      let sid = act().sessionId;
+      let sid = requestSid;
       if (!sid) {
         const sessionTitle = prompt.trim()
           || attachments.map(({ filename }) => filename).join(", ");
         const session = await api.createSession(sessionTitle.slice(0, 50));
+        if (act().sessionId !== requestSid || act().activity?.attemptId !== pendingAttemptId) return;
         sid = session.session_id;
+        requestSid = sid;
         act().setSessionId(sid);
         setSearchParams({ session: sid }, { replace: true });
       }
       setupSSE(sid);
       const sent = await api.sendMessage(sid, finalPrompt);
-      if (act().activity?.attemptId.startsWith("pending-")) {
+      if (act().sessionId !== sid) return;
+      if (act().activity?.attemptId === pendingAttemptId) {
         act().setActivityAttemptId(sent.attempt_id);
-      }
+      } else if (act().activity?.attemptId !== sent.attempt_id) return;
       void syncCompletedAttempt(sid, sent.attempt_id);
     } catch (error) {
+      if (act().sessionId !== requestSid || act().activity?.attemptId !== pendingAttemptId) return;
       archiveActivity("failed");
       act().setStatus("error");
       const message = isAuthRequiredError(error) ? AUTH_REQUIRED_MESSAGE
@@ -1577,7 +1616,6 @@ export function Agent() {
   }, [
     archiveActivity,
     clearStreamingView,
-    ensureGoalSession,
     forceScrollToBottom,
     goalComposerActive,
     setSearchParams,
@@ -1602,8 +1640,10 @@ export function Agent() {
       act().setStatus("idle");
       return;
     }
+    const attemptId = act().activity?.attemptId;
     try {
       await api.cancelSession(sessionId);
+      if (act().sessionId !== sessionId || act().activity?.attemptId !== attemptId) return;
       flushPendingStreamUpdate();
       const partialAnswer = act().streamingText;
       const stoppedActivity = archiveActivity("stopped");
@@ -1612,6 +1652,7 @@ export function Agent() {
       act().setStatus("idle");
       toast.info(t('agent.cancelRequestSent'));
     } catch {
+      if (act().sessionId !== sessionId || act().activity?.attemptId !== attemptId) return;
       // The attempt is still live. Preserve its activity, buffered text and
       // streaming status so a failed cancel request does not strand the turn.
       toast.error(t('agent.cancelFailed'));
@@ -1636,7 +1677,7 @@ export function Agent() {
   }, [handleCancel, status]);
 
   const handleContinueGoal = useCallback(async () => {
-    if (!sessionId || !goalSnapshot || status === "streaming") return;
+    if (!sessionId || !goalSnapshot || act().sessionId !== sessionId || act().status === "streaming") return;
     const prompt = goalContinuePrompt(goalSnapshot);
     act().addMessage({
       id: "",
@@ -1645,25 +1686,28 @@ export function Agent() {
       meta: { goalMode: true, requestText: prompt },
       timestamp: Date.now(),
     });
-    act().startActivity(`pending-${Date.now()}`);
+    const pendingAttemptId = `pending-${crypto.randomUUID()}`;
+    act().startActivity(pendingAttemptId);
     act().setStatus("streaming");
     forceScrollToBottom();
     composerRef.current?.focus();
     try {
       setupSSE(sessionId);
       const sent = await api.sendMessage(sessionId, prompt);
-      if (act().activity?.attemptId.startsWith("pending-")) {
+      if (act().sessionId !== sessionId) return;
+      if (act().activity?.attemptId === pendingAttemptId) {
         act().setActivityAttemptId(sent.attempt_id);
-      }
+      } else if (act().activity?.attemptId !== sent.attempt_id) return;
       void syncCompletedAttempt(sessionId, sent.attempt_id);
     } catch (error) {
+      if (act().sessionId !== sessionId || act().activity?.attemptId !== pendingAttemptId) return;
       archiveActivity("failed");
       act().setStatus("error");
       const message = isAuthRequiredError(error) ? AUTH_REQUIRED_MESSAGE : t('agent.failedToContinue');
       toast.error(message);
       act().addMessage({ id: "", type: "error", content: message, timestamp: Date.now() });
     }
-  }, [archiveActivity, forceScrollToBottom, goalSnapshot, sessionId, setupSSE, status, syncCompletedAttempt, t]);
+  }, [archiveActivity, forceScrollToBottom, goalSnapshot, sessionId, setupSSE, syncCompletedAttempt, t]);
 
   const handleRetry = useCallback((errorMsg: AgentMessage) => {
     if (status === "streaming") return;
@@ -1709,8 +1753,10 @@ export function Agent() {
   }, [forceScrollToBottom, sessionId, setupSSE, status]);
 
   const handleGoalSnapshotChange = useCallback((snapshot: GoalSnapshot | null) => {
-    setGoalSnapshot(snapshot);
-  }, []);
+    if (act().sessionId !== sessionId) return;
+    goalSnapshotRequestRef.current += 1;
+    setGoalSnapshot((current) => current?.goal.goal_id === goalSnapshot?.goal.goal_id ? snapshot : current);
+  }, [goalSnapshot?.goal.goal_id, sessionId]);
 
   const handleStartGoal = useCallback(() => {
     setSwarmPreset(null);
@@ -1749,7 +1795,10 @@ export function Agent() {
       } else if (msg.type === "run_complete") {
         lines.push(`> Backtest complete: ${msg.runId || ""}`, ``);
       }
+      const sourceLinks = sourceResolutionMarkdown(msg.sources ?? []);
+      if (sourceLinks) lines.push(`Nguồn của phản hồi: ${sourceLinks}`, "");
     }
+    lines.push(sourceReferencesMarkdown(messages.flatMap((msg) => msg.sources ?? [])));
     const blob = new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -2018,21 +2067,6 @@ export function Agent() {
         className="border-t border-white/[0.06] dark:border-white/[0.04] px-4 pt-2 pb-3.5 bg-gradient-to-t from-background/95 via-background/90 to-background/50 backdrop-blur-xl"
       >
         <div className="max-w-2xl mx-auto">
-          {/* Controls Bar đặt ở PHÍA TRÊN khung chat theo chuẩn Codex */}
-          <div className="mb-2 flex min-w-0 items-center justify-between gap-2 px-0.5">
-            <ComposerModelControls
-              settings={llmSettings}
-              disabled={status === "streaming"}
-              onChange={setLlmSettings}
-            />
-            <ContextUsageIndicator
-              key={`${sessionId || "draft"}:${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
-              sessionId={sessionId}
-              live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined}
-              modelKey={`${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
-            />
-          </div>
-
           <LiveRuntimePanel
             ref={liveRuntimeRef}
             sessionId={sessionId}
@@ -2045,6 +2079,15 @@ export function Agent() {
               hasCompletedTurn={hasCompletedTurn}
               showExport={sessionId != null}
               canExport={messages.length > 0}
+              controls={<>
+                <ContextUsageIndicator compact
+                  key={`${sessionId || "draft"}:${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
+                  sessionId={sessionId}
+                  live={contextSnapshot?.sessionId === sessionId ? contextSnapshot.snapshot : undefined}
+                  modelKey={`${llmSettings?.provider || ""}:${llmSettings?.model_name || ""}`}
+                />
+                <ComposerModelControls settings={llmSettings} disabled={status === "streaming"} onChange={setLlmSettings} />
+              </>}
               goalComposerActive={goalComposerActive}
               swarmPreset={swarmPreset}
               panels={
@@ -2073,6 +2116,7 @@ export function Agent() {
       </div>
     </div>
     <ReportPreviewPanel />
+    <SourceBrowserPanel />
     </div>
   );
 }

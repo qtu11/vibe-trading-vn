@@ -260,8 +260,9 @@ class WebSearchTool(BaseTool):
                 continue
             except Exception as exc:  # noqa: BLE001 — surface a clean error to the agent
                 last_error = exc
-                # "No results found" is a definitive empty answer, not a transient
-                # failure — retrying or switching engines won't change it.
+                # "No results found" is a definitive empty answer, not a
+                # transient failure — retrying or switching engines won't
+                # change it.
                 if "no results" in str(exc).lower():
                     return json.dumps(
                         {
@@ -274,15 +275,30 @@ class WebSearchTool(BaseTool):
                         ensure_ascii=False,
                     )
                 logger.warning("web_search attempt %d/%d failed: %s", attempt, _MAX_ATTEMPTS, exc)
+                err_msg = str(exc).lower()
                 # Network/egress errors (timeout, connection refused, unreachable)
                 # won't recover on retry — stop retrying ddgs and fall through to
                 # the cn.bing fallback instead of wasting ~20-30s on more timeouts.
-                err_msg = str(exc).lower()
                 if any(s in err_msg for s in ("timeout", "timed out", "unreachable", "connection", "max retries")):
                     break
                 if attempt < _MAX_ATTEMPTS:
                     time.sleep(_BACKOFF_BASE_SECONDS * attempt)
                 continue
+
+            if not raw:
+                # ddgs answered without an error but found nothing. The
+                # engines were reachable and the query has no hits, which is
+                # the same answer as "no results found".
+                return json.dumps(
+                    {
+                        "status": "ok",
+                        "query": query,
+                        "backends": backends if supports_backend else "duckduckgo",
+                        "results": [],
+                        "note": "No results found for this query across the search engines.",
+                    },
+                    ensure_ascii=False,
+                )
 
             results = [
                 {

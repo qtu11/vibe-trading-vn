@@ -27,13 +27,26 @@ it("uses one estimated prompt rather than last-request or cumulative billed toke
   const trigger = screen.getByRole("button", { name: "Context approximately 25% used" });
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   fireEvent.pointerEnter(trigger);
-  expect(screen.getByRole("tooltip")).toHaveTextContent("Estimated prompt: 25,000 · Remaining: 75,000");
+  const tooltip = screen.getByRole("tooltip");
+  expect(tooltip).toHaveTextContent("Context window");
+  expect(tooltip).toHaveTextContent("25k / 100k tokens used");
+  expect(tooltip).toHaveTextContent("Used 25% · 75% remaining");
   fireEvent.click(trigger);
   const popover = screen.getByRole("dialog", { name: "Context usage details" });
+  expect(within(popover).getByText("25%")).toBeVisible();
+  expect(within(popover).getByText("75% left")).toBeVisible();
+  expect(within(popover).getByText("25k / 100k tokens used")).toBeVisible();
   expect(within(popover).getByText("Last provider input").parentElement).toHaveTextContent("80,000");
   expect(within(popover).getByText(/Last-request input and total billed tokens are separate/)).toBeVisible();
   expect(screen.queryByText("9,000,000")).not.toBeInTheDocument();
   expect(screen.queryByText("Saved messages")).not.toBeInTheDocument();
+});
+
+it("matches the Codex summary shape for a verified window", () => {
+  render(<ContextUsageIndicator sessionId="session-one" live={snapshot({ model_window: 475000, estimated_next_request_tokens: 196000 })} />);
+  fireEvent.click(screen.getByRole("button", { name: "Context approximately 41% used" }));
+  expect(screen.getByText("196k / 475k tokens used")).toBeVisible();
+  expect(screen.getByText("59% left")).toBeVisible();
 });
 
 it("discovers the selected model window before a chat session exists", async () => {
@@ -46,6 +59,7 @@ it("discovers the selected model window before a chat session exists", async () 
   expect(screen.getByRole("button",{name:"Refresh metadata"})).toBeEnabled();
   expect(screen.getByText("Automatic compaction enabled")).toBeVisible();
   expect(screen.getByText("60,000")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Details" }));
   expect(screen.getByText("Window confidence: provider_reported")).toBeVisible();
   expect(document.querySelector("circle[stroke-dasharray]")).toBeNull();
 });
@@ -64,6 +78,7 @@ it("discovers model metadata for existing chats before reading context and on re
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
   expect(vi.mocked(fetch).mock.calls.map(([url]) => url)).toEqual(["/settings/llm/context", "/sessions/session-one/context"]);
   fireEvent.click(screen.getByRole("button", { name: "Context usage unknown" }));
+  fireEvent.click(screen.getByRole("button", { name: "Details" }));
   expect(screen.getByText("Window source: provider:/models")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Refresh metadata" }));
   await waitFor(() => expect(fetch).toHaveBeenCalledTimes(4));
@@ -103,18 +118,21 @@ it("updates from compaction snapshots without claiming a running summary already
   live.compaction = { state: "running", automatic: true, count: 0 };
   const { rerender } = render(<ContextUsageIndicator sessionId="session-one" live={live} />);
   fireEvent.click(screen.getByRole("button", { name: "Context approximately 80% used" }));
-  expect(screen.getByText("Compacting context…", { selector: "p" })).toBeVisible();
+  expect(screen.getByText("Compacting context…")).toBeVisible();
   const compacted = snapshot({ estimated_next_request_tokens: 10000, phase: "post_compaction" });
   compacted.compaction = { state: "completed", automatic: true, count: 1 };
   rerender(<ContextUsageIndicator sessionId="session-one" live={compacted} />);
   expect(screen.getByRole("button", { name: "Context approximately 10% used" })).toBeVisible();
-  expect(screen.getByText("Context compacted", { selector: "p" })).toBeVisible();
+  expect(screen.getByText("Context compacted")).toBeVisible();
 });
 
 it("dismisses by Escape, returns keyboard focus, and keeps diagnostics behind another action", () => {
   render(<ContextUsageIndicator sessionId="session-one" live={snapshot()} />);
   const trigger = screen.getByRole("button", { name: "Context approximately 25% used" });
   fireEvent.click(trigger);
+  expect(screen.getByText("Context window")).toBeVisible();
+  expect(screen.queryByText("History & long-term memory")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Details" }));
   expect(screen.getByText("History & long-term memory")).toBeVisible();
   expect(screen.queryByText("Persistent memory")).not.toBeInTheDocument();
   const cancellation = vi.fn(); document.addEventListener("keydown", cancellation);

@@ -51,7 +51,7 @@ def test_every_loader_has_a_canonical_contract_assertion():
     assert CONTRACT_SUITES.keys() == VALID_SOURCES - {"auto"}
     root = Path(__file__).parent
     for source, filename in CONTRACT_SUITES.items():
-        tree = ast.parse((root / filename).read_text())
+        tree = ast.parse((root / filename).read_text(encoding="utf-8"))
         assert any(
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Name)

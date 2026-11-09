@@ -5,11 +5,12 @@ describe("AgentAvatar", () => {
   it("renders the brand mark as a decorative 32px avatar", () => {
     const { container } = render(<AgentAvatar />);
     const wrapper = container.firstElementChild;
-    const mark = wrapper?.querySelector("svg");
+    const mark = wrapper?.querySelector("img");
 
     expect(wrapper).toHaveAttribute("aria-hidden", "true");
     expect(wrapper).toHaveClass("h-8", "w-8");
     expect(mark).toHaveClass("h-8", "w-8");
+    expect(mark).toHaveAttribute("src", "/logo.png");
     expect(container).not.toHaveTextContent("P");
   });
 });

@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Gráfico indisponível: não foram obtidos candles OHLC completos. Nenhum candle foi estimado.",
+    "legacyUnavailable": "Este gráfico salvo não pode ser reconstruído porque parte dos dados de candles foi editada. Pergunte novamente para gerar um gráfico novo a partir de dados de mercado observados.",
+    "historicalNote": "Candles históricos com a base de ajuste indicada acima; não são cotações em tempo real da última negociação.",
+    "sourceLink": "Fonte de dados ↗",
+    "sourceUrlUnavailable": "O provedor de dados não forneceu a URL de origem",
+    "retrievedAt": "Obtido em: {{value}}",
+    "volumeUnit": "Unidade de volume: {{value}}",
+    "volumeUnavailable": "O volume de alguns candles está indisponível; valores ausentes não são zero.",
     "noPriceData": "Ainda não há dados de preço para este símbolo",
     "noCorrelationData": "Escolha pelo menos dois símbolos para comparar",
     "correlationUndefined": "indefinida (sem variação de preço na janela)",
@@ -1916,7 +1924,8 @@
     "timeoutHint": "Tempo limite esgotado. Simplifique a estratégia ou use menos ativos.",
     "apiFailedHint": "Falha na solicitação da API. Tente novamente em breve.",
     "executionFailedHint": "A execução falhou. Tente novamente.",
-    "retry": "Tente novamente"
+    "retry": "Tente novamente",
+    "legacyWithheld": "Alguns números desta resposta antiga não puderam ser verificados e foram ocultados. Pergunte novamente para receber uma resposta nova com fontes e gráfico."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

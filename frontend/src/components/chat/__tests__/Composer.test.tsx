@@ -32,6 +32,13 @@ const baseProps = {
 };
 
 describe("Composer", () => {
+  it("keeps model/context controls inside the same frame as the prompt", () => {
+    const { container } = render(<Composer {...baseProps} controls={<button type="button">Model controls</button>} />);
+    const frame = container.querySelector("[data-composer-frame]");
+    expect(frame).toContainElement(screen.getByRole("textbox"));
+    expect(frame).toContainElement(screen.getByRole("button", { name: "Model controls" }));
+    expect(container.querySelector("[data-composer-toolbar]")).toContainElement(screen.getByRole("button", { name: "Model controls" }));
+  });
   it("retains oversized input and gives an actionable error", () => {
     render(<Composer {...baseProps} />);
     const textarea = screen.getByRole("textbox");

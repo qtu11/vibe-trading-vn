@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "navigation": {
     "menu": "浏览功能",
@@ -1910,7 +1910,8 @@
     "timeoutHint": "执行超时。可简化策略或减少资产。",
     "apiFailedHint": "API 请求失败。请稍后重试。",
     "executionFailedHint": "执行失败。请重试。",
-    "retry": "再试一次"
+    "retry": "再试一次",
+    "legacyWithheld": "此旧回答中的部分数字无法核实，已隐藏。请重新提问，以获取带来源和图表的全新回答。"
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",
@@ -1950,6 +1951,14 @@
     "somethingWrong": "出了点问题，刷新页面就能继续。"
   },
   "charts": {
+    "noCompleteBars": "图表暂不可用：未获取完整的 OHLC 蜡烛数据。未估算任何蜡烛。",
+  "legacyUnavailable": "无法重建此已保存图表，因为其蜡烛数据已被部分删减。请重新提问，以便根据已观测的市场数据生成新图表。",
+    "historicalNote": "历史蜡烛采用上述复权口径，并非实时最新成交报价。",
+    "sourceLink": "数据来源 ↗",
+    "sourceUrlUnavailable": "数据提供方未提供来源网址",
+    "retrievedAt": "获取时间：{{value}}",
+    "volumeUnit": "成交量单位：{{value}}",
+    "volumeUnavailable": "部分蜡烛缺少成交量；缺失值不代表零。",
     "noPriceData": "这个标的还没有价格数据",
     "noCorrelationData": "至少选两个标的才能比较",
     "correlationUndefined": "无法计算（该标的在窗口内价格无波动）",

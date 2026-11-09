@@ -12,7 +12,7 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
-from backtest.engines._market_hooks import _detect_market, _is_china_futures
+from backtest.engines._market_hooks import _is_china_futures
 from backtest.loaders._symbol_utils import _is_etf_listed
 from backtest.loaders.additive_conversion import convert_additive_to_multiplicative
 from backtest.loaders.base import cached_loader_fetch, validate_date_range
@@ -204,17 +204,11 @@ class DataLoader:
         if _is_china_futures(code):
             _require_daily_interval(interval, "futures")
             return self._fetch_china_futures(ak, code, start_date, end_date)
-        if _detect_market(code) == "futures":
-            # A futures contract Sina does not carry (CL2412.NYMEX, ESZ4).
-            # Returning None hands the symbol to the next link in the chain;
-            # letting it reach the A-share default below priced a USD-quoted
-            # global contract off ``stock_zh_a_hist`` without erroring (#1395).
-            logger.warning(
-                "akshare serves Chinese futures only; %s has no akshare source", code
-            )
-            return None
-        # Default: try A-share
-        return self._fetch_a_share(ak, code, start_date, end_date, interval)
+        if re.fullmatch(r"[0-9]{6}", code):
+            return self._fetch_a_share(ak, code, start_date, end_date, interval)
+        # A wrong-market response must remain a miss so the real source can serve it.
+        logger.warning("akshare has no supported source for %s", code)
+        return None
 
     def _fetch_a_share(
         self, ak, code: str, start_date: str, end_date: str, interval: str,

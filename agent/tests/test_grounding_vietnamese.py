@@ -284,7 +284,7 @@ def test_a_vietnamese_note_reports_the_cut_in_vietnamese() -> None:
 
 
 def test_a_redacted_vietnamese_answer_reads_as_vietnamese(tmp_path: Path) -> None:
-    """A cut figure leaves a Vietnamese marker, never an English one."""
+    """An unverified price cannot leave its recommendation standing."""
     ledger = _ledger(tmp_path)
     draft = (
         "FPT.VN đóng cửa tại 99.999 đồng, khuyến nghị MUA."
@@ -296,7 +296,8 @@ def test_a_redacted_vietnamese_answer_reads_as_vietnamese(tmp_path: Path) -> Non
     released = ledger.redacted_release(draft, result)
 
     assert released is not None
-    assert _REDACTION_MARKER_VI in released
+    assert "Chưa đủ dữ liệu xác minh" in released
+    assert "khuyến nghị MUA" not in released
     assert _REDACTION_MARKER_EN not in released
 
 

@@ -5,6 +5,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 import pytest
+from docx import Document
 
 from src.reporting.schema import NarrativeSection, ResearchReport
 from src.reporting.service import ReportJobError, ReportJobService
@@ -96,7 +97,7 @@ def fake_renderer(report, root, formats):
     directory = root / "renderer-owned-directory"
     directory.mkdir()
     path = directory / "research.docx"
-    path.write_bytes(b"PK\x03\x04test-renderer-output")
+    Document().save(path)
     return {"docx": str(path), "warnings": ["PDF unavailable"] if "pdf" in formats else []}
 
 
@@ -161,6 +162,21 @@ def test_tool_does_not_replace_empty_format_request_with_defaults():
     assert receipt["error_code"] == "MISSING_FORMATS"
 
 
+def test_missing_or_cyclic_artifact_indexes_do_not_recurse(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.tools.report_artifacts.resolve_report_artifact", lambda *_: None)
+    service = ReportJobService(tmp_path)
+    index = tmp_path / "artifacts"
+    index.mkdir()
+    first, second = "1" * 32, "2" * 32
+    (index / f"{first}.json").write_text(json.dumps({"job_id": second}), encoding="utf-8")
+    (index / f"{second}.json").write_text(json.dumps({"job_id": first}), encoding="utf-8")
+    assert service.get_job(first) is None
+    assert service.get_job_for_artifact(second) is None
+    # A corrupt receipt must not crash the scan of otherwise valid jobs.
+    (tmp_path / f"{second}.json").write_text(json.dumps({"job_id": second, "artifacts": None}), encoding="utf-8")
+    assert service.get_job(first) is None
+
+
 def test_artifact_lookup_survives_restart_and_missing_legacy_index(tmp_path, monkeypatch):
     monkeypatch.setattr("src.reporting.service.export_report", fake_renderer)
     service = ReportJobService(tmp_path)
@@ -204,3 +220,39 @@ def test_publishing_one_format_failure_preserves_already_available_download(tmp_
     assert job["error"] is not None
     assert ReportJobService(tmp_path).get_job(job["job_id"]) == job
     assert list((tmp_path / "staging").iterdir()) == []
+
+
+def test_export_tool_tolerates_host_injected_run_dir(tmp_path, monkeypatch):
+    """The agent loop injects ``run_dir`` into every tool call.
+
+    A signature that rejected it made this tool fail on every invocation, so the
+    agent fell back to the plain Markdown PDF writer and shipped a paginated text
+    dump instead of the branded research document. Transport keywords must never
+    decide whether the deliverable exists.
+    """
+    monkeypatch.setattr("src.reporting.service.export_report", fake_renderer)
+
+    receipt = json.loads(
+        ExportResearchReportTool().execute(
+            report=sample(), formats=["docx"], minimum_pages=1, run_dir=str(tmp_path)
+        )
+    )
+
+    assert receipt["ok"] is True, receipt
+    assert receipt["artifacts"][0]["filename"].endswith(".docx")
+
+
+def test_export_tool_rejects_unknown_report_content_rather_than_silently_degrading(tmp_path, monkeypatch):
+    """Ignoring transport keywords must not turn into ignoring bad content."""
+    monkeypatch.setattr("src.reporting.service.export_report", fake_renderer)
+
+    receipt = json.loads(
+        ExportResearchReportTool().execute(
+            report={"symbol": "MBB"},
+            formats=["docx"],
+            run_dir=str(tmp_path),
+        )
+    )
+
+    assert receipt["ok"] is False
+    assert receipt["error_code"] == "SCHEMA_VALIDATION_FAILED"

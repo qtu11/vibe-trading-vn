@@ -6,6 +6,8 @@ import { Composer } from './src/components/chat/Composer';
 import { ComposerModelControls } from './src/components/chat/ComposerModelControls';
 import { ContextUsageIndicator } from './src/components/chat/ContextUsageIndicator';
 import { api, type LLMSettings } from './src/lib/api';
+import { MarkdownContent } from './src/components/chat/MessageBubble';
+import chartReplay from './ui-review-chart.json';
 
 const initial: LLMSettings = { provider:'openai', model_name:'GPT-6.1 Sol', base_url:'https://example.invalid/v1', api_key_configured:true, api_key_required:true, temperature:0, timeout_seconds:120, max_retries:2, reasoning_effort:'xhigh', sse_timeout_seconds:90, env_path:'fixture', providers:[{name:'openai', label:'OpenAI', base_url_env:'OPENAI_BASE_URL', default_model:'GPT-6.1 Sol', default_base_url:'https://example.invalid/v1', api_key_required:true, reasoning_efforts:['low','medium','high','xhigh']}] };
 api.listLLMModels = async () => ({ provider:'openai', models:['GPT-6.1 Sol','Alternative model with a deliberately very long display name'], source:'provider', effort_levels:{'GPT-6.1 Sol':['low','medium','high','xhigh'],'Alternative model with a deliberately very long display name':[]} });
@@ -23,7 +25,11 @@ const noop = () => {};
 function Review() {
   const [settings,setSettings] = useState<LLMSettings>(params.has('custom') ? {...initial,provider:'custom',model_name:'deepseek-ai/deepseek-v4.1-flash-1017',reasoning_effort:''} : initial);
   const controls = <><ContextUsageIndicator sessionId={null} compact modelKey={`${settings.provider}:${settings.model_name}`} /><ComposerModelControls settings={settings} disabled={params.has('streaming')} onChange={setSettings} /></>;
-  return <main className="flex h-dvh min-w-0 bg-background text-foreground">
+  if (params.has('chart')) return <main className="min-h-screen bg-background text-foreground" style={{padding:'24px',minHeight:'100vh'}}>
+    <div style={{maxWidth:'1050px',margin:'0 auto'}}><h1 style={{fontSize:24,fontWeight:600}}>MBB · Kiểm chứng biểu đồ trong câu trả lời</h1>
+    <p style={{fontSize:12,color:'#888',margin:'8px 0 24px'}}>Phát lại 53 nến từ công cụ trong phiên gốc · dữ liệu ghi nhận ngày 07/11/2026 · không phải báo giá trực tiếp</p>
+    <MarkdownContent content={'```chart\n'+JSON.stringify(chartReplay)+'\n```'} /></div></main>;
+  return <main style={{height:'100dvh'}} className="flex h-dvh min-w-0 bg-background text-foreground">
     <aside className="w-12 shrink-0 border-r" aria-hidden="true" />
     <section className="flex min-w-0 flex-1 flex-col">
       <div className="flex-1 p-5 text-xs text-muted-foreground">Kiểm tra giao diện · dữ liệu mô phỏng · không gọi provider</div>

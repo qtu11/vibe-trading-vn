@@ -138,13 +138,13 @@ describe("SwarmStatusCard token usage line", () => {
     );
 
     expect(container.textContent).toContain("↑15K");
-    expect(container.textContent).toContain("↓1,300");
+    expect(container.textContent).toContain(`↓${(1300).toLocaleString()}`);
   });
 
   it("shows per-agent tokens inside the dashboard rows", () => {
     const { container } = render(<SwarmStatusCard status={statusWith({})} />);
 
     const rowgroup = container.querySelector('[role="rowgroup"]');
-    expect(rowgroup?.textContent).toContain("↑4,200 ↓1,300");
+    expect(rowgroup?.textContent).toContain(`↑${(4200).toLocaleString()} ↓${(1300).toLocaleString()}`);
   });
 });

@@ -47,7 +47,8 @@ _RISK_XRAY_MAX_SYMBOLS = 50
 # USD/HKD/CNY snapshots whose numeric values would otherwise remain valid.
 # Version 4 rebuilds persisted holdings after market-prefix normalization;
 # old snapshots may have split one instrument into separate broker holdings.
-PORTFOLIO_VALUATION_VERSION = 4
+# Version 5 excludes snapshots that could use the former invented VND rate.
+PORTFOLIO_VALUATION_VERSION = 5
 _LOADER_MARKET_SUFFIXES = frozenset({"US", "HK", "SZ", "SH", "BJ", "KS", "KQ", "NS", "BO", "TO", "V"})
 _NON_EQUITY_ASSET_TYPES = frozenset({"crypto", "stablecoin", "cash"})
 # Futu reports codes market-first (``HK.00700``, ``US.AAPL``); the rest of the
@@ -1092,6 +1093,10 @@ class PortfolioService:
         except Exception:
             cached = self.store.load_fx_quote()
             if cached is not None:
+                if cached.get("source") == "Frankfurter v1 reference rates":
+                    # Older releases appended a fixed VND rate absent from this feed.
+                    cached["rates"] = {code: rate for code, rate in cached["rates"].items()
+                                       if code != "VND"}
                 return FxQuote(**cached).validated(), True
             cny, hkd = self.store.load_fx("USD", "CNY"), self.store.load_fx("USD", "HKD")
             if cny is None or hkd is None:
@@ -1112,7 +1117,6 @@ class PortfolioService:
         if observed > datetime.now(timezone.utc).date():
             raise RuntimeError("FX response date is in the future")
         rates = {code: Decimal(str(payload["rates"][code])) for code in ("CNY", "HKD", "EUR")}
-        rates["VND"] = Decimal("25400")
         return FxQuote({"USD": Decimal(1), **rates}, _now(), observed.isoformat(),
                        "Frankfurter v1 reference rates").validated()
 

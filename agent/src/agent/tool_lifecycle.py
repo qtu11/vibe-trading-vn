@@ -866,6 +866,14 @@ class ToolCallLifecycle:
         # Scrub before caching, truncation and model context, not just the
         # downstream trace/event preview. Shell stdout may hold credentials.
         result = redact_tool_result(result)
+        if tc.name in {"get_market_data", "build_price_chart"}:
+            from src.agent.answer_charts import collect_observed_charts
+
+            for symbol, chart in collect_observed_charts(self.registry.get(tc.name), tc.arguments, result).items():
+                if symbol not in self._answer_charts and len(self._answer_charts) >= 3:
+                    continue
+                if chart.get("bars") or symbol not in self._answer_charts:
+                    self._answer_charts[symbol] = chart
         if update_memory:
             self._update_memory(tc.name)
 

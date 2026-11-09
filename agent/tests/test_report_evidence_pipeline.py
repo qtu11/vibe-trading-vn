@@ -131,6 +131,40 @@ def test_absent_stale_or_uncaptured_sources_cannot_claim_current_rating(tmp_path
         validate_report_evidence(report, replace(context, sources=()))
 
 
+def test_rated_target_cannot_bypass_arithmetic_with_methodology_prose(tmp_path):
+    report, context = research(tmp_path)
+    payload = report.model_dump(mode="json")
+    payload["recommendation"] = "MUA"
+    payload["valuation_metrics"] = [{"key": "target_price", "label": "Giá mục tiêu", "value": 999999,
+        "unit": "VND", "as_of": "2026-11-06", "price_basis": "raw", "evidence_kind": "derived",
+        "input_keys": ["market_price"], "methodology": "Chiết khấu dòng tiền kết hợp P/E mục tiêu"}]
+    with pytest.raises(ValueError, match="cần công thức"):
+        validate_report_evidence(ResearchReport.model_validate(payload), context)
+    payload["valuation_metrics"][0]["evidence_kind"] = "assumption"
+    with pytest.raises(ValueError, match="giả định"):
+        validate_report_evidence(ResearchReport.model_validate(payload), context)
+
+
+def test_rated_target_recomputes_declared_inputs_and_visible_assumptions(tmp_path):
+    report, context = research(tmp_path)
+    payload = report.model_dump(mode="json")
+    payload["recommendation"] = "MUA"
+    payload["valuation_metrics"] = [
+        {"key": "target_multiple", "label": "Hệ số định giá giả định", "value": 1.1, "unit": "x",
+         "as_of": "2026-11-06", "evidence_kind": "assumption", "methodology": "Giả định phân tích có điều kiện"},
+        {"key": "target_price", "label": "Giá mục tiêu", "value": 55880, "unit": "VND", "decimals": 0,
+         "as_of": "2026-11-06", "price_basis": "raw", "evidence_kind": "derived",
+         "input_keys": ["market_price", "target_multiple"], "methodology": "market_price * target_multiple"},
+    ]
+    assert validate_report_evidence(ResearchReport.model_validate(payload), context).report.recommendation.value == "MUA"
+    payload["valuation_metrics"][1]["value"] = 999999
+    with pytest.raises(ValueError, match="không khớp công thức"):
+        validate_report_evidence(ResearchReport.model_validate(payload), context)
+    payload["valuation_metrics"][1].update(value=55880, input_keys=["market_price"], methodology="market_price * 1.1")
+    with pytest.raises(ValueError, match="hằng số ẩn"):
+        validate_report_evidence(ResearchReport.model_validate(payload), context)
+
+
 def test_all_rendered_fact_surfaces_require_real_source_urls(tmp_path):
     report, _ = research(tmp_path)
     payload = report.model_dump(mode="json")

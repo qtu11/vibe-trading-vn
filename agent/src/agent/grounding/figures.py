@@ -483,6 +483,7 @@ def _numbers(text: str, *, decimal_commas: bool | None = None) -> list[_Token]:
     comma_decimals = (
         _writes_decimal_commas(text) if decimal_commas is None else decimal_commas
     )
+    dotted_grouping = comma_decimals or _writes_decimal_commas(text, allow_mixed=True)
     dotted = [
         _Token(
             match.start(),
@@ -501,7 +502,8 @@ def _numbers(text: str, *, decimal_commas: bool | None = None) -> list[_Token]:
             True,
         )
         for match in _DOTTED_GROUPING_RE.finditer(text)
-    ] if comma_decimals else []
+        if dotted_grouping or match.group(0).count(".") > 1
+    ]
     vietnamese_grouped = [
         _Token(
             match.start(),
@@ -588,7 +590,7 @@ def _sign_before_currency(text: str, start: int) -> int | None:
     return mark - 1
 
 
-def _writes_decimal_commas(text: str) -> bool:
+def _writes_decimal_commas(text: str, *, allow_mixed: bool = False) -> bool:
     """Whether a document writes decimal commas and never a thousands grouping.
 
     Evidence for a decimal comma is a zero integer part with at least two
@@ -624,7 +626,7 @@ def _writes_decimal_commas(text: str) -> bool:
                 )
             ):
                 decimal = True
-    return decimal and not grouped
+    return decimal and (allow_mixed or not grouped)
 
 
 def _percent_mark(text: str, end: int) -> tuple[float, int]:
@@ -823,7 +825,9 @@ def parse_figures_block(content: str) -> FiguresBlock:
     malformed: list[tuple[int, str]] = []
     # The prose decides whether "2,639" is a decimal; a declaration cell must agree
     # with it. ``None`` (no document evidence) lets the cell speak for itself.
-    document_reading = _writes_decimal_commas(_normalize(content).text) or None
+    # A copied English-format market-cap cell must not break every Vietnamese
+    # declaration in an otherwise decimal-comma report.
+    document_reading = _writes_decimal_commas(_normalize(content).text, allow_mixed=True) or None
     for number, line in enumerate(raw.splitlines(), start=1):
         stripped = line.strip().replace("｜", "|")
         if not stripped:

@@ -47,3 +47,15 @@ it("keeps completed and failed receipts consistent with their errors", () => {
   value.error = null;
   expect(validReportJob(value)).toBe(false);
 });
+
+it("keeps all usable formats for a report that did not meet the measured page requirement", () => {
+  const value = { ...job(), status: "partial", minimum_pages: 24, pdf_pages: 23,
+    error: { code: "INSUFFICIENT_REPORT_DEPTH", message: "23 pages; 24 required" } };
+  expect(validReportJob(value)).toBe(true);
+  expect(validReportJob({ ...value, status: "succeeded", error: null })).toBe(false);
+  expect(validReportJob({ ...value, error: { code: "OTHER", message: "unknown" } })).toBe(false);
+  expect(validReportJob({ ...value, pdf_pages: 24 })).toBe(false);
+  expect(validReportJob({ ...value, pdf_pages: 24, status: "succeeded", error: null })).toBe(true);
+  expect(validReportJob({ ...value, pdf_pages: null, error: { code: "PAGE_COUNT_UNAVAILABLE", message: "PDF unavailable" } })).toBe(true);
+  expect(validReportJob({ ...value, minimum_pages: true })).toBe(false);
+});

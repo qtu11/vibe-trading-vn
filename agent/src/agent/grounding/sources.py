@@ -545,7 +545,8 @@ class _SourceMixin:
 
     def sources_index(self, call_id: str) -> list[dict[str, Any]]:
         """Compact index of sources this tool call produced, for the model."""
-        rows = [record for record in self._sources if record.call_id == call_id]
+        associated = {record.source_id for record in getattr(self, "_evidence", []) if record.call_id == call_id and record.source_id}
+        rows = [record for record in self._sources if record.call_id == call_id or record.source_id in associated]
         return [
             {
                 "id": record.source_id,
@@ -634,8 +635,69 @@ class _SourceMixin:
                 self._ingest_document(payload, call_id)
             elif tool_name == "get_stock_news":
                 self._ingest_news(payload, call_id)
+            elif tool_name == "parallel_web_search":
+                self._ingest_parallel_search_payload(payload, call_id)
+            elif tool_name == "concurrent_scraper":
+                self._ingest_concurrent_scraper_payload(payload, call_id)
         except Exception:  # noqa: BLE001 - source intake must not break a run
             return
+
+    def _ingest_parallel_search_payload(self, payload: Mapping[str, Any], call_id: str) -> None:
+        """Record the ranked links returned by the multi-engine search tool."""
+        results = payload.get("results")
+        if not isinstance(results, list):
+            return
+        for row in results[:MAX_INDEX_ENTRIES]:
+            if not isinstance(row, Mapping):
+                continue
+            url = str(row.get("url") or "").strip()
+            title = _clip(row.get("title"), 240)
+            snippet = _bounded_text(row.get("snippet"))
+            if not url and not title:
+                continue
+            self._add_source(
+                call_id=call_id,
+                tool="parallel_web_search",
+                url=url or None,
+                title=title or url,
+                publisher=str(row.get("source") or ""),
+                published_at=str(
+                    row.get("published_date") or row.get("published_at") or ""
+                )
+                or None,
+                text=" ".join(part for part in (title, snippet) if part),
+                excerpt=_clip(" ".join(part for part in (title, snippet) if part)),
+                language=_language_of(snippet or title),
+            )
+
+    def _ingest_concurrent_scraper_payload(self, payload: Mapping[str, Any], call_id: str) -> None:
+        """Record the pages the concurrent scraper actually read.
+
+        Only pages that produced text are recorded. A URL listed as a source
+        but never read would let a report cite a page the agent never saw.
+        """
+        sources = payload.get("sources")
+        if not isinstance(sources, list):
+            return
+        for row in sources[:MAX_INDEX_ENTRIES]:
+            if not isinstance(row, Mapping):
+                continue
+            url = str(row.get("url") or "").strip()
+            title = _clip(row.get("title"), 240)
+            if not url:
+                continue
+            body = _bounded_text(row.get("excerpt") or row.get("summary_markdown") or title)
+            self._add_source(
+                call_id=call_id,
+                tool="concurrent_scraper",
+                url=url,
+                title=title or url,
+                publisher="",
+                published_at=None,
+                text=body or title,
+                excerpt=_clip(body or title),
+                language=_language_of(body or title),
+            )
 
     def _ingest_search_payload(self, payload: Mapping[str, Any], call_id: str) -> None:
         results = payload.get("results")

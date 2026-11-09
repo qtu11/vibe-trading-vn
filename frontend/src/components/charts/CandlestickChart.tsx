@@ -24,8 +24,26 @@ const OVERLAY_OPTIONS: { id: Overlay; label: string; group: string }[] = [
   { id: "boll", label: "BOLL", group: "Channel" },
 ];
 
-const RANGE_BARS: Record<Range, number> = { "1M": 22, "3M": 63, "6M": 126, "1Y": 252, ALL: Infinity };
+const RANGE_MONTHS = { "1M": 1, "3M": 3, "6M": 6, "1Y": 12 };
 const OVERLAY_COLORS = ["#f59e0b", "#8b5cf6", "#3b82f6", "#ec4899", "#10b981", "#f97316", "#6366f1"];
+
+function rangeStartIndex(dates: string[], range: Range): number {
+  if (range === "ALL" || dates.length < 2) return 0;
+  const last = dates[dates.length - 1];
+  const parts = /^(\d{4})-(\d{2})-(\d{2})/.exec(last);
+  if (!parts || !Number.isFinite(Date.parse(last))) return 0;
+  const cutoff = new Date(Date.UTC(Number(parts[1]), Number(parts[2]) - 1, 1));
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - RANGE_MONTHS[range]);
+  const monthEnd = new Date(Date.UTC(cutoff.getUTCFullYear(), cutoff.getUTCMonth() + 1, 0)).getUTCDate();
+  cutoff.setUTCDate(Math.min(Number(parts[3]), monthEnd));
+  // Keep the source clock and offset when subtracting calendar months.
+  const threshold = Date.parse(cutoff.toISOString().slice(0, 10) + last.slice(10));
+  if (!Number.isFinite(threshold)) return 0;
+  return Math.max(0, dates.findIndex((value) => {
+    const stamp = Date.parse(value);
+    return Number.isFinite(stamp) && stamp >= threshold;
+  }));
+}
 
 interface Props {
   data: PriceBar[];
@@ -38,6 +56,8 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<ReturnType<typeof echarts.init> | null>(null);
   const [sub, setSub] = useState<Sub>("vol");
+  const hasVolume = data.some((bar) => Number.isFinite(bar.volume) && bar.volume >= 0);
+  const activeSub = sub === "vol" && !hasVolume ? "macd" : sub;
   const [range, setRange] = useState<Range>("ALL");
   const [overlays, setOverlays] = useState<Set<Overlay>>(new Set(["ma5", "ma20"]));
   const [showMenu, setShowMenu] = useState(false);
@@ -167,7 +187,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
 
     // Volume
     const vol = data.map((d, i) => ({
-      value: d.volume,
+      value: Number.isFinite(d.volume) && d.volume >= 0 ? d.volume : null,
       itemStyle: { color: closes[i] >= opens[i] ? t.volumeUp : t.volumeDown },
     }));
 
@@ -177,19 +197,19 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let subYAxis: any = { scale: true, gridIndex: 1, splitLine: { lineStyle: { color: t.gridColor } }, axisLabel: { color: t.textColor, fontSize: 10 } };
 
-    if (sub === "vol") {
+    if (activeSub === "vol") {
       subSeries = [{ name: "Vol", type: "bar", data: vol, xAxisIndex: 1, yAxisIndex: 1 }];
       subYAxis = { ...subYAxis, axisLabel: { ...subYAxis.axisLabel, formatter: (v: number) => abbreviateNum(v) } };
       legendNames.push("Vol");
-    } else if (sub === "macd") {
+    } else if (activeSub === "macd") {
       const m = indicatorCache.macd;
       subSeries = [
         { name: "DIF", type: "line", data: m.dif, xAxisIndex: 1, yAxisIndex: 1, symbol: "none", lineStyle: { width: 1, color: t.infoColor } },
         { name: "DEA", type: "line", data: m.signal, xAxisIndex: 1, yAxisIndex: 1, symbol: "none", lineStyle: { width: 1, color: t.warningColor } },
-        { name: "MACD", type: "bar", data: m.histogram.map(v => ({ value: v ?? 0, itemStyle: { color: (v ?? 0) >= 0 ? t.upColor : t.downColor } })), xAxisIndex: 1, yAxisIndex: 1 },
+        { name: "MACD", type: "bar", data: m.histogram.map(v => v == null ? null : ({ value: v, itemStyle: { color: v >= 0 ? t.upColor : t.downColor } })), xAxisIndex: 1, yAxisIndex: 1 },
       ];
       legendNames.push("DIF", "DEA", "MACD");
-    } else if (sub === "rsi") {
+    } else if (activeSub === "rsi") {
       subSeries = [{ name: "RSI", type: "line", data: indicatorCache.rsi, xAxisIndex: 1, yAxisIndex: 1, symbol: "none", lineStyle: { width: 1.5, color: t.infoColor } }];
       subYAxis = { ...subYAxis, min: 0, max: 100 };
       legendNames.push("RSI");
@@ -209,8 +229,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
       return { name: ind.name, type: "line" as const, data: ind.values, xAxisIndex: 0, yAxisIndex: 0, symbol: "none", lineStyle: { width: 1, color: OVERLAY_COLORS[(colorIdx + i) % OVERLAY_COLORS.length], type: "dashed" as const } };
     });
 
-    const maxBars = RANGE_BARS[range];
-    const defaultStart = maxBars >= data.length ? 0 : Math.max(0, 100 - (maxBars / data.length) * 100);
+    const firstVisible = rangeStartIndex(dates, range);
 
     chart.setOption({
       backgroundColor: "transparent",
@@ -231,7 +250,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
               html += `<br/>O: ${open.toFixed(2)}&nbsp; H: ${high.toFixed(2)}`;
               html += `<br/>L: ${low.toFixed(2)}&nbsp; C: <span style="color:${clr}"><b>${close.toFixed(2)}</b> ${chg >= 0 ? "+" : ""}${chg.toFixed(2)} (${chg >= 0 ? "+" : ""}${pct}%)</span>`;
             } else if (p.seriesName === "Vol") {
-              html += `<br/>Vol: ${abbreviateNum(Number(p.value))}`;
+              if (p.value != null && Number.isFinite(Number(p.value))) html += `<br/>Vol: ${abbreviateNum(Number(p.value))}`;
             } else if (p.value != null) {
               html += `<br/>${p.marker} ${p.seriesName}: ${Number(p.value).toFixed(2)}`;
             }
@@ -249,7 +268,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
         { left: 8, right: 8, top: "66%", height: "22%", containLabel: true },
       ],
       xAxis: [
-        { type: "category", data: dates, gridIndex: 0, axisLine: { lineStyle: { color: t.axisColor } }, axisLabel: { color: t.textColor, fontSize: 10 }, boundaryGap: true },
+        { type: "category", data: dates, gridIndex: 0, axisLine: { lineStyle: { color: t.axisColor } }, axisLabel: { color: t.textColor, fontSize: 10, formatter: (value: string) => value.replace(/T00:00:00(?:\.0+)?(?:Z|[+-]\d{2}:\d{2})?$/, "") }, boundaryGap: true },
         { type: "category", data: dates, gridIndex: 1, axisLine: { lineStyle: { color: t.axisColor } }, axisLabel: { show: false }, boundaryGap: true },
       ],
       yAxis: [
@@ -257,8 +276,8 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
         subYAxis,
       ],
       dataZoom: [
-        { type: "inside", xAxisIndex: [0, 1], start: defaultStart, end: 100 },
-        { type: "slider", xAxisIndex: [0, 1], bottom: 4, height: 20, labelFormatter: (val: string) => val },
+        { type: "inside", xAxisIndex: [0, 1], startValue: firstVisible, endValue: data.length - 1 },
+        { type: "slider", xAxisIndex: [0, 1], startValue: firstVisible, endValue: data.length - 1, bottom: 4, height: 20, labelFormatter: (val: string) => val },
       ],
       series: [
         {
@@ -271,7 +290,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
         ...subSeries,
       ],
     }, true);
-  }, [data, markers, baseData, indicatorCache, extraIndicators, sub, range, overlays, dark]);
+  }, [data, markers, baseData, indicatorCache, extraIndicators, activeSub, range, overlays, dark]);
 
   if (data.length === 0) {
     return <div className="text-muted-foreground text-sm p-4">{i18n.t("charts.noPriceData")}</div>;
@@ -324,7 +343,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
         {/* Sub-chart selector */}
         <div className="flex gap-0.5">
           {(["vol", "macd", "rsi", "kdj"] as const).map((id) => (
-            <button key={id} onClick={() => setSub(id)} className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono uppercase transition-colors", sub === id ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground/50 hover:text-muted-foreground")}>{id}</button>
+            <button key={id} disabled={id === "vol" && !hasVolume} title={id === "vol" && !hasVolume ? i18n.t("charts.volumeUnavailable") : undefined} onClick={() => setSub(id)} className={cn("px-1.5 py-0.5 rounded text-[10px] font-mono uppercase transition-colors disabled:opacity-40", activeSub === id ? "bg-primary/15 text-primary font-medium" : "text-muted-foreground/50 hover:text-muted-foreground")}>{id}</button>
           ))}
         </div>
       </div>

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import ipaddress
 import json
 import math
 import re
@@ -33,6 +34,27 @@ _TIMESTAMP_FIELDS = ("trade_date", "date", "datetime", "timestamp", "time", "ind
 
 _MAX_GENERIC_EVIDENCE = 2_000
 _FINANCIAL_EVIDENCE_TOOLS = frozenset({"get_financial_statements", "financial_statements", "vietnam_research"})
+
+
+def _public_source_url(value: Any) -> str | None:
+    """Accept a public HTTP reference without resolving or fetching it."""
+    if not isinstance(value, str) or not value or any(ord(char) <= 32 for char in value):
+        return None
+    try:
+        parsed = urlsplit(value)
+        host = parsed.hostname or ""
+        if (parsed.scheme not in {"http", "https"} or parsed.username or parsed.password
+                or not host or "\\" in value or host == "localhost" or host.endswith((".localhost", ".local"))):
+            return None
+        parsed.port  # Reject malformed ports before source canonicalisation.
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            return value if ("." in host and re.fullmatch(r"[A-Za-z0-9.-]+", host)
+                             and not re.fullmatch(r"[0-9.]+", host)) else None
+        return value if address.is_global and not address.is_multicast else None
+    except ValueError:
+        return None
 
 #: Top-level fields of a code-running tool's envelope (backtest, bash, ...). They
 #: describe the process, not the market, so they never become observed evidence.
@@ -1464,6 +1486,24 @@ class _EvidenceMixin:
             if not symbol or returned_symbol != symbol:
                 return
         source = str(payload.get("source") or tool_name)
+        source_record = None
+        technical_provenance: dict[str, Any] = {}
+        if tool_name == "technical_indicators" and symbol:
+            identity = payload.get("read_identity")
+            provenance = identity.get("provenance") if isinstance(identity, dict) else None
+            if isinstance(provenance, dict):
+                technical_provenance = provenance
+                source = str(provenance.get("source") or source)
+                source_url = _public_source_url(provenance.get("source_url"))
+                if source_url:
+                    source_record = self._add_source(
+                        call_id=call_id, tool=tool_name, url=source_url,
+                        title=f"{symbol} — indicators computed from source candles", publisher=source,
+                        published_at=None, data_effective_at=payload.get("latest_date"),
+                        text=json.dumps({"symbol": symbol, "provenance": provenance}, ensure_ascii=False),
+                        excerpt=f"{symbol}: indicators computed from source candles; not published indicator values",
+                        language=None,
+                    )
         remaining = _MAX_GENERIC_EVIDENCE
         timestamp_fields = (*_TIMESTAMP_FIELDS, "latest_date", "as_of")
         data = payload.get("data")
@@ -1493,10 +1533,15 @@ class _EvidenceMixin:
                             if tool_name == "get_sec_filings"
                             and path.startswith("data.metric.points[")
                             and path.endswith("].val")
-                            else None if typed_ratio else _infer_currency(symbol or "")
+                            else None if typed_ratio else technical_provenance.get("quote_currency") or _infer_currency(symbol or "")
                         ),
-                        venue=_infer_venue(symbol or ""),
+                        venue=technical_provenance.get("venue") or _infer_venue(symbol or ""),
                         unit="ratio" if typed_ratio else None,
+                        source_url=source_record.url if source_record else None,
+                        source_id=source_record.source_id if source_record else None,
+                        retrieved_at=technical_provenance.get("retrieved_at"),
+                        price_basis=technical_provenance.get("adjustment"),
+                        data_role="computed_from_source_candles" if technical_provenance else None,
                     )
                 )
                 remaining -= 1
@@ -1511,6 +1556,8 @@ class _EvidenceMixin:
                     timestamp,
                 )
                 for key, item in value.items():
+                    if tool_name == "technical_indicators" and not path and key == "read_identity":
+                        continue
                     if str(key).casefold() in timestamp_fields:
                         continue
                     if not path and str(key).casefold() in _ENVELOPE_FIELDS:

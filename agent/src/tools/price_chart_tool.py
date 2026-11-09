@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import json
 import math
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from src.agent.tools import BaseTool
@@ -162,25 +162,34 @@ def _rows_of(payload: Any) -> list[dict[str, Any]]:
 
 def _bars(rows: list[dict[str, Any]], keep: int) -> tuple[list[dict[str, Any]], bool]:
     """Build compact bars from the most recent ``keep`` rows."""
-    bars: list[dict[str, Any]] = []
+    dated: dict[str, dict[str, Any]] = {}
     for row in rows:
-        close = _as_float(row.get("close"))
-        if close is None:
+        prices = [_as_float(row.get(key)) for key in ("open", "high", "low", "close")]
+        if any(value is None for value in prices):
+            continue
+        opening, high, low, close = prices
+        if not low <= min(opening, close) <= max(opening, close) <= high:
             continue
         stamp = _bar_time(row)
         if not stamp:
             continue
+        try:
+            datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+        except ValueError:
+            continue
         bar: dict[str, Any] = {
             "t": stamp,
-            "o": _round(_as_float(row.get("open"))),
-            "h": _round(_as_float(row.get("high"))),
-            "l": _round(_as_float(row.get("low"))),
+            "o": _round(opening),
+            "h": _round(high),
+            "l": _round(low),
             "c": _round(close),
         }
         volume = _as_float(row.get("volume"))
-        if volume is not None:
+        if volume is not None and volume >= 0:
             bar["v"] = int(round(volume))
-        bars.append(bar)
+        dated[stamp] = bar
+    # shortcut: loader rows share one market-local time basis, normalize by venue before accepting mixed-timezone inputs.
+    bars = [dated[stamp] for stamp in sorted(dated)]
     truncated = len(bars) > keep
     return bars[-keep:], truncated
 
@@ -237,10 +246,13 @@ def build_chart_spec(
         "currency": _currency_for(code, symbol_provenance),
         "interval": interval,
         "source": symbol_provenance.get("source") or source,
+        "source_url": symbol_provenance.get("source_url"),
         "adjustment": symbol_provenance.get("adjustment"),
+        "price_unit": symbol_provenance.get("price_unit") or _currency_for(code, symbol_provenance),
         "volume_unit": symbol_provenance.get("volume_unit"),
+        "data_role": "historical_bars",
         "as_of": last["t"],
-        "retrieved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "retrieved_at": symbol_provenance.get("retrieved_at"),
         "bars": bars,
         "range": {
             "requested_start": requested_start,

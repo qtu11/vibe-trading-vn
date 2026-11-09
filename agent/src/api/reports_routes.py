@@ -26,6 +26,7 @@ class ReportExportRequest(BaseModel):
     report: dict
     formats: list[Literal["docx", "pdf", "pptx"]] = Field(default=["docx", "pdf", "pptx"], min_length=1, max_length=3)
     run_id: Annotated[str, Field(strict=True, pattern=r"^[A-Za-z0-9_-]{1,100}$")] | None = None
+    minimum_pages: Annotated[int, Field(strict=True, ge=1, le=2000)] = 24
 
 
 def register_reports_routes(app: FastAPI) -> None:
@@ -39,9 +40,10 @@ def register_reports_routes(app: FastAPI) -> None:
                 report_data=payload.report,
                 formats=payload.formats,
                 run_id=payload.run_id,
+                minimum_pages=payload.minimum_pages,
             )
         except ReportJobError as exc:
-            status_code = 422 if exc.code in ("SCHEMA_VALIDATION_FAILED", "EVIDENCE_VALIDATION_FAILED", "INVALID_FORMAT", "MISSING_FORMATS") else 500
+            status_code = 422 if exc.code in ("SCHEMA_VALIDATION_FAILED", "EVIDENCE_VALIDATION_FAILED", "INVALID_FORMAT", "MISSING_FORMATS", "INVALID_PAGE_COUNT") else 500
             raise HTTPException(status_code=status_code, detail={"code": exc.code, "message": exc.message}) from None
         except Exception as exc:
             _LOG.error("Failed to process report export: %s", exc, exc_info=True)

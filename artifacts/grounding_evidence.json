@@ -19,7 +19,7 @@
         "source_tool_call_id": "user_message",
         "status": "locked",
         "symbol": "FPT.VN",
-        "updated_at": "2026-11-07T14:24:56.963769Z",
+        "updated_at": "2026-11-08T17:47:59.313808Z",
         "venue": "hose",
         "version": 1
       }
@@ -42,6 +42,6 @@
   ],
   "sources": [],
   "tool_failures": [],
-  "updated_at": "2026-11-07T14:24:56.963769Z",
+  "updated_at": "2026-11-08T17:47:59.313936Z",
   "validations": []
 }

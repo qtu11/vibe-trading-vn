@@ -14,7 +14,7 @@ import json
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from threading import Barrier
+from threading import Barrier, local
 
 import pytest
 
@@ -83,10 +83,16 @@ def test_save_completes_short_writes(live_runtime, monkeypatch) -> None:
 def test_concurrent_saves_use_distinct_temporary_files(live_runtime, monkeypatch) -> None:
     store = JobStore()
     barrier = Barrier(2)
+    state = local()
+    temporary_paths = []
     real_replace = os.replace
 
     def replace(src, dst):
-        barrier.wait(timeout=2)
+        if not getattr(state, 'entered', False):
+            state.entered = True
+            temporary_paths.append(src)
+            barrier.wait(timeout=2)
+            raise PermissionError('transient Windows lock fixture')
         real_replace(src, dst)
 
     monkeypatch.setattr("src.live.runtime.jobstore.os.replace", replace)
@@ -95,6 +101,7 @@ def test_concurrent_saves_use_distinct_temporary_files(live_runtime, monkeypatch
         for result in results:
             result.result(timeout=3)
     assert store.load()[0].id in {"a", "b"}
+    assert len(set(temporary_paths)) == 2
     assert list(runtime_dir().glob(".*tmp")) == []
 
 

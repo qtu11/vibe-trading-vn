@@ -1,4 +1,4 @@
-﻿"""System and utility HTTP routes.
+"""System and utility HTTP routes.
 
 Mounted by ``agent/api_server.py`` via ``register_system_routes(app, ...)``.
 """

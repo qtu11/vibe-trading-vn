@@ -23,9 +23,20 @@ export function ModelRuntimeBar({
   const provider = settings.providers.find((item) => item.name === providerId);
   const providerLabel = provider?.label || providerId || t("agent.unknownProvider");
   const model = runtimeModel || settings.model_name || t("agent.unknownModel");
+  const configuredEffort = settings.provider === "custom" ? "" : settings.reasoning_effort;
   const reasoningEffort = runtimeReasoningEffort !== undefined
     ? runtimeReasoningEffort
-    : settings.provider === "custom" ? "" : settings.reasoning_effort;
+    : configuredEffort;
+  // The composer already names the model and effort the next turn will use.
+  // Keep this bar for a historical/runtime identity that differs from those
+  // settings; repeating an identical identity above the chat is noise.
+  if (
+    providerId === settings.provider
+    && (runtimeModel || settings.model_name) === settings.model_name
+    && reasoningEffort === configuredEffort
+  ) {
+    return null;
+  }
   const effortKey = effortLabelKey(reasoningEffort);
   const effortLabel = effortKey ? t(effortKey) : t("settings.providerDefault");
 

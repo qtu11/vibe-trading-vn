@@ -184,6 +184,110 @@ def test_cancelled_run_is_cancelled_not_failed(tmp_path, monkeypatch):
     asyncio.run(scenario())
 
 
+@pytest.mark.parametrize("status", ["cancelled", "failed"])
+def test_terminal_partial_response_survives_reload(tmp_path, monkeypatch, status):
+    async def scenario():
+        service = _service(tmp_path, monkeypatch)
+        session = service.create_session(title="partial")
+        events = []
+        service.event_bus.emit = lambda sid, kind, data: events.append((kind, data))
+
+        async def partial_agent(attempt, messages=None, **kwargs):
+            service.store.save_partial_response(session.session_id, attempt.attempt_id, "Work already streamed")
+            return {"status": status, "reason": "stopped"}
+
+        monkeypatch.setattr(service, "_run_with_agent", partial_agent)
+        sent = await service.send_message(session.session_id, "analyze")
+        await service._active_tasks[session.session_id]
+        reply = service.store.get_message_for_attempt(session.session_id, sent["attempt_id"])
+        assert "Work already streamed" in reply.content
+        assert "incomplete and has not been fully verified" in reply.content
+        assert reply.metadata["status"] == status and reply.metadata["partial"] is True
+        terminal = next(data for kind, data in events if kind == f"attempt.{status}")
+        assert terminal["summary"] == reply.content and terminal["partial"] is True
+        assert service.store.get_partial_response(session.session_id, sent["attempt_id"]) is None
+        reloaded = _service(tmp_path, monkeypatch)
+        assert reloaded.store.get_message_for_attempt(session.session_id, sent["attempt_id"]).content == reply.content
+
+    asyncio.run(scenario())
+
+
+def test_completed_reply_does_not_restore_an_old_unverified_partial(tmp_path, monkeypatch):
+    async def scenario():
+        service = _service(tmp_path, monkeypatch)
+        session = service.create_session(title="verified")
+
+        async def agent(attempt, messages=None, **kwargs):
+            service.store.save_partial_response(session.session_id, attempt.attempt_id, "Rejected draft")
+            return {"status": "success", "content": "Verified final answer"}
+
+        monkeypatch.setattr(service, "_run_with_agent", agent)
+        sent = await service.send_message(session.session_id, "analyze")
+        await service._active_tasks[session.session_id]
+        reply = service.store.get_message_for_attempt(session.session_id, sent["attempt_id"])
+        assert reply.content == "Verified final answer"
+        assert not reply.metadata.get("partial")
+        assert service.store.get_partial_response(session.session_id, sent["attempt_id"]) is None
+
+    asyncio.run(scenario())
+
+
+def test_agent_exception_preserves_the_checkpoint_in_terminal_history(tmp_path, monkeypatch):
+    async def scenario():
+        service = _service(tmp_path, monkeypatch)
+        session = service.create_session(title="exception")
+        async def explode(attempt, messages=None, **kwargs):
+            service.store.save_partial_response(session.session_id, attempt.attempt_id, "Durable work")
+            raise RuntimeError("provider disconnected")
+        monkeypatch.setattr(service, "_run_with_agent", explode)
+        sent = await service.send_message(session.session_id, "go")
+        await service._active_tasks[session.session_id]
+        reply = service.store.get_message_for_attempt(session.session_id, sent["attempt_id"])
+        assert reply is not None and "Durable work" in reply.content
+        assert reply.metadata["status"] == "failed" and reply.metadata["partial"] is True
+    asyncio.run(scenario())
+
+
+def test_failed_transcript_write_keeps_checkpoint_recoverable(tmp_path, monkeypatch):
+    async def scenario():
+        service = _service(tmp_path, monkeypatch)
+        session = service.create_session(title="disk failure")
+        append = service.store.append_message
+        async def finish(attempt, messages=None, **kwargs):
+            service.store.save_partial_response(session.session_id, attempt.attempt_id, "Recover this work")
+            monkeypatch.setattr(service.store, "append_message", lambda message: (_ for _ in ()).throw(OSError("disk full")))
+            return {"status": "success", "content": "Final answer"}
+        monkeypatch.setattr(service, "_run_with_agent", finish)
+        sent = await service.send_message(session.session_id, "go")
+        await service._active_tasks[session.session_id]
+        assert service.store.get_partial_response(session.session_id, sent["attempt_id"]) == "Recover this work"
+        assert service.store.get_attempt(session.session_id, sent["attempt_id"]).status == AttemptStatus.RUNNING
+        monkeypatch.setattr(service.store, "append_message", append)
+        reloaded = _service(tmp_path, monkeypatch)
+        reply = reloaded.store.get_message_for_attempt(session.session_id, sent["attempt_id"])
+        assert reply is not None and "Recover this work" in reply.content
+        assert reply.metadata["status"] == "interrupted"
+    asyncio.run(scenario())
+
+
+def test_search_index_failure_cannot_reclassify_a_completed_answer(tmp_path, monkeypatch):
+    async def scenario():
+        service = _service(tmp_path, monkeypatch)
+        session = service.create_session(title="optional index")
+        _stub_agent(service, monkeypatch, {"status": "success", "content": "Verified final"})
+        index_message = service._search_index.index_message
+        def index(sid, role, content):
+            if role == "assistant":
+                raise RuntimeError("FTS unavailable")
+            index_message(sid, role, content)
+        monkeypatch.setattr(service._search_index, "index_message", index)
+        sent = await service.send_message(session.session_id, "go")
+        await service._active_tasks[session.session_id]
+        assert service.store.get_attempt(session.session_id, sent["attempt_id"]).status == AttemptStatus.COMPLETED
+        assert service.store.get_message_for_attempt(session.session_id, sent["attempt_id"]).content == "Verified final"
+    asyncio.run(scenario())
+
+
 def test_metrics_reach_the_attempt_and_the_reply(tmp_path, monkeypatch):
     """Loaded metrics were dropped on the floor before reaching the reply."""
 

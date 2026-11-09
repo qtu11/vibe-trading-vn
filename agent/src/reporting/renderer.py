@@ -35,10 +35,10 @@ from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Pt, RGBColor
+from docx.shared import Cm, Inches, Pt, RGBColor
 
 from src.reporting.brand import BRAND, resolve_brand_logo
-from src.reporting.citations import datum_source_ids, datum_sources
+from src.reporting.citations import apa_reference_suffix, datum_source_ids, datum_sources, reference_sources
 from docx.opc.constants import RELATIONSHIP_TYPE as RT
 from src.reporting.schema import (
     Catalyst,
@@ -1306,7 +1306,10 @@ def create_price_chart(report: ResearchReport, png_path: Path) -> bool:
         volume_ax.xaxis.set_major_locator(MaxNLocator(6))
         volume_ax.xaxis.set_major_formatter(DateFormatter("%d/%m"))
 
-        figure.subplots_adjust(left=0.1, right=0.975, top=0.94, bottom=0.14, hspace=0.1)
+        # The left-aligned unit/basis title sits above the axes, so the plot
+        # needs headroom for it: at top=0.94 the first line of the title is
+        # clipped by the figure edge.
+        figure.subplots_adjust(left=0.1, right=0.975, top=0.88, bottom=0.14, hspace=0.1)
         canvas.print_figure(str(png_path), dpi=210, facecolor="white")
     return True
 
@@ -1693,6 +1696,18 @@ def add_analyst_block(document, report: ResearchReport):
 
 
 def add_sources(document, sources):
+    document.add_heading("Tài liệu tham khảo (APA 7th)", level=2)
+    for source in reference_sources(sources):
+        paragraph = document.add_paragraph()
+        paragraph.paragraph_format.left_indent = Inches(0.5)
+        paragraph.paragraph_format.first_line_indent = Inches(-0.5)
+        set_para_spacing(paragraph, before=0, after=6, line=2)
+        p_text(paragraph, source.title, size=8.4, italic=True)
+        p_text(paragraph, "." if not source.title.endswith((".", "!", "?")) else "", size=8.4)
+        p_text(paragraph, apa_reference_suffix(source), size=8.4)
+        if source.url:
+            append_source_links(paragraph, DatumEvidence(source_ids=[source.id]), full_url=True)
+    add_body(document, "Tác giả chưa có trong metadata: dùng nhan đề ở vị trí tác giả; n.d. khi thiếu ngày xuất bản. Bảng dưới giữ mã nguồn và trạng thái kiểm chứng.", size=7)
     widths = [1.5, 11.3, CONTENT_W - 1.5 - 11.3]
     table = fixed_table(document, widths)
     header = add_row(table, widths)
@@ -2302,19 +2317,39 @@ def make_docx(report: ResearchReport, path: Path):
 
 
 def find_soffice() -> str | None:
-    """Find LibreOffice or OpenOffice executable across environments."""
+    """Find LibreOffice or OpenOffice executable across environments.
+
+    An operator override wins, because a per-user or portable extraction is the
+    only option when the machine-wide MSI cannot be installed (it needs admin
+    rights). ``VIBE_SOFFICE`` therefore names an absolute executable, and the
+    search also covers the unpacked-package layout this app ships.
+    """
+    override = os.environ.get("VIBE_SOFFICE", "").strip()
+    if override and os.path.isfile(override):
+        return override
     exe = shutil.which("libreoffice") or shutil.which("soffice")
     if exe:
         return exe
+    local_appdata = os.environ.get("LOCALAPPDATA", "")
     candidates = [
         r"C:\Program Files\LibreOffice\program\soffice.exe",
         r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+        os.path.join(os.environ.get("ProgramW6432", r"C:\Program Files"), "LibreOffice", "program", "soffice.exe"),
+        os.path.join(local_appdata, "LibreOffice", "program", "soffice.exe") if local_appdata else "",
+        os.path.join(local_appdata, "Programs", "LibreOffice", "program", "soffice.exe") if local_appdata else "",
         "/usr/bin/libreoffice",
         "/usr/bin/soffice",
         "/Applications/LibreOffice.app/Contents/MacOS/soffice",
     ]
+    # A checkout-local unpacked LibreOffice (from ``msiexec /a``) keeps the PDF
+    # path working on hosts where the machine-wide install is not permitted.
+    project_root = Path(__file__).resolve().parents[3]
+    candidates.extend(str(path) for path in (
+        project_root / "tools" / "libreoffice" / "program" / "soffice.exe",
+        project_root / "vendor" / "libreoffice" / "program" / "soffice.exe",
+    ))
     for candidate in candidates:
-        if os.path.isfile(candidate):
+        if candidate and os.path.isfile(candidate):
             return candidate
     return None
 

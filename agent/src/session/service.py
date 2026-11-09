@@ -129,11 +129,9 @@ class SessionService:
                         "recovery_reason": "service_restart",
                     },
                 )
-                self.store.append_message(reply)
-                self._search_index.index_message(
-                    attempt.session_id, "assistant", reply.content
-                )
                 attempt.mark_interrupted("service restarted before attempt completed")
+                self._commit_terminal_reply(attempt, reply)
+                continue
             else:
                 # The append-only reply is committed before attempt.json. If a
                 # process exits between those writes, finish the second half
@@ -152,6 +150,16 @@ class SessionService:
                     )
             self.store.update_attempt(attempt)
             self.store.delete_partial_response(attempt.session_id, attempt.attempt_id)
+
+    def _commit_terminal_reply(self, attempt: Attempt, reply: Message) -> None:
+        # A durable transcript must exist before its recovery checkpoint is removed.
+        self.store.append_message(reply)
+        self.store.update_attempt(attempt)
+        self.store.delete_partial_response(attempt.session_id, attempt.attempt_id)
+        try:
+            self._search_index.index_message(attempt.session_id, "assistant", reply.content)
+        except Exception:
+            logger.warning("Could not index terminal reply for %s", attempt.attempt_id, exc_info=True)
 
     @staticmethod
     def _format_interrupted_message(partial: Optional[str]) -> str:
@@ -427,9 +435,13 @@ class SessionService:
                 # only while the live tool result is on screen.
                 reply_metadata["sources"] = result["sources"]
 
+            partial = (self.store.get_partial_response(session.session_id, attempt.attempt_id)
+                       if attempt.status != AttemptStatus.COMPLETED else None)
+            if partial:
+                reply_metadata["partial"] = True
             reply = Message(
                 session_id=session.session_id, role="assistant",
-                content=self._format_result_message(attempt),
+                content=self._format_result_message(attempt, partial),
                 linked_attempt_id=attempt.attempt_id,
                 metadata=reply_metadata,
                 # Every terminal attempt keeps its steps. A failed run saved an
@@ -447,20 +459,14 @@ class SessionService:
                 links = [f"[{str(report['filename']).replace('[', '').replace(']', '')}]({report['download_url']})"
                          for report in reports]
                 reply.content += "\n\n" + "\n\n".join(dict.fromkeys(links))
-            self.store.append_message(reply)
-            # The append-only transcript is the user-visible source of truth.
-            # Commit it before attempt.json so startup recovery can finish a
-            # process interrupted between the two writes.
-            self.store.update_attempt(attempt)
-            self.store.delete_partial_response(session.session_id, attempt.attempt_id)
-            self._search_index.index_message(session.session_id, "assistant", reply.content)
+            self._commit_terminal_reply(attempt, reply)
             self.event_bus.emit(
                 session.session_id,
                 _TERMINAL_EVENTS.get(attempt.status.value, "attempt.failed"),
                 {"attempt_id": attempt.attempt_id, "status": attempt.status.value,
                  "summary": reply.content, "error": attempt.error, "run_dir": attempt.run_dir,
                  "started_at": wall_started_at, "ended_at": time.time(),
-                 **{key: reply_metadata[key] for key in ("elapsed_ms", *runtime_keys, "forex_trade_plan", "sources") if key in reply_metadata}},
+                 **{key: reply_metadata[key] for key in ("elapsed_ms", *runtime_keys, "forex_trade_plan", "sources", "partial") if key in reply_metadata}},
             )
 
         except asyncio.CancelledError:
@@ -469,14 +475,19 @@ class SessionService:
                 # reached its AgentLoop yet. Keep that explicit user action
                 # distinct from event-loop cancellation during server shutdown.
                 attempt.mark_cancelled(reason="cancelled by user")
-                self.store.update_attempt(attempt)
-                self.store.delete_partial_response(
-                    session.session_id, attempt.attempt_id
-                )
+                partial = self.store.get_partial_response(session.session_id, attempt.attempt_id)
+                reply = Message(session_id=session.session_id, role="assistant",
+                                content=self._format_result_message(attempt, partial), linked_attempt_id=attempt.attempt_id,
+                                metadata={"status": attempt.status.value, "partial": bool(partial)})
+                try:
+                    self._commit_terminal_reply(attempt, reply)
+                except OSError:
+                    logger.exception("Cancelled reply was not committed; checkpoint retained for %s", attempt.attempt_id)
                 self.event_bus.emit(
                     session.session_id,
                     "attempt.cancelled",
-                    {"attempt_id": attempt.attempt_id, "status": attempt.status.value},
+                    {"attempt_id": attempt.attempt_id, "status": attempt.status.value,
+                     "summary": reply.content, "partial": bool(partial)},
                 )
             else:
                 logger.info(
@@ -485,10 +496,20 @@ class SessionService:
                 )
             raise
         except Exception as exc:
+            if self.store.get_message_for_attempt(session.session_id, attempt.attempt_id) is not None:
+                logger.warning("Terminal reply already committed for %s; preserving its status", attempt.attempt_id, exc_info=True)
+                return
             attempt.mark_failed(error=str(exc))
-            self.store.update_attempt(attempt)
-            self.store.delete_partial_response(session.session_id, attempt.attempt_id)
-            self.event_bus.emit(session.session_id, "attempt.failed", {"attempt_id": attempt.attempt_id, "error": str(exc)})
+            partial = self.store.get_partial_response(session.session_id, attempt.attempt_id)
+            reply = Message(session_id=session.session_id, role="assistant",
+                            content=self._format_result_message(attempt, partial), linked_attempt_id=attempt.attempt_id,
+                            metadata={"status": attempt.status.value, "partial": bool(partial)})
+            try:
+                self._commit_terminal_reply(attempt, reply)
+            except OSError:
+                logger.exception("Failed reply was not committed; checkpoint retained for %s", attempt.attempt_id)
+            self.event_bus.emit(session.session_id, "attempt.failed", {"attempt_id": attempt.attempt_id, "status": attempt.status.value,
+                                "summary": reply.content, "partial": bool(partial), "error": str(exc)})
         finally:
             # The only release path for the claim taken in send_message.
             self._active_tasks.pop(session.session_id, None)
@@ -747,11 +768,12 @@ class SessionService:
         return metrics or None
 
     @staticmethod
-    def _format_result_message(attempt: Attempt) -> str:
+    def _format_result_message(attempt: Attempt, partial: Optional[str] = None) -> str:
         """Format the final execution result message.
 
         Args:
             attempt: The terminal attempt.
+            partial: Checkpointed text from an unfinished attempt.
 
         Returns:
             The reply text shown in the transcript.
@@ -765,6 +787,7 @@ class SessionService:
                 "The run finished without producing any text output. "
                 "Check the run artifacts, or rephrase the request and try again."
             )
-        if attempt.status == AttemptStatus.CANCELLED:
-            return "Run cancelled."
-        return f"Execution failed: {attempt.error or 'unknown error'}"
+        notice = "Run cancelled." if attempt.status == AttemptStatus.CANCELLED else f"Execution failed: {attempt.error or 'unknown error'}"
+        if partial:
+            return f"{notice}\n\nThe partial response below is incomplete and has not been fully verified:\n\n{partial}"
+        return notice

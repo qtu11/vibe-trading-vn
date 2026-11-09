@@ -18,6 +18,7 @@ import {
   resolveDesktopLocale,
 } from "./locales";
 import { SecureCredentialStore } from "./secure-credentials";
+import { registerSourceBrowser } from "./source-browser";
 
 let mainWindow: BrowserWindow | undefined;
 let backend: BackendManager | undefined;
@@ -137,6 +138,7 @@ function createWindow(): void {
 }
 
 function registerIpc(): void {
+  registerSourceBrowser(mainWindow!, assertMainWindowSender);
   ipcMain.on("desktop:retry", (event) => {
     assertMainWindowSender(event.sender);
     void boot();

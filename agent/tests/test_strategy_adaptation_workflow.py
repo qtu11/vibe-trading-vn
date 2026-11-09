@@ -14,6 +14,7 @@ from src.strategy_discovery.models import EvidenceRow
 from src.strategy_store.models import Artifact, ArtifactStatus, ArtifactType, ValidationStatus
 from src.strategy_store.sqlite_store import SqliteStrategyStore
 from src.tools.strategy_discovery_tool import refresh_strategy_evidence_core
+from tests.symlink_support import symlink_or_skip
 
 
 @pytest.fixture
@@ -130,7 +131,7 @@ def test_alternate_or_changed_run_cannot_be_adopted(context, tmp_path, mutation)
         path = root / "artifacts/equity.csv"
         other = tmp_path / "elsewhere.csv"
         path.rename(other)
-        path.symlink_to(other)
+        symlink_or_skip(path, other)
     before = context[1].get_rows()
     output = refresh_strategy_evidence_core(runs=[{"strategy_id": result["strategy_id"], "run_dir": str(root)}], scope="strategies")
     assert output["rows"] == 0 and output["skipped"], output

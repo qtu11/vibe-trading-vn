@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.config.migrate import migrate_legacy_state
+from tests.symlink_support import symlink_or_skip
 
 
 def _seed(directory: Path, filename: str = "record.json") -> Path:
@@ -120,7 +121,7 @@ def test_symlinked_destination_receives_children(tmp_path: Path) -> None:
     target = tmp_path / "bigdisk-runs"
     target.mkdir()
     root.mkdir()
-    (root / "runs").symlink_to(target)
+    symlink_or_skip(root / "runs", target, target_is_directory=True)
     _seed(legacy / "runs")
     _seed(legacy / "uploads")
 

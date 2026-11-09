@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, RotateCcw, X, Zap } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, RotateCcw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, type LLMSettings } from "@/lib/api";
 import { effortLabelKey } from "@/lib/reasoningEffort";
@@ -30,10 +30,7 @@ export function ComposerModelControls({
   const dialogId = useId();
 
   const provider = settings?.providers.find((p) => p.name === settings.provider);
-  const levels =
-    settings?.provider === "custom"
-      ? []
-      : modelEfforts?.[model] ?? provider?.reasoning_efforts ?? [];
+  const levels = modelEfforts?.[model] ?? provider?.reasoning_efforts ?? [];
   const steps = ["", ...levels];
   const label = (level: string) =>
     effortLabelKey(level)
@@ -41,11 +38,10 @@ export function ComposerModelControls({
       : level || t("settings.providerDefault");
   const activeLevel = Math.max(0, steps.indexOf(effort));
   const maxStep = Math.max(1, steps.length - 1);
-  const progressPercent = steps.length > 1 ? (activeLevel / maxStep) * 100 : 100;
 
   useEffect(() => {
     setModel(settings?.model_name ?? "");
-    setEffort(settings?.provider === "custom" ? "" : settings?.reasoning_effort ?? "");
+    setEffort(settings?.reasoning_effort ?? "");
     setError("");
   }, [settings]);
 
@@ -109,6 +105,11 @@ export function ComposerModelControls({
 
   async function save(nextEffort = effort, close = false) {
     if (!settings || locked) return;
+    const confirmedEffort = levels.includes(nextEffort) ? nextEffort : "";
+    if (model === settings.model_name && confirmedEffort === settings.reasoning_effort) {
+      if (close) { setOpen(false); trigger.current?.focus(); }
+      return;
+    }
     setSaving(true);
     setError("");
     try {
@@ -119,7 +120,7 @@ export function ComposerModelControls({
         temperature: settings.temperature,
         timeout_seconds: settings.timeout_seconds,
         max_retries: settings.max_retries,
-        reasoning_effort: levels.includes(nextEffort) ? nextEffort : "",
+        reasoning_effort: confirmedEffort,
       });
       onChange(next);
       if (close) {
@@ -137,10 +138,39 @@ export function ComposerModelControls({
     (settings.model_name || "").split("/").pop() ||
     settings.model_name ||
     (vi ? "Chọn model" : "Select model");
-  const activeEffort = label(
-    settings.provider === "custom" ? "" : settings.reasoning_effort,
-  );
+  const configuredEffort = settings.reasoning_effort;
+  const activeEffort = configuredEffort ? label(configuredEffort) : "";
   const openEffortPrompt = vi ? "Chọn mức nỗ lực" : "Select effort";
+  const effortRatio = maxStep <= 0 ? 0 : activeLevel / maxStep;
+  const effortRamp: Array<[number, number, number]> = [
+    [37, 99, 235],
+    [59, 130, 246],
+    [139, 92, 246],
+    [239, 68, 68],
+    [153, 27, 27],
+  ];
+  const effortFill = (() => {
+    const clamped = Math.min(1, Math.max(0, effortRatio));
+    const scaled = clamped * (effortRamp.length - 1);
+    const lo = Math.min(effortRamp.length - 2, Math.floor(scaled));
+    const mix = scaled - lo;
+    const [r1, g1, b1] = effortRamp[lo];
+    const [r2, g2, b2] = effortRamp[lo + 1];
+    const r = Math.round(r1 + (r2 - r1) * mix);
+    const g = Math.round(g1 + (g2 - g1) * mix);
+    const b = Math.round(b1 + (b2 - b1) * mix);
+    return `rgb(${r}, ${g}, ${b})`;
+  })();
+  const effortGlow = effortFill.replace("rgb(", "rgba(").replace(")", ", 0.45)");
+  const effortParticles = [
+    { left: "6%", delay: "0s", dur: "2.6s", size: 4, top: "30%" },
+    { left: "18%", delay: "0.7s", dur: "3.1s", size: 3, top: "62%" },
+    { left: "32%", delay: "1.3s", dur: "2.4s", size: 5, top: "44%" },
+    { left: "47%", delay: "0.4s", dur: "2.9s", size: 3, top: "28%" },
+    { left: "61%", delay: "1.8s", dur: "3.4s", size: 4, top: "58%" },
+    { left: "74%", delay: "1.1s", dur: "2.7s", size: 3, top: "38%" },
+    { left: "88%", delay: "2s", dur: "3s", size: 4, top: "52%" },
+  ];
 
   return (
     <div ref={root} className="relative min-w-0 text-xs" data-composer-model-controls>
@@ -151,19 +181,19 @@ export function ComposerModelControls({
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-controls={dialogId}
-        aria-label={`${shortModel} · ${activeEffort || (vi ? "Mặc định" : "Default")}`}
+        aria-label={activeEffort ? `${shortModel} · ${activeEffort}` : shortModel}
         title={`${settings.model_name}${activeEffort ? ` (${activeEffort})` : ""}`}
         onClick={() => {
           setModel(settings.model_name);
-          setEffort(settings.provider === "custom" ? "" : settings.reasoning_effort);
+          setEffort(settings.reasoning_effort ?? "");
           setPickingModel(false);
           setError("");
           setOpen(!open);
         }}
-        className={`inline-flex h-7 max-w-full items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6] disabled:opacity-50 ${
+        className={`inline-flex h-[30px] max-w-full items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6] disabled:opacity-50 ${
           open
-            ? "border border-black/[0.1] dark:border-white/[0.1] bg-black/[0.08] dark:bg-white/[0.09] text-muted-foreground"
-            : "border border-black/[0.1] dark:border-white/[0.12] bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.07] dark:hover:bg-white/[0.08] hover:border-[#3b82f6]/60 text-foreground"
+            ? "border border-black/[0.1] dark:border-white/[0.12] bg-black/[0.08] dark:bg-[#27272a] text-muted-foreground shadow-inner"
+            : "border border-[#2563eb] dark:border-[#3b82f6] bg-[#2563eb]/10 dark:bg-[#3b82f6]/10 hover:bg-[#2563eb]/20 dark:hover:bg-[#3b82f6]/20 text-foreground shadow-2xs"
         }`}
       >
         {open ? (
@@ -176,7 +206,7 @@ export function ComposerModelControls({
               {shortModel}
             </span>
             {activeEffort && (
-              <span className="text-muted-foreground shrink-0 font-normal">
+              <span className="hidden text-zinc-400 shrink-0 font-normal sm:inline">
                 {activeEffort}
               </span>
             )}
@@ -184,7 +214,7 @@ export function ComposerModelControls({
         )}
         <ChevronDown
           size={13}
-          className={`shrink-0 text-muted-foreground/75 transition-transform duration-200 ${
+          className={`shrink-0 text-muted-foreground/80 transition-transform duration-200 ${
             open ? "rotate-180" : ""
           }`}
           aria-hidden="true"
@@ -197,19 +227,17 @@ export function ComposerModelControls({
           role="dialog"
           aria-modal="false"
           aria-label={vi ? "Model và mức suy nghĩ" : "Model and reasoning"}
-          className="absolute bottom-full end-0 z-50 mb-2.5 max-h-[min(75vh,30rem)] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-[20px] border border-black/[0.1] dark:border-white/[0.1] bg-popover dark:bg-[#25262a] p-4 text-popover-foreground shadow-[0_16px_40px_rgba(0,0,0,0.48)] animate-in fade-in slide-in-from-bottom-1 duration-150"
+          className="absolute bottom-full -end-10 z-50 mb-3 max-h-[70vh] w-[272px] max-w-[calc(100vw-4rem)] overflow-y-auto rounded-2xl border border-black/[0.1] dark:border-white/[0.12] bg-popover dark:bg-[#1a1b1e] p-3.5 text-popover-foreground shadow-[0_12px_36px_rgba(0,0,0,0.4)] sm:end-0"
         >
-          {/* Header: Zap icon | Effort + Model | Reset & Close */}
-          <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-start gap-1">
-            <Zap
-              size={15}
-              className="mt-0.5 justify-self-start text-muted-foreground/75"
-              aria-hidden="true"
-            />
-            <div className="min-w-0 text-center">
+          {/* Header: effort + model, reset */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1 text-center">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+                {vi ? "Mức suy nghĩ" : "Reasoning"}
+              </p>
               <p
                 aria-live="polite"
-                className="text-[13.5px] font-semibold leading-5 text-[#2b7fff] dark:text-[#4d9eff]"
+                className="mt-1 text-[17px] font-semibold leading-6 tracking-tight text-foreground"
               >
                 {label(effort)}
               </p>
@@ -218,9 +246,9 @@ export function ComposerModelControls({
                 disabled={locked}
                 onClick={() => setPickingModel(!pickingModel)}
                 aria-expanded={pickingModel}
-                className="mx-auto mt-0.5 flex max-w-full items-center justify-center gap-0.5 rounded px-1.5 py-0.5 text-[12px] leading-4 text-muted-foreground hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.06] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                className="mx-auto mt-1.5 flex max-w-full items-center justify-center gap-1 rounded-full bg-black/[0.04] px-2.5 py-1 text-[11.5px] leading-4 text-muted-foreground transition-colors hover:bg-black/[0.08] hover:text-foreground dark:bg-white/[0.06] dark:hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
               >
-                <span className="truncate">
+                <span className="max-w-[160px] truncate">
                   {(model || "").split("/").pop() || model}
                 </span>
                 <ChevronRight
@@ -232,7 +260,7 @@ export function ComposerModelControls({
                 />
               </button>
             </div>
-            <div className="flex items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5 pt-0.5">
               <button
                 type="button"
                 aria-label={vi ? "Đặt lại mức suy nghĩ" : "Reset reasoning effort"}
@@ -242,7 +270,7 @@ export function ComposerModelControls({
                   setEffort("");
                   void save("");
                 }}
-                className="rounded-md p-1 text-muted-foreground/75 hover:text-foreground hover:bg-black/[0.05] dark:hover:bg-white/[0.06] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-35"
+                className="rounded-full p-1.5 text-muted-foreground/70 transition-colors hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-35"
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -264,88 +292,140 @@ export function ComposerModelControls({
             </div>
           </div>
 
-          {/* Codex Segmented Blue Pill Slider */}
+          {/* Effort selector — flowing particles, deep red at max */}
           <div
-            className={`relative mt-3.5 flex h-7 items-center rounded-full bg-zinc-200 dark:bg-[#383a40] px-1 ${
+            className={`effort-flow mt-4 rounded-2xl border border-black/[0.06] bg-black/[0.03] px-3 pb-2.5 pt-3 dark:border-white/[0.08] dark:bg-white/[0.04] transition-opacity ${
               locked || !levels.length ? "opacity-45" : ""
             }`}
+            style={{ ["--effort-fill" as string]: effortFill, ["--effort-glow" as string]: effortGlow }}
           >
-            {/* Active Blue Fill Bar */}
-            <div
-              className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-[#2b7fff] transition-all duration-150"
-              style={{
-                width:
-                  steps.length > 1
-                    ? `calc(${progressPercent}% + ${
-                        ((50 - progressPercent) / 50) * 12
-                      }px)`
-                    : "100%",
-              }}
-            />
-            {/* Discrete Step Dots */}
-            <div className="pointer-events-none relative z-10 flex w-full items-center justify-between px-2.5">
-              {steps.map((stepValue, idx) => (
-                <span
-                  key={stepValue || `step-${idx}`}
-                  className={`h-1 w-1 rounded-full transition-colors ${
-                    idx <= activeLevel
-                      ? "bg-white/70"
-                      : "bg-black/30 dark:bg-white/30"
-                  }`}
+            <div className="relative flex h-[26px] items-center">
+              {/* base track */}
+              <div className="absolute inset-x-[9px] h-[6px] overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                <div
+                  className="effort-flow-fill h-full rounded-full transition-all duration-500 ease-out"
+                  style={{
+                    width:
+                      !levels.length || maxStep <= 0
+                        ? "0%"
+                        : `${(activeLevel / maxStep) * 100}%`,
+                    background: effortFill,
+                    boxShadow: `0 0 12px ${effortGlow}`,
+                  }}
                 />
-              ))}
+                {/* flowing highlight + drifting particles */}
+                <div className="effort-flow-sheen" aria-hidden="true" />
+                {effortParticles.map((p, i) => (
+                  <span
+                    key={i}
+                    aria-hidden="true"
+                    className="effort-flow-particle"
+                    style={{
+                      left: p.left,
+                      top: p.top,
+                      width: p.size,
+                      height: p.size,
+                      animationDelay: p.delay,
+                      animationDuration: p.dur,
+                    }}
+                  />
+                ))}
+              </div>
+              {/* step ticks */}
+              <div className="pointer-events-none relative z-10 flex w-full items-center justify-between px-[3px]">
+                {steps.map((stepValue, idx) => (
+                  <span
+                    key={stepValue || `step-${idx}`}
+                    className={`h-[5px] w-[5px] rounded-full transition-all duration-300 ${
+                      idx <= activeLevel
+                        ? "bg-white"
+                        : "bg-black/30 dark:bg-white/30"
+                    }`}
+                    style={
+                      idx <= activeLevel
+                        ? { boxShadow: `0 0 0 3px ${effortGlow}` }
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+              {/* thumb */}
+              <div
+                className="pointer-events-none absolute top-1/2 z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white ring-1 ring-black/10 transition-all duration-500 ease-out"
+                style={{
+                  left:
+                    !levels.length || maxStep <= 0
+                      ? "9px"
+                      : `calc(9px + ${(activeLevel / maxStep)} * (100% - 18px))`,
+                  boxShadow: `0 2px 10px ${effortGlow}, 0 0 0 3px ${effortGlow}`,
+                }}
+              >
+                <span
+                  className="h-[6px] w-[6px] rounded-full transition-colors duration-500"
+                  style={{ background: effortFill }}
+                />
+              </div>
+              {/* Interactive Range Input Overlay */}
+              <input
+                ref={slider}
+                type="range"
+                min={0}
+                max={maxStep}
+                step={1}
+                value={activeLevel}
+                disabled={locked || !levels.length}
+                aria-label={vi ? "Mức suy nghĩ" : "Reasoning effort"}
+                aria-valuetext={label(effort)}
+                className="composer-reasoning-slider absolute inset-0 z-20 m-0 h-full w-full cursor-pointer opacity-0"
+                onChange={(event) =>
+                  setEffort(steps[Number(event.target.value)] ?? "")
+                }
+                onPointerUp={(event) =>
+                  void save(steps[Number(event.currentTarget.value)] ?? "")
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void save();
+                  }
+                }}
+                onKeyUp={(event) => {
+                  if (
+                    [
+                      "ArrowLeft",
+                      "ArrowRight",
+                      "ArrowUp",
+                      "ArrowDown",
+                      "Home",
+                      "End",
+                      "PageUp",
+                      "PageDown",
+                    ].includes(event.key)
+                  ) {
+                    void save(steps[Number(event.currentTarget.value)] ?? "");
+                  }
+                }}
+              />
             </div>
-            {/* Crisp White Thumb */}
-            <div
-              className="pointer-events-none absolute top-1/2 z-10 h-5 w-5 -translate-y-1/2 rounded-full bg-white shadow-[0_2px_6px_rgba(0,0,0,0.4)] transition-all duration-150"
-              style={{
-                left: `calc(${progressPercent}% - ${(progressPercent / 100) * 20}px + ${
-                  (1 - progressPercent / 100) * 4 - (progressPercent / 100) * 4
-                }px)`,
-              }}
-            />
-            {/* Interactive Range Input */}
-            <input
-              ref={slider}
-              type="range"
-              min={0}
-              max={maxStep}
-              step={1}
-              value={activeLevel}
-              disabled={locked || !levels.length}
-              aria-label={vi ? "Thanh trượt mức suy nghĩ" : "Reasoning effort slider"}
-              aria-valuetext={label(effort)}
-              className="composer-reasoning-slider absolute inset-0 z-20 m-0 h-full w-full opacity-0"
-              onChange={(event) =>
-                setEffort(steps[Number(event.target.value)] ?? "")
-              }
-              onPointerUp={(event) =>
-                void save(steps[Number(event.currentTarget.value)] ?? "")
-              }
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  void save();
-                }
-              }}
-              onKeyUp={(event) => {
-                if (
-                  [
-                    "ArrowLeft",
-                    "ArrowRight",
-                    "ArrowUp",
-                    "ArrowDown",
-                    "Home",
-                    "End",
-                    "PageUp",
-                    "PageDown",
-                  ].includes(event.key)
-                ) {
-                  void save(steps[Number(event.currentTarget.value)] ?? "");
-                }
-              }}
-            />
+            {/* level captions */}
+            {levels.length > 0 && (
+              <div className="mt-1.5 flex items-center justify-between px-[2px] text-[10px] font-medium">
+                {steps.map((stepValue, idx) => (
+                  <span
+                    key={stepValue || `cap-${idx}`}
+                    className="max-w-[64px] truncate text-muted-foreground/55 transition-colors duration-500"
+                    style={
+                      idx === activeLevel
+                        ? { color: effortFill }
+                        : undefined
+                    }
+                  >
+                    {label(stepValue)}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {!levels.length && (
@@ -358,6 +438,7 @@ export function ComposerModelControls({
 
           {/* Expandable Model & Effort Selectors (always in DOM for a11y & testing) */}
           <div
+            hidden={!pickingModel}
             className={
               pickingModel
                 ? "mt-3.5 space-y-2.5 border-t border-black/[0.08] dark:border-white/[0.08] pt-3"
@@ -376,11 +457,9 @@ export function ComposerModelControls({
                   const nextModel = event.target.value;
                   setModel(nextModel);
                   const nextLevels =
-                    settings.provider === "custom"
-                      ? []
-                      : modelEfforts?.[nextModel] ??
-                        provider?.reasoning_efforts ??
-                        [];
+                    modelEfforts?.[nextModel] ??
+                    provider?.reasoning_efforts ??
+                    [];
                   if (effort && !nextLevels.includes(effort)) {
                     setEffort("");
                   }

@@ -52,7 +52,6 @@ from src.agent.context_budget import (
     is_context_overflow,
     parse_context_limit,
     resolve_context,
-    resolve_window,
 )
 from src.agent.context_compact import (  # noqa: F401  (re-exported so loop imports keep working)
     COLLAPSE_HEAD,
@@ -240,6 +239,7 @@ class AgentLoop(ToolCallLifecycle):
         self._run_iteration: int = 0
         self._has_run = False
         self._grounding: GroundingLedger | None = None
+        self._answer_charts: dict[str, dict] = {}
         self._released_fallback = False
         self._released_fallback_reason: str | None = None
         self._written_files: set[str] = set()
@@ -407,6 +407,7 @@ class AgentLoop(ToolCallLifecycle):
         self._context_session_id = session_id
         self.registry = prepare_registry(self.registry)
         self._forex_trade_plan = None
+        self._answer_charts = {}
         forex_tool = self.registry.get("get_forex_market_snapshot")
         if forex_tool is not None:
             forex_tool.cancel_event = self._cancel_event
@@ -1243,7 +1244,7 @@ class AgentLoop(ToolCallLifecycle):
             iteration,
             self.max_iterations,
             final_content,
-            self._llm_runtime,
+            getattr(self.llm, "runtime_snapshot", self._llm_runtime),
             last_response_model,
             content_filter_count,
         )

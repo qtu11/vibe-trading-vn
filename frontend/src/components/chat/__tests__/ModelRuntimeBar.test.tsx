@@ -43,10 +43,25 @@ describe("ModelRuntimeBar", () => {
     render(
       <ModelRuntimeBar
         settings={{ ...settings, reasoning_effort: "none" }}
+        runtimeModel="deepseek-v4-flash-202607"
       />,
     );
 
     expect(screen.getByText(/Reasoning Effort: None \(explicit\)/)).toBeInTheDocument();
+  });
+
+  it("hides itself when the runtime identity matches the composer settings", () => {
+    render(
+      <ModelRuntimeBar
+        settings={settings}
+        runtimeProvider="deepseek"
+        runtimeModel="deepseek-v4-flash"
+        runtimeReasoningEffort="high"
+      />,
+    );
+
+    expect(screen.queryByText("DeepSeek")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Reasoning Effort/)).not.toBeInTheDocument();
   });
 
   it("labels the claude-cli xhigh level instead of falling back to the default", () => {

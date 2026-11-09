@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Gráfico no disponible: no se obtuvieron velas OHLC completas. No se ha estimado ninguna vela.",
+  "legacyUnavailable": "No se pudo reconstruir este gráfico guardado porque parte de los datos de velas fue redactada. Vuelve a preguntar para generar un gráfico nuevo con datos de mercado observados.",
+    "historicalNote": "Velas históricas con la base de ajuste indicada arriba; no son una cotización en tiempo real de la última operación.",
+    "sourceLink": "Fuente de datos ↗",
+    "sourceUrlUnavailable": "El proveedor de datos no facilitó la URL de origen",
+    "retrievedAt": "Obtenido: {{value}}",
+    "volumeUnit": "Unidad de volumen: {{value}}",
+    "volumeUnavailable": "Falta el volumen de algunas velas; los valores ausentes no son cero.",
     "noPriceData": "Aún no hay datos de precio para este símbolo",
     "noCorrelationData": "Elige al menos dos símbolos para comparar",
     "correlationUndefined": "indefinida (sin variación de precio en la ventana)",
@@ -1916,7 +1924,8 @@
     "timeoutHint": "Tiempo agotado. Simplifica la estrategia o usa menos activos.",
     "apiFailedHint": "La solicitud a la API falló. Intenta de nuevo en breve.",
     "executionFailedHint": "La ejecución falló. Intenta de nuevo.",
-    "retry": "Intentar de nuevo"
+    "retry": "Intentar de nuevo",
+    "legacyWithheld": "Algunas cifras de esta respuesta antigua no se pudieron verificar y se ocultaron. Vuelve a preguntar para obtener una respuesta nueva con fuentes y un gráfico."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

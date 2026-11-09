@@ -6,7 +6,7 @@ Zero API key required for HK/US/crypto research markets (yfinance, OKX,
 AKShare are free). Trading connector tools are profile-scoped and require the
 selected connector's own local app or OAuth setup.
 
-Surfaces 85 tools: skills, research goals, strategy discovery,
+Surfaces 87 tools: skills, research goals, strategy discovery,
 backtest/factor/options/pattern
 analysis, deterministic paper-trading matching (paper_trade_step), market data, fundamentals & capital-flow & news & discovery
 (get_fund_flow / get_dragon_tiger / get_northbound_flow / get_southbound_flow /
@@ -21,9 +21,11 @@ etf_holdings / prediction_market / research_papers), read-only finance math and
 market analytics (quantlib_call / cashflow_performance / orderbook_depth /
 sentiment / technical_indicators / get_fundamentals), read-only
 trading-connector reads, swarm orchestration, trade-journal and shadow-account
-analysis. Every exposed tool is read-only or research-only except
-refresh_strategy_evidence, which writes ONLY the disposable facade-owned
-strategy-evidence cache from local run artifacts; no order-placing or
+analysis, evidence-bound DOCX/PDF/PPTX report export, curated Vietnam research,
+supplied basis curves, and read-only crypto derivatives. Research writers create
+local artifacts or session bookkeeping: export_research_report writes private
+runtime report files, and refresh_strategy_evidence writes ONLY the disposable
+facade-owned strategy-evidence cache from local run artifacts. No order-placing or
 order-cancelling tool is ever surfaced via MCP. The QVeris tools additionally
 require QVeris paid routing (QVERIS_API_KEY + paid mode), and qveris_execute
 is billable research-data execution only — it never places orders.
@@ -1252,6 +1254,66 @@ def web_search(query: str, max_results: int = 5) -> str:
     )
 
 
+@mcp.tool
+def parallel_web_search(
+    query: str,
+    queries: list[str] | None = None,
+    max_results: int = 8,
+    category: str = "finance",
+) -> str:
+    """Execute high-speed parallel multi-engine search across DuckDuckGo, Brave, Bing, QVeris, and Vietnam portals.
+
+    Returns deduplicated, RRF-ranked results with domain diversity gating.
+
+    Args:
+        query: Primary search query.
+        queries: Optional list of additional queries to run concurrently.
+        max_results: Maximum results to return (default 8, max 20).
+        category: Search category ('finance', 'news', 'general').
+    """
+    registry = _get_registry()
+    return registry.execute(
+        "parallel_web_search",
+        {
+            "query": query,
+            "queries": queries,
+            "max_results": max_results,
+            "category": category,
+        },
+    )
+
+
+@mcp.tool
+def concurrent_scraper(
+    urls: list[str],
+    query: str = "",
+    target_tickers: list[str] | None = None,
+    token_budget: int = 2500,
+    synthesize: bool = True,
+) -> str:
+    """Fetch and analyze multiple URLs concurrently with SSRF protection, DOM cleaning,
+    GFM table conversion, 75-90% token pruning, and Map-Reduce synthesis.
+
+    Args:
+        urls: List of target URLs to scrape and analyze concurrently.
+        query: Research query to guide BM25-FSB semantic pruning.
+        target_tickers: Optional list of target tickers (e.g. ['HPG']).
+        token_budget: Maximum token budget across all documents.
+        synthesize: Whether to generate structured Map-Reduce synthesis and cross-reconciliation.
+    """
+    registry = _get_registry()
+    return registry.execute(
+        "concurrent_scraper",
+        {
+            "urls": urls,
+            "query": query,
+            "target_tickers": target_tickers,
+            "token_budget": token_budget,
+            "synthesize": synthesize,
+        },
+    )
+
+
 # ---------------------------------------------------------------------------
 # File I/O tools (sandboxed to workspace)
 # ---------------------------------------------------------------------------
@@ -2368,11 +2430,12 @@ def get_sec_filings(
 
 @mcp.tool
 def export_research_report(report: dict[str, Any], formats: list[str] | None = None) -> str:
-    """Render an authoritative Vibe-Trading branded research report in DOCX and PDF formats.
+    """Render an evidence-bound Vibe-Trading research draft in DOCX/PDF/PPTX formats.
 
     Receives structured research JSON complying with the ResearchReport schema, executes
     deterministic document rendering without altering business figures, and registers
-    downloadable artifacts.
+    downloadable private runtime artifacts. Missing evidence remains unavailable;
+    the default deep-report gate requires at least 24 measured PDF pages.
     """
     params = {"report": report}
     if formats is not None:

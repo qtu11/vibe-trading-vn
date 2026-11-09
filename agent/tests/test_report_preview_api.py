@@ -1,6 +1,7 @@
 """Authenticated previews render the actual PDF without a browser PDF plug-in."""
 
 from io import BytesIO
+from docx import Document
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -63,6 +64,20 @@ def test_preview_refuses_unknown_ids_and_other_formats(preview, tmp_path):
     for report_id in ("0" * 32, "not-an-opaque-handle"):
         assert client.get(f"/api/reports/{report_id}/preview").status_code == 404
     docx = tmp_path / "doc.docx"
-    docx.write_bytes(b"PK\x03\x04only-a-fixture")
+    Document().save(docx)
     artifact = publish_report_artifact(docx)
     assert client.get(f"/api/reports/{artifact['report_id']}/preview").status_code == 404
+
+
+def test_artifact_job_resolves_standalone_published_pdf(preview):
+    client, _, artifact = preview
+    report_id = artifact["report_id"]
+    response = client.get(f"/api/reports/artifacts/{report_id}/job")
+    assert response.status_code == 200
+    job = response.json()
+    assert job["status"] == "succeeded"
+    assert job["formats"] == ["pdf"]
+    assert len(job["artifacts"]) == 1
+    assert job["artifacts"][0]["report_id"] == report_id
+    assert job["artifacts"][0]["filename"] == "research.pdf"
+    assert job["artifacts"][0]["media_type"] == "application/pdf"

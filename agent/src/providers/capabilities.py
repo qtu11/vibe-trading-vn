@@ -141,6 +141,7 @@ _OPENCODE_CAPABILITIES = ProviderCapabilities(
     "OPENCODE_API_KEY",
     "OPENCODE_BASE_URL",
     capture_reasoning=True,
+    top_level_reasoning_effort=True,
     default_headers={"User-Agent": _VIBE_USER_AGENT},
 )
 

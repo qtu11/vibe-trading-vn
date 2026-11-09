@@ -1,5 +1,7 @@
 # Tài liệu Vibe-Trading Multi-Market AI
 
+**Audit đang thực hiện — 08/11/2026:** [ma trận audit toàn bộ source, luồng và kiểm thử](FULL_SOURCE_LOGIC_AUDIT_2026-11-08.md), [lỗi số/chart của phiên MBB và bản phát lại](CHAT_NUMBERS_CHART_AUDIT_2026-11-08.md). Trạng thái hoàn thành toàn sản phẩm vẫn mở; xem từng bằng chứng và phần chưa kiểm tra trong ma trận.
+
 **Cập nhật:** 06/11/2026. Bộ tài liệu đối chiếu master plan với source cục bộ `0.1.18`, nguồn chính thức và các sửa code local. Mục tiêu là đủ cụ thể để triển khai và nghiệm thu, đồng thời giữ rõ phần đang có, phần còn thiếu và phần chưa kiểm tra runtime.
 
 **Đợt7 — 06/11/2026:** [reverse DCF VN](VN_REVERSE_DCF.md), [bootstrap trade OOS Forex](FOREX_RESEARCH_LAB.md#bootstrap-đường-vốn-từ-các-trade-oos-đã-khóa) và [Crypto dated-futures basis](CRYPTO_BASIS_CURVE.md) đã nối API/Web/MCP phù hợp từng luồng. Xem [kiểm thử, giới hạn và rollback đợt7](IMPLEMENTATION_STATUS_2026-11-06_07.md).

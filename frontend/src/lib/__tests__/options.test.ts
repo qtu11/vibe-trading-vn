@@ -244,6 +244,6 @@ describe("display formatters", () => {
 
   it("ivLabel formats IV fractions as percents", () => {
     expect(ivLabel(0.3)).toBe("30%");
-    expect(ivLabel(0.255)).toBe("25.5%");
+    expect(ivLabel(0.255)).toBe(`${(25.5).toLocaleString()}%`);
   });
 });

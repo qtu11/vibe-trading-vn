@@ -38,7 +38,11 @@ function text(value: unknown, limit = MAX_TEXT): string | null {
 
 function safeHref(value: unknown): string | null {
   const url = text(value, 2_000);
-  return url && /^https?:\/\//i.test(url) ? url : null;
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:"].includes(parsed.protocol) && !parsed.username && !parsed.password ? parsed.href : null;
+  } catch { return null; }
 }
 
 function timestamp(value: unknown): string | null {
@@ -90,4 +94,44 @@ export function parseSourceCitations(value: unknown): SourceCitation[] {
     });
   }
   return sources;
+}
+
+function markdownText(value: string): string {
+  return value.replace(/[\r\n\t]+/g, " ").replace(/[\\`*_{}\[\]<>()#!|]/g, "\\$&");
+}
+
+function markdownUrl(value: string): string {
+  return value.replace(/[()<>"\s\\]/g, (char) => encodeURIComponent(char).replace(/\(/g, "%28").replace(/\)/g, "%29"));
+}
+
+function apaDate(value: string | null): string {
+  if (!value) return "n.d.";
+  if (/^\d{4}$/.test(value)) return value;
+  const match = /^(\d{4})-(\d{2})(?:-(\d{2})(?:T.*)?)?$/.exec(value);
+  if (!match) return "n.d.";
+  const date = new Date(`${match[1]}-${match[2]}-${match[3] || "01"}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.getUTCMonth() + 1 !== Number(match[2]) || date.getUTCDate() !== Number(match[3] || 1)) return "n.d.";
+  return `${match[1]}, ${date.toLocaleString("en-US", { month: "long", timeZone: "UTC" })}${match[3] ? ` ${Number(match[3])}` : ""}`;
+}
+
+/** Keep each turn's S# mapping: IDs may be reused by subsequent research runs. */
+export function sourceResolutionMarkdown(sources: SourceCitation[]): string {
+  return sources.filter((source) => source.citeAllowed && safeHref(source.url))
+    .map((source) => `[${markdownText(source.sourceId)}](${markdownUrl(source.url!)})`).join(" · ");
+}
+
+export function sourceReferencesMarkdown(sources: SourceCitation[]): string {
+  const unique = new Map<string, SourceCitation>();
+  for (const source of sources) {
+    const url = safeHref(source.url);
+    if (source.citeAllowed && url && !unique.has(url)) unique.set(url, source);
+  }
+  if (!unique.size) return "";
+  const entries = [...unique.values()].sort((a, b) => a.title.localeCompare(b.title, "en"));
+  return ["## Tài liệu tham khảo (APA 7th)", "",
+    "Metadata chưa có tác giả: dùng nhan đề ở vị trí tác giả; n.d. khi thiếu ngày xuất bản. Trạng thái nguồn không được nâng thành đã xác minh khi xuất.", "",
+    ...entries.flatMap((source) => [
+      `*${markdownText(source.title)}*${/[.!?]$/.test(source.title) ? "" : "."} (${apaDate(source.publishedAt)}).${source.publisher ? ` ${markdownText(source.publisher)}.` : ""} [${markdownText(source.url!)}](${markdownUrl(source.url!)})`, "",
+    ]),
+  ].join("\n");
 }

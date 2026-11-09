@@ -1,29 +1,100 @@
 .composer-reasoning-slider {
   appearance: none;
   width: 100%;
-  height: 28px;
-  border-radius: 999px;
+  height: 100%;
+  border-radius: 9999px;
   cursor: pointer;
   background: transparent;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
 }
 .composer-reasoning-slider::-webkit-slider-thumb {
   appearance: none;
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
 }
 .composer-reasoning-slider::-moz-range-thumb {
-  width: 22px;
-  height: 22px;
-  border: none;
-  border-radius: 50%;
-  background: transparent;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
 }
 .composer-reasoning-slider:focus-visible {
   outline: none;
 }
-.composer-reasoning-slider:disabled {
-  cursor: not-allowed;
+
+/* Flowing particles for the effort track */
+.effort-flow {
+  --effort-fill: #2563eb;
+  --effort-glow: rgba(37, 99, 235, 0.45);
+}
+
+.effort-flow-fill {
+  position: relative;
+  overflow: visible;
+}
+
+.effort-flow-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.55) 42%,
+    rgba(255, 255, 255, 0.75) 50%,
+    rgba(255, 255, 255, 0.55) 58%,
+    transparent 80%
+  );
+  background-size: 180% 100%;
+  animation: effort-sheen 2.8s linear infinite;
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+.effort-flow-particle {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.55) 45%, transparent 75%);
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+  animation: effort-particle-drift 3s ease-in-out infinite;
+  opacity: 0;
+}
+
+@keyframes effort-sheen {
+  0% {
+    background-position: 130% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+@keyframes effort-particle-drift {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  55% {
+    transform: translate(10px, -2.5px) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(22px, 1.5px) scale(0.5);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effort-flow-sheen,
+  .effort-flow-particle {
+    animation: none;
+    opacity: 0;
+  }
 }

@@ -1,8 +1,16 @@
 {
   "app": {
-    "version": "v0.1.18"
+    "version": "v0.3.2"
   },
   "charts": {
+    "noCompleteBars": "Grafik tidak tersedia: candle OHLC lengkap belum diperoleh. Tidak ada candle yang diperkirakan.",
+    "legacyUnavailable": "Grafik tersimpan ini tidak dapat direkonstruksi karena sebagian data candle telah disunting. Tanyakan lagi untuk membuat grafik baru dari data pasar yang diamati.",
+    "historicalNote": "Candle historis menggunakan dasar penyesuaian di atas; bukan kuotasi transaksi terakhir secara langsung.",
+    "sourceLink": "Sumber data ↗",
+    "sourceUrlUnavailable": "Penyedia data tidak memberikan URL sumber",
+    "retrievedAt": "Diambil: {{value}}",
+    "volumeUnit": "Satuan volume: {{value}}",
+    "volumeUnavailable": "Volume beberapa candle tidak tersedia; nilai yang hilang bukan nol.",
     "noPriceData": "Belum ada data harga untuk simbol ini",
     "noCorrelationData": "Pilih setidaknya dua simbol untuk dibandingkan",
     "correlationUndefined": "belum terdefinisi (tidak ada variasi harga pada jendela)",
@@ -1916,7 +1924,8 @@
     "timeoutHint": "Timeout. Sederhanakan strategi atau gunakan lebih sedikit aset.",
     "apiFailedHint": "Permintaan API gagal. Coba lagi beberapa saat lagi.",
     "executionFailedHint": "Eksekusi gagal. Coba lagi.",
-    "retry": "Coba lagi"
+    "retry": "Coba lagi",
+    "legacyWithheld": "Beberapa angka dalam jawaban lama ini tidak dapat diverifikasi dan telah disembunyikan. Tanyakan lagi untuk mendapatkan jawaban baru dengan sumber dan grafik."
   },
   "pineViewer": {
     "pineScript": "Pine Script v6",

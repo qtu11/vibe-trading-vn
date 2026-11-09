@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from typing import Any, Iterable, Sequence
+from urllib.parse import quote, urlsplit
 
 from src.agent.grounding.identity import (
     _CANONICAL_SYMBOL_RE,
@@ -12,10 +13,11 @@ from src.agent.grounding.identity import (
     _normalize_symbol,
     _utc_now,
 )
-from src.agent.grounding.evidence import EvidenceRecord
+from src.agent.grounding.evidence import EvidenceRecord, _public_source_url
 from src.agent.grounding.figures import (
     BLOCK_LANGUAGE,
     Figure,
+    _fenced_blocks,
     _lines_with_offsets,
     parse_figures_block,
     scan_figures,
@@ -188,6 +190,105 @@ def _strip_release_markers(content: str) -> str:
 
 class _ReleaseMixin:
     """Release behaviour of :class:`GroundingLedger`."""
+
+    def repair_unique_field_refs(self, content: str, validation: ValidationResult) -> str | None:
+        """Bind a mistaken tool name only when the exact field has one call."""
+        replacements: dict[str, str] = {}
+        for issue in validation.issues:
+            if issue.get("reason") != "field_ref_needs_call_id":
+                continue
+            candidates = list(dict.fromkeys(issue.get("field_ref_candidates") or []))
+            refs = issue.get("source_tool_call_ids") or []
+            if len(candidates) == len(refs) == 1:
+                replacements[str(refs[0])] = str(candidates[0])
+        if not replacements:
+            return None
+        pieces, cursor = [], 0
+        for _start, _end, info, (body_start, body_end) in _fenced_blocks(content):
+            if info != BLOCK_LANGUAGE:
+                continue
+            pieces.append(content[cursor:body_start])
+            lines = []
+            for line in content[body_start:body_end].splitlines(keepends=True):
+                # Replace only the ref column, never a price, note or chart.
+                parts = line.split("|", 3)
+                if len(parts) == 4 and parts[3].strip() in replacements:
+                    ending = "\n" if parts[3].endswith("\n") else ""
+                    parts[3] = " " + replacements[parts[3].strip()] + ending
+                lines.append("|".join(parts))
+            pieces.append("".join(lines))
+            cursor = body_end
+        pieces.append(content[cursor:])
+        return "".join(pieces)
+
+    def surface_data_gaps(self, content: str) -> str:
+        """State missing statement evidence before any research conclusions."""
+        statement_tools = {"get_financial_statements", "financial_statements", "vietnam_research"}
+        failures = [item for item in self._tool_failures if item.get("tool") in statement_tools]
+        if not failures:
+            return content
+        subjects = {symbol for failure in failures for symbol in failure.get("symbols", [])}
+        subjects = subjects or self.authorized_symbols
+        # A different issuer's statements never repair this issuer's data gap.
+        for subject in tuple(subjects):
+            matches = [symbol for symbol in self.authorized_symbols if symbol.rsplit(".", 1)[0] == subject]
+            if len(matches) == 1:
+                subjects.remove(subject)
+                subjects.add(matches[0])
+        observed = {record.symbol for record in self._evidence if record.tool in statement_tools
+                    and record.status == "observed" and record.value is not None and record.symbol}
+        if subjects and subjects <= observed:
+            return content
+        if self._user_writes_chinese():
+            note = "> 数据缺口：财务报表工具未返回可核验报表。下述网页或新闻指标尚未与原始报表核对，财务结论有待确认。"
+        elif self._user_writes_vietnamese():
+            note = "> Thiếu dữ liệu BCTC: công cụ chưa trả về báo cáo tài chính để kiểm chứng. Các chỉ tiêu lấy từ trang web/bài viết dưới đây chưa được đối chiếu với BCTC gốc; các kết luận tài chính còn cần xác nhận."
+        else:
+            note = "> Statement data unavailable: the financial-statement tools returned no verifiable statements. Web and news metrics below have not been reconciled with the original filings; financial conclusions remain provisional."
+        return content if content.startswith(note) else note + "\n\n" + content
+
+    def link_collected_sources(self, content: str) -> str:
+        """Publish collected URLs beside citations without touching chart JSON."""
+        protected = [(start, end) for start, end, _info, _body in _fenced_blocks(content)]
+        protected.extend((match.start(), match.end()) for match in re.finditer(r"\[[^\]\n]*\]\([^\n]*?\)|https?://[^\s<>]+", content))
+        protected.extend((match.start(), match.end()) for match in re.finditer(r"(`+)[^`\n]*?\1", content)
+                         if match.group(0) != "`technical_indicators`")
+        records = [record for record in self._evidence if record.tool == "technical_indicators"
+                   and record.status == "observed" and record.value is not None]
+        # A tool name alone cannot select among different acquisitions.
+        if (len({record.call_id for record in records}) == 1
+                and len({record.symbol for record in records}) == 1
+                and len(urls := {record.source_url for record in records}) == 1
+                and (url := _public_source_url(next(iter(urls))))):
+            label = "tính từ nến nguồn" if self._user_writes_vietnamese() else "computed from source candles"
+            target = quote(url, safe=":/?#[]@!$&'()*+,;=%~")
+
+            def link_tool(match: re.Match[str]) -> str:
+                if any(start <= match.start() < end for start, end in protected):
+                    return match.group(0)
+                return f"[technical_indicators — {label}](<{target}>)"
+
+            content = re.sub(r"(?<![\w\[`])(?:`technical_indicators`|technical_indicators)(?![\w`\]])", link_tool, content)
+        protected = [(start, end) for start, end, _info, _body in _fenced_blocks(content)]
+        protected.extend((match.start(), match.end()) for match in re.finditer(r"(`+)[^`\n]*?\1", content))
+        protected.extend((match.start(), match.end()) for match in re.finditer(r"\[[^\]\n]*\]\([^\n]*?\)|https?://[^\s<>]+", content))
+
+        def link(match: re.Match[str]) -> str:
+            if any(start <= match.start() < end for start, end in protected):
+                return match.group(0)
+            source = self.source_by_id(match.group(1))
+            if source is None or not source.url:
+                return match.group(0)
+            try:
+                parsed = urlsplit(source.url)
+            except ValueError:
+                return match.group(0)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+                return match.group(0)
+            url = quote(source.url, safe=":/?#[]@!$&'()*+,;=%~")
+            return f"[{source.source_id}](<{url}>)"
+
+        return re.sub(r"(?<!!)\[(S\d{1,3})\](?!\s*\()", link, content, flags=re.IGNORECASE)
 
     def correction_prompt(self, validation: ValidationResult) -> str:
         """Build per-figure feedback for one rejected model draft (spec 6).
@@ -692,13 +793,19 @@ class _ReleaseMixin:
         # Stripping shifts offsets and the cuts anchor on issue spans, so the
         # verdict is retaken on the stripped text.
         check = validation if text == content else self._validate(text, record=False)
-        # An unreadable declaration cannot be cut, but the block is not answer
-        # text either: without it the draft is checked in undeclared mode.
+        # Keep readable declarations: one malformed row must not erase the
+        # provenance and arithmetic of every correctly declared number.
         dropped_block = any(
             issue.get("code") == "figures_block_malformed" for issue in check.issues
         )
         if dropped_block:
-            text = strip_figures_block(text, parse_figures_block(text))
+            block = parse_figures_block(text)
+            text = strip_figures_block(text, block)
+            if block.declarations:
+                text += "\n\n```figures\n" + "\n".join(
+                    f"{item.value_text} | {item.role} | {item.note} | {item.ref}"
+                    for item in block.declarations
+                ) + "\n```"
             check = self._validate(text, record=False)
         removed = 0
         keys: set[str] = set()
@@ -744,6 +851,8 @@ class _ReleaseMixin:
                 return None
             text, check, removed = swept, recheck, removed + len(swept_keys)
         body = check.released_text
+        if removed and self.sources:
+            body = self._withdraw_unverified_paragraphs(body)
         released = body
         if removed:
             note = self._release_note(removed, body)
@@ -752,6 +861,7 @@ class _ReleaseMixin:
             if not self._validate(note, record=False).valid:
                 return None
             released = body.rstrip() + "\n\n" + note
+        released = self.surface_data_gaps(self.link_collected_sources(released))
         # Recorded beside the drafts, not as one: every recheck here is
         # unrecorded, so this is the artifact's only evidence of the release.
         self._released = {
@@ -763,6 +873,37 @@ class _ReleaseMixin:
         }
         self.persist()
         return released
+
+    def _withdraw_unverified_paragraphs(self, body: str) -> str:
+        """Withdraw dependent prose instead of leaving a confident hollow claim."""
+        markers = (_REDACTION_MARKER_VI, _REDACTION_MARKER_EN, _REDACTION_MARKER_ZH)
+        if self._user_writes_chinese():
+            unavailable = "> 此段数据尚未核实，相关结论暂不成立。"
+            table_note = "> 表中无法核实的行及其结论已移除。"
+        elif self._user_writes_vietnamese():
+            unavailable = "> Chưa đủ dữ liệu xác minh đoạn này; chưa thể kết luận từ các số liệu bị loại."
+            table_note = "> Các hàng chưa đủ dữ liệu xác minh và kết luận liên quan đã được loại khỏi bảng."
+        else:
+            unavailable = "> This passage could not be verified; its conclusions are withheld."
+            table_note = "> Unverified rows and their dependent conclusions have been removed from this table."
+        paragraphs = body.split("\n\n")
+        for index, paragraph in enumerate(paragraphs):
+            if not any(marker in paragraph for marker in markers):
+                continue
+            if all(not line.strip() or line.lstrip().startswith("|") for line in paragraph.splitlines()):
+                rows = [line for line in paragraph.splitlines() if line.strip()]
+                kept = [line for line in rows if not any(marker in line for marker in markers)]
+                if len(kept) > 2 and rows[:2] == kept[:2]:
+                    paragraphs[index] = "\n".join(kept) + "\n\n" + table_note
+                    continue
+                paragraphs[index] = table_note
+            else:
+                paragraphs[index] = unavailable
+            # A heading often states the conclusion established by the next
+            # paragraph; it cannot survive after that evidence is withdrawn.
+            if index and re.fullmatch(r"#{1,6}\s+[^\n]+", paragraphs[index - 1].strip()):
+                paragraphs[index - 1] = ""
+        return "\n\n".join(paragraph for paragraph in paragraphs if paragraph)
 
     @staticmethod
     def _issue_span(text: str, issue: dict[str, Any]) -> tuple[int, int] | None:
@@ -854,10 +995,16 @@ class _ReleaseMixin:
         keys = {key for key in keys if len(key) > 1}
         if not keys:
             return text, []
+        trusted = [
+            (start, end)
+            for start, end, info, (body_start, body_end) in _fenced_blocks(text)
+            if info == "chart" and text[body_start:body_end].strip() in self._trusted_chart_payloads
+        ]
         stale = [
             figure
             for figure in scan_figures(text, parse_figures_block(text))
             if figure.digits in keys
+            and not any(start <= figure.start < end for start, end in trusted)
             and (
                 figure.shape == "bare"
                 or (figure.fence is not None and figure.fence != BLOCK_LANGUAGE)

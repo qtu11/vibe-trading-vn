@@ -23,6 +23,8 @@ export interface ReportEngineJob {
   error: { code: string; message: string } | null;
   publication_status: "draft_unverified" | "simulated_demo";
   warnings?: string[];
+  minimum_pages?: number;
+  pdf_pages?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +53,11 @@ export function validReportArtifact(value: unknown): value is ReportArtifact {
 export function validReportJob(value: unknown): value is ReportEngineJob {
   if (!value || typeof value !== "object") return false;
   const job = value as ReportEngineJob;
+  const validPageCount = (pages: unknown) => Number.isSafeInteger(pages) && Number(pages) >= 1 && Number(pages) <= 2000;
+  const depthIncomplete = job.minimum_pages !== undefined && job.minimum_pages > 1 && (
+    job.error?.code === "PAGE_COUNT_UNAVAILABLE" && job.pdf_pages === null
+    || job.error?.code === "INSUFFICIENT_REPORT_DEPTH" && validPageCount(job.pdf_pages) && job.pdf_pages! < job.minimum_pages
+  );
   return isReportHandle(job.job_id) && ["queued", "running", "succeeded", "partial", "failed"].includes(job.status)
     && ["draft_unverified", "simulated_demo"].includes(job.publication_status) && Array.isArray(job.formats)
     && job.formats.length > 0 && job.formats.length <= 3 && job.formats.every(isReportFormat)
@@ -58,8 +65,10 @@ export function validReportJob(value: unknown): value is ReportEngineJob {
     && job.artifacts.length <= 3 && job.artifacts.every(validReportArtifact)
     && new Set(job.artifacts.map((artifact) => artifactFormat(artifact))).size === job.artifacts.length
     && job.artifacts.every((artifact) => job.formats.includes(artifactFormat(artifact)!))
-    && (job.status === "succeeded" ? job.artifacts.length === job.formats.length
-      : job.status === "partial" ? job.artifacts.length > 0 && job.artifacts.length < job.formats.length
+    && (job.minimum_pages === undefined || validPageCount(job.minimum_pages))
+    && (job.pdf_pages === undefined || job.pdf_pages === null || validPageCount(job.pdf_pages))
+    && (job.status === "succeeded" ? job.artifacts.length === job.formats.length && (job.minimum_pages === undefined || job.minimum_pages <= 1 || validPageCount(job.pdf_pages) && job.pdf_pages! >= job.minimum_pages)
+      : job.status === "partial" ? job.artifacts.length > 0 && (job.artifacts.length < job.formats.length || depthIncomplete)
       : job.artifacts.length === 0)
     && (job.error === null || (typeof job.error?.code === "string" && typeof job.error?.message === "string"))
     && (job.status === "succeeded" ? job.error === null

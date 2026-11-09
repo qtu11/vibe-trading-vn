@@ -1,6 +1,7 @@
 import { memo } from "react";
 import { ExternalLink } from "lucide-react";
 import type { SourceCitation } from "@/lib/sourceEvidence";
+import { SourceLink } from "./SourceLink";
 
 function stripProtocol(value: string): string {
   return value.replace(/^https?:\/\//i, "").replace(/\/$/, "");
@@ -32,7 +33,7 @@ function SourceRow({ source }: { source: SourceCitation }) {
         <div className="min-w-0 flex-1 space-y-0.5">
           <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
             {source.url ? (
-              <a
+              <SourceLink
                 href={source.url}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -40,7 +41,7 @@ function SourceRow({ source }: { source: SourceCitation }) {
               >
                 <span className="truncate">{source.title}</span>
                 <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
-              </a>
+              </SourceLink>
             ) : (
               <span className="text-xs font-medium text-foreground">{source.title}</span>
             )}

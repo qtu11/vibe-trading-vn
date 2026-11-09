@@ -78,6 +78,9 @@ agent/uploads/
 /cache/
 /data/
 /reports/
+/report_jobs/
+/research/
+/forex/
 /hypotheses/
 /history/
 /pairing/
@@ -190,3 +193,18 @@ agent/tests/artifacts/
 
 # Local simulated account ledgers
 /paper-trading/
+
+# Temporary scratch and diagnostics
+/tmp/
+_diag_nav.py
+
+# Local portable tools
+tools/libreoffice/
+
+# Local audit and replay artifacts
+artifacts/full-source-audit-*/
+artifacts/*-audit-*/
+artifacts/chart-replay-*/
+
+
+

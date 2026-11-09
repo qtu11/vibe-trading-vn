@@ -126,14 +126,19 @@ export function MonteCarloPathsChart({ paths, height = 260 }: Props) {
       ],
     });
 
-    const ro = new ResizeObserver(() => chart.resize());
+    let frameId = 0;
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => chart.resize());
+    });
     ro.observe(ref.current!);
     return () => {
+      cancelAnimationFrame(frameId);
       ro.disconnect();
       chart.dispose();
     };
   }, [paths, dark]);
 
-  if (paths.steps.length === 0) return null;
+  if (!paths || !paths.steps || paths.steps.length === 0) return null;
   return <div ref={ref} style={{ height }} />;
 }

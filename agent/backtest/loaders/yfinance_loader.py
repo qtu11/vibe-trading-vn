@@ -219,7 +219,7 @@ def _normalize_frame(frame: pd.DataFrame, requested_interval: str) -> pd.DataFra
 
     index = pd.DatetimeIndex(pd.to_datetime(normalized.index))
     if getattr(index, "tz", None) is not None:
-        index = index.tz_localize(None)
+        index = index.tz_convert("UTC").tz_localize(None)
     normalized.index = index
     normalized.index.name = "trade_date"
     normalized = normalized.sort_index()

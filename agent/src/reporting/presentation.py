@@ -11,7 +11,7 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Inches, Pt
 
 from src.reporting.brand import BRAND, resolve_brand_logo
-from src.reporting.citations import datum_sources
+from src.reporting.citations import apa_reference_suffix, datum_sources, reference_sources
 from src.reporting.schema import DatumEvidence, ResearchReport
 
 
@@ -199,9 +199,14 @@ def make_pptx(report: ResearchReport, path: Path) -> Path:
             [f"{catalyst.horizon} · {catalyst.detail} · {catalyst.probability} · {catalyst.impact}"],
             catalyst,
         )
-    for source in report.sources:
-        slide = new_slide(f"Nguồn {source.id}", source.status)
-        box = textbox(slide, 0.8, 1.65, 11.7, 4.8, f"{source.title}\n{source.provider}", 20)
+    for source in reference_sources(report.sources):
+        slide = new_slide("Tài liệu tham khảo (APA 7th)", f"{source.id} · {source.status} · Metadata chưa có tác giả")
+        box = textbox(slide, 0.8, 1.65, 11.7, 4.8, source.title, 20)
+        paragraph = box.text_frame.paragraphs[0]
+        paragraph.runs[0].font.italic = True
+        run = paragraph.add_run()
+        run.text = ("" if source.title.endswith((".", "!", "?")) else ".") + apa_reference_suffix(source)
+        run.font.size = Pt(20)
         if source.url:
             run = box.text_frame.add_paragraph().add_run()
             run.text = str(source.url)

@@ -13,6 +13,7 @@ from src.session.search import SessionSearchIndex
 from src.tools.path_utils import resolve_safe_path
 from src.tools.swarm_tool import _build_variables, _match_preset, _merge_variables
 from src.tools.write_file_tool import WriteFileTool
+from tests.symlink_support import symlink_or_skip
 
 
 @pytest.mark.parametrize("text,query", [
@@ -64,11 +65,11 @@ def test_case_alias_and_symlink_paths_use_real_directory_identity(tmp_path):
         with pytest.raises(ValueError):
             resolve_safe_path(str(lower / "report.txt"), None, [root], purpose="write")
     alias = tmp_path / "cloud-alias"
-    alias.symlink_to(root, target_is_directory=True)
+    symlink_or_skip(alias, root, target_is_directory=True)
     assert resolve_safe_path(str(alias / "report.txt"), None, [root]) == root.resolve() / "report.txt"
     outside = tmp_path / "private"
     outside.mkdir()
-    (root / "escape").symlink_to(outside, target_is_directory=True)
+    symlink_or_skip(root / "escape", outside, target_is_directory=True)
     with pytest.raises(ValueError):
         resolve_safe_path(str(root / "escape" / "secret.txt"), None, [root])
 
@@ -152,7 +153,7 @@ def test_pdf_write_authenticated_download_and_im_delivery_share_real_file(tmp_pa
     message = Message(metadata={"generated_reports": [payload, payload, {"report_id": "../secret"}]})
     assert ChannelRuntime._report_media(message) == [str(path)]
     path.unlink()
-    path.symlink_to(tmp_path / "研究报告.pdf")
+    symlink_or_skip(path, tmp_path / "研究报告.pdf")
     assert client.get(payload["download_url"], headers={"Authorization": "Bearer test-token"}).status_code == 404
 
 

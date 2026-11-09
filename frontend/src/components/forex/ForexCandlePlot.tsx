@@ -34,9 +34,18 @@ export function ForexCandlePlot({ snapshot }: { snapshot: ForexChartSnapshot }) 
         formatter: forexCandleTooltip },
       series: [],
     });
-    const observer = new ResizeObserver(() => chart.resize());
+    let frameId = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(() => chart.resize());
+    });
     observer.observe(container.current);
-    return () => { observer.disconnect(); chart.dispose(); instance.current = null; };
+    return () => {
+      cancelAnimationFrame(frameId);
+      observer.disconnect();
+      chart.dispose();
+      instance.current = null;
+    };
   }, [dark]);
   useEffect(() => {
     const chart = instance.current;

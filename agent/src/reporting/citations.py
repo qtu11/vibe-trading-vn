@@ -1,6 +1,25 @@
 """Resolve clickable attribution, including the inputs of derived values."""
 
-from src.reporting.schema import ResearchReport
+from calendar import month_name
+
+from src.reporting.schema import ResearchReport, Source
+
+
+def apa_date(value) -> str:
+    return f"{value.year}, {month_name[value.month]} {value.day}" if value else "n.d."
+
+
+def reference_sources(sources: list[Source]) -> list[Source]:
+    """One entry per URL, alphabetized by title (the recorded author is unknown)."""
+    unique = {}
+    for source in sources:
+        unique.setdefault(str(source.url) if source.url else source.id, source)
+    return sorted(unique.values(), key=lambda source: source.title.casefold())
+
+
+def apa_reference_suffix(source: Source) -> str:
+    # Publisher metadata is not an author byline: use APA's missing-author format.
+    return f" ({apa_date(source.published_at)}). {source.provider}."
 
 
 def datum_source_ids(report: ResearchReport | None, item) -> list[str]:

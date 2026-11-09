@@ -76,7 +76,7 @@ def test_explicit_a_share_context_locks_the_a_share_candidate(tmp_path: Path) ->
         }
     ]
     assert message not in json.dumps(record, ensure_ascii=False)
-    artifact = (tmp_path / "artifacts" / "grounding_evidence.json").read_text()
+    artifact = (tmp_path / "artifacts" / "grounding_evidence.json").read_text(encoding="utf-8")
     assert message not in artifact
 
 

@@ -9,6 +9,7 @@ import pytest
 
 from evals.harness.artifacts import ArtifactBundle
 from evals.harness.schema import HarnessCase
+from tests.symlink_support import symlink_or_skip
 
 
 @pytest.mark.parametrize(
@@ -97,7 +98,7 @@ def test_known_artifact_symlink_cannot_escape_run_directory(artifact_dir: Path) 
     outside = artifact_dir.parent / "outside.json"
     outside.write_text(json.dumps({"prompt": "private"}), encoding="utf-8")
     (artifact_dir / "req.json").unlink()
-    (artifact_dir / "req.json").symlink_to(outside)
+    symlink_or_skip(artifact_dir / "req.json", outside)
 
     bundle = ArtifactBundle.load(artifact_dir)
 

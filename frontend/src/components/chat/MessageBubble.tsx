@@ -6,7 +6,9 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import { toast } from "sonner";
 import { normalizeMathDelimiters } from "@/lib/markdown";
+import { withdrawLegacyGrounding } from "@/lib/legacyGrounding";
 import { useReportPreviewStore } from "@/stores/reportPreview";
+import { SourceLink } from "./SourceLink";
 import type { AgentMessage } from "@/types/agent";
 import type { StoredAgentMessage } from "@/stores/agent";
 import { AgentAvatar } from "./AgentAvatar";
@@ -97,7 +99,7 @@ const markdownComponents: ReactMarkdownOptions["components"] = {
         useReportPreviewStore.getState().openArtifact(report[1]);
       }} />;
     }
-    return <a {...props} target="_blank" rel="noopener noreferrer" />;
+    return <SourceLink {...props} />;
   },
 };
 const proseClassName = "prose prose-sm dark:prose-invert max-w-none text-[15px] leading-relaxed prose-p:font-serif prose-p:text-[15.5px] prose-p:leading-[1.75] prose-li:font-serif prose-li:text-[15.5px] prose-li:leading-[1.75] prose-headings:font-sans prose-table:font-sans prose-code:font-mono prose-blockquote:font-sans [&_blockquote_p]:font-sans prose-table:border prose-table:border-border/50 prose-th:bg-muted/30 prose-th:px-3 prose-th:py-1.5 prose-td:px-3 prose-td:py-1.5 prose-th:text-left prose-th:text-xs prose-th:font-medium prose-td:text-xs prose-hr:hidden";
@@ -138,23 +140,13 @@ interface MarkdownContentProps {
   showCursor?: boolean;
 }
 
-function sanitizeGroundingRedactions(text: string): string {
-  if (!text.includes("※")) return text;
-  return text
-    .replace(
-      /\n*※\s*(?:\d+\s+figure\(s\)\s+that\s+could\s+not\s+be\s+matched|Đã\s+lược\s+bỏ\s+\d+\s+giá\s+trị\s+không\s+khớp|略去\s*\d+\s*处无法与本会话工具数据对上的数值)[^\n]*/gi,
-      "",
-    )
-    .replace(/\((?:omitted|đã lược)※\)/gi, "—")
-    .replace(/（略※）/g, "—");
-}
-
 export const MarkdownContent = memo(function MarkdownContent({
   content,
   streaming = false,
   showCursor = false,
 }: MarkdownContentProps) {
-  const cleanedContent = sanitizeGroundingRedactions(content);
+  const legacy = withdrawLegacyGrounding(content);
+  const cleanedContent = legacy.content;
   let normalized = cleanedContent;
   try {
     normalized = normalizeMathDelimiters(cleanedContent);
@@ -311,11 +303,12 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
   }
 
   if (msg.type === "answer") {
+    const renderedContent = withdrawLegacyGrounding(msg.content).content;
     return (
       <div className="flex gap-3 group relative">
         <AgentAvatar />
         <div className="flex-1 min-w-0 space-y-1.5">
-          <CopyButton text={msg.content} />
+          <CopyButton text={renderedContent} />
           {msg.forexTradePlan && <ForexTradeCards plan={msg.forexTradePlan} />}
           <MarkdownContent content={msg.content} />
           {msg.sources && msg.sources.length > 0 && (
@@ -346,7 +339,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
         <div className="space-y-2">
           <div className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
             <XCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
-            <p dir="auto" className="text-sm text-danger leading-relaxed">{msg.content}</p>
+            <p dir="auto" className="whitespace-pre-wrap text-sm text-danger leading-relaxed">{msg.content}</p>
           </div>
           {onRetry && (
             <div className="space-y-1.5">

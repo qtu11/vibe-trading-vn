@@ -571,7 +571,7 @@ class _PolicyMixin:
                     continue
             if declaration is None:
                 auto_sources = (
-                    self._table_cited_sources(figure)
+                    self._visible_cited_sources(figure)
                     if figure.shape == "measured"
                     else []
                 )
@@ -587,7 +587,7 @@ class _PolicyMixin:
                                 "cited",
                                 symbol,
                                 "citation_value_not_in_source",
-                                "sits under a table caption citing "
+                                "visibly cites "
                                 + ", ".join(f"[{source.source_id}]" for source in auto_sources)
                                 + " but does not appear in that source",
                                 source_ids=[source.source_id for source in auto_sources],
@@ -2375,6 +2375,17 @@ class _PolicyMixin:
             return []
         records = [self.source_by_id(source_id) for source_id in source_ids_in(caption)]
         return [record for record in records if record is not None]
+
+    def _visible_cited_sources(self, figure: Figure) -> list[Any]:
+        """Resolve inline citations by the same contract as table captions."""
+        content = getattr(self, "_active_content", "") or ""
+        lines = _lines_with_offsets(content)
+        line = lines[figure.line][0] if 0 <= figure.line < len(lines) else ""
+        inline_ids = source_ids_in(line)
+        if inline_ids:
+            records = [self.source_by_id(source_id) for source_id in inline_ids]
+            return [record for record in records if record is not None]
+        return self._table_cited_sources(figure)
 
     @grounding_check(name="figure-cited", code="numeric_claim_conflict",
                      additional_codes=("numeric_claim_unavailable",),

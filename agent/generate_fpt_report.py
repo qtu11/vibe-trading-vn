@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.min_pages < 1:
         parser.error("--min-pages must be positive")
     data = json.loads(args.template.read_text(encoding="utf-8"))
-    job = ReportJobService().create_job(data, formats=["docx", "pdf", "pptx"])
+    job = ReportJobService().create_job(data, formats=["docx", "pdf", "pptx"], minimum_pages=args.min_pages)
     if job["status"] != "succeeded":
         print(json.dumps(job, ensure_ascii=False, indent=2))
         return 1

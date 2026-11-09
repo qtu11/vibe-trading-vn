@@ -626,11 +626,14 @@ def check_mandate(
 
     # 8. Funding (defense-in-depth; broker is the real ceiling). Only a buy can
     #    push us past funding — never block a sell on this.
-    if intent.side == "buy" and post_exposure > caps.account_funding_usd:
+    effective_funding_limit = caps.account_funding_usd * (caps.max_leverage if caps.max_leverage and caps.max_leverage > 0 else 1.0)
+    current_gross = _post_trade_gross_exposure(positions, symbol=symbol, signed_order_notional=0.0)
+    is_reducing_exposure = current_gross is not None and post_exposure <= current_gross
+    if intent.side == "buy" and not is_reducing_exposure and post_exposure > effective_funding_limit:
         return _breach(
             broker=broker, remote_tool=remote_tool, intent=intent,
             kind=BREACH_KIND_QUANTITATIVE, limit="account_funding_usd",
-            limit_value=caps.account_funding_usd, attempted_value=post_exposure,
+            limit_value=effective_funding_limit, attempted_value=post_exposure,
             detail="post-trade exposure exceeds mirrored funding ceiling",
         )
 

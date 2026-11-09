@@ -12,18 +12,21 @@ import logging
 import os
 import re
 import time as _time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, List, Optional
 
 from src.config.accessor import get_env_config
 from src.providers.content_filter import is_content_filter_triggered
-from src.providers.llm import build_llm
+from src.providers.llm import ChatOpenAIWithReasoning, _REASONING_EFFORT_UNSUPPORTED, build_llm
 
 logger = logging.getLogger(__name__)
 
 
 def effective_reasoning_effort(adapter) -> str:
     """Report the setting actually sent by the adapter, never a dormant env value."""
+    if ChatOpenAIWithReasoning is not None and isinstance(adapter, ChatOpenAIWithReasoning):
+        if adapter._rejection_scope() in _REASONING_EFFORT_UNSUPPORTED:
+            return ""
     effort = getattr(adapter, "reasoning_effort", None)
     if isinstance(effort, str):
         return effort.strip().lower()
@@ -383,7 +386,7 @@ class ChatLLM:
         if identity["provider"] == "anthropic":
             output_reserve = token_limit(runtime_cfg.anthropic_max_tokens) or output_reserve
         self.model_name = configured_model
-        self.runtime_snapshot = LLMRuntimeSnapshot(
+        self._runtime_snapshot = LLMRuntimeSnapshot(
             provider=runtime_cfg.langchain_provider.strip().lower() or "openai",
             configured_model=configured_model,
             reasoning_effort=effective_reasoning_effort(self._llm),
@@ -391,6 +394,10 @@ class ChatLLM:
             output_reserve=output_reserve,
         )
         self.context_metadata = cached_model_metadata(self.runtime_snapshot.provider, base_url, configured_model)
+
+    @property
+    def runtime_snapshot(self) -> LLMRuntimeSnapshot:
+        return replace(self._runtime_snapshot, reasoning_effort=effective_reasoning_effort(self._llm))
 
     def close(self) -> None:
         """Best-effort release of HTTP clients owned by this adapter.
