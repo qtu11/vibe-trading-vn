@@ -178,6 +178,34 @@ class ToolCallLifecycle:
                     iteration,
                 )
                 continue
+            # A repair loop changes the arguments on every round, so the
+            # exact-call block above never fires for it. The family block
+            # catches it: several repairs of the same failure class have
+            # already been tried and the next one will not differ.
+            family_code = self._tool_progress.blocked_family(tc.name)
+            if family_code is not None:
+                failed_result = json.dumps(
+                    {
+                        "status": "error",
+                        "skipped": True,
+                        "reason": (
+                            f"{tc.name} đã thất bại {family_code} nhiều lần với các tham số khác nhau. "
+                            "Sửa lỗi hình dạng dữ liệu một lần nữa sẽ không có tác dụng: hãy kiểm tra "
+                            "lại schema của công cụ, hoặc dừng lại và trả lời bằng những gì đã thu thập được."
+                        ),
+                    },
+                    ensure_ascii=False,
+                )
+                self._record_blocked_tool_call(
+                    tc,
+                    failed_result,
+                    context,
+                    messages,
+                    trace,
+                    react_trace,
+                    iteration,
+                )
+                continue
             if self._grounding is not None:
                 authorization = self._grounding.authorize_tool_call(
                     tc.name,

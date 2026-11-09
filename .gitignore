@@ -198,6 +198,9 @@ agent/tests/artifacts/
 /tmp/
 _diag_nav.py
 
+# Test scratch: report export jobs written by the reporting tests
+agent/tests/_tmp_export_jobs/
+
 # Local portable tools
 tools/libreoffice/
 

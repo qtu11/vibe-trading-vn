@@ -188,6 +188,8 @@ Decide which workflow to use based on the request:
 4. Answer company and market questions as a CFA-style equity note, in this order: (a) conclusion or conditional recommendation; (b) observed market evidence — quote, dated OHLCV and the attached candlestick chart; (c) business and industry drivers; (d) financial analysis with period, currency, unit and consolidation basis; (e) valuation method, inputs, bear/base/bull scenarios and sensitivity; (f) catalysts, risks and the strongest counterargument; (g) data gaps and what would change the view; (h) sources. Use CFA-style research discipline without claiming CFA certification or guaranteed accuracy. Do not manufacture a BUY/SELL rating when quote, source or valuation evidence is missing.
    A price or trend answer must contain at least one observed candlestick chart from this run's fetched OHLCV, not a recalled, model-drawn or text-only substitute. If the fetch returns no complete candles, say so explicitly and let the unavailable state show; never fabricate the missing bars.
 5. Use `export_research_report` with DOCX/PDF/PPTX. Supply per-item `source_ids`; calculated/assumed values need `evidence_kind`, `input_keys` and `methodology`. The export gate checks this run's collected sources and quote. Use the returned `report_artifact` fence so the user can open the right-hand preview and download actual files.
+   Send the payload in the shape the schema expects, because a shape mismatch costs the whole export: `market` is `VN_EQUITY`/`FOREX`/`CRYPTO`; every metric carries `key`, `label`, `value` (number), `unit` and `as_of`; `key_stats`/`forecast_stats` `value` is a display STRING; `price_history` is an array of objects with date, close, unit, price_basis and source_ids; `analysis_sections` paragraphs and bullets are arrays of plain strings; a chart's `bars` is ONE object and it has at most 8 `categories`.
+   If the export returns `field_errors`, fix exactly those fields in the `accepted_report` it hands back — that payload is already normalised, so a retry is a small diff, not a rewrite. If it returns `ok: false` because a figure has no source text behind it, correct the number to the source's own figure or drop the item; do not restate the same payload, and never substitute `write_file`/`edit_file` for the export.
 
 **Trading plan / to-do list / sell-orders file** — user asks to create, refresh, or extend a weekly plan / to-do-list / sell-orders markdown from a prior week's file:
 1. Read the source file(s) first.
@@ -386,6 +388,40 @@ _MEMORY_SECTION = """
 """
 
 
+def _format_prompt_template(template: str, **values: Any) -> str:
+    """Substitute the prompt placeholders without letting a stray brace win.
+
+    The system prompt is built with ``str.format``. A literal ``{`` or ``}``
+    in the template text -- a JSON shape example, a regex, a set literal --
+    is read as a placeholder and raises ``KeyError``, and that happens while
+    the prompt is being assembled, before the run starts. The user sees a
+    failed turn with no research in it and no way to tell why.
+
+    A placeholder that is *not* one of the known names is left as written;
+    a known placeholder is still substituted. The prompt therefore survives
+    any example it contains, and no run is lost to a formatting detail.
+    """
+    try:
+        return template.format(**values)
+    except (KeyError, IndexError, ValueError):
+        pass
+
+    class _SafeDict(dict):
+        def __missing__(self, key: str) -> str:
+            return "{" + key + "}"
+
+    try:
+        return template.format_map(_SafeDict(values))
+    except (IndexError, ValueError):
+        # A malformed brace pair can still upset the parser. Fall back to
+        # substituting the known placeholders one at a time, which never
+        # raises on unknown text.
+        result = template
+        for name, value in values.items():
+            result = result.replace("{" + name + "}", str(value))
+        return result
+
+
 class ContextBuilder:
     """Builds message context for AgentLoop.
 
@@ -455,7 +491,8 @@ class ContextBuilder:
             )
 
         template, self.prompt_profile = project_prompt(_SYSTEM_PROMPT, user_message)
-        return template.format(
+        return _format_prompt_template(
+            template,
             tool_descriptions=tool_discovery,
             tool_count=len(self.registry._tools),
             skill_count=len(self.skills_loader.skills),

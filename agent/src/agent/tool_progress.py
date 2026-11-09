@@ -16,6 +16,22 @@ NO_PROGRESS_LIMIT = 8
 #: rejected path ~35 times, so a threshold of 2 still kills it well inside
 #: NO_PROGRESS_LIMIT.
 FAILURE_BLOCK_THRESHOLD = 2
+#: How many times the *same kind* of failure may recur on one tool before the
+#: run is told to stop and change approach. The exact-argument block above
+#: cannot catch a loop where every attempt fixes one field and fails on the
+#: next (the screenshot's export loop: market -> value type -> source_ids ->
+#: input_keys -> as_of, seven different payloads, one failure class). The
+#: fingerprint groups by tool + error code so that family is caught too.
+FAILURE_FAMILY_BLOCK_THRESHOLD = 4
+#: Error codes that describe a repairable payload shape rather than a broken
+#: tool or a missing file. They are the codes a repair loop produces.
+_REPAIRABLE_ERROR_CODES = frozenset({
+    "SCHEMA_VALIDATION_FAILED",
+    "EVIDENCE_VALIDATION_FAILED",
+    "INVALID_PAYLOAD",
+    "INVALID_FORMAT",
+    "MISSING_FORMATS",
+})
 #: What the user can do next, whatever stalled: #1363's case was an artifact
 #: the agent could not find, where only the exact path helps.
 _NEXT_STEP = (
@@ -39,6 +55,17 @@ _NOTE_TEXT = {
 }
 
 
+def _failure_code(result: str) -> str:
+    """Machine-readable error code from a failed tool envelope, if any."""
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    return str(payload.get("error_code") or payload.get("code") or "")
+
+
 def _failure_detail(result: str) -> str:
     """Short reason from a failed tool envelope, for the stop message."""
     try:
@@ -57,6 +84,7 @@ class ToolProgress:
 
     def __init__(self) -> None:
         self.failed: dict[tuple[str, str], int] = {}
+        self._failed_families: dict[tuple[str, str], int] = {}
         self._observations: set[tuple[str, str | None, str]] = set()
         self._new_observation = False
         self._context_restored = False
@@ -88,10 +116,16 @@ class ToolProgress:
         if not success:
             if key is not None:
                 self.failed[key] = self.failed.get(key, 0) + 1
-            self.note("error", name, _failure_detail(result))
+            detail = _failure_detail(result)
+            code = _failure_code(result)
+            if code in _REPAIRABLE_ERROR_CODES:
+                family = (name, code)
+                self._failed_families[family] = self._failed_families.get(family, 0) + 1
+            self.note("error", name, detail)
             return
         if not is_readonly:
             self.failed.clear()
+            self._failed_families.clear()
         if not is_readonly and key is None:
             self._new_observation = True
             return
@@ -191,6 +225,25 @@ class ToolProgress:
             failures without an intervening successful mutation.
         """
         return self.failed.get(key, 0) >= FAILURE_BLOCK_THRESHOLD
+
+    def blocked_family(self, name: str) -> str | None:
+        """The error code whose repeated repairs have exhausted their budget.
+
+        A repair loop changes the arguments every round, so the exact-call
+        block never fires. Grouping by tool + error code catches that loop:
+        the model has already tried the same class of fix several times and
+        the next attempt will not be different.
+
+        Args:
+            name: Tool name.
+
+        Returns:
+            The error code when its family hit the threshold, else ``None``.
+        """
+        for (tool, code), count in self._failed_families.items():
+            if tool == name and count >= FAILURE_FAMILY_BLOCK_THRESHOLD:
+                return code
+        return None
 
     def finish_iteration(self) -> bool:
         """Return whether the run exhausted its consecutive no-progress budget."""

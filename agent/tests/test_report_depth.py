@@ -65,13 +65,35 @@ def test_invalid_page_requirement_is_rejected_before_rendering(tmp_path, minimum
     assert error.value.code == "INVALID_PAGE_COUNT"
 
 
-def test_deep_report_tool_defaults_to_24_and_exposes_the_measured_shortfall(monkeypatch):
+def test_deep_report_tool_reports_shortfall_without_hiding_the_docx(monkeypatch):
+    """A short document is delivered, not refused.
+
+    The tool used to default to 24 pages and report ``ok: false`` whenever a
+    report fell short. That told the model the export had failed, so it
+    retried -- eight reasoning rounds burned to produce a file that already
+    existed. The depth gate reports depth; it does not decide whether the
+    export happened.
+    """
     monkeypatch.setattr("src.reporting.service.export_report", renderer(23, []))
-    receipt = json.loads(ExportResearchReportTool().execute(report(), formats=["docx"]))
-    assert receipt["minimum_pages"] == 24 and receipt["pdf_pages"] == 23
-    assert receipt["ok"] is False and receipt["status"] == "partial"
+    receipt = json.loads(
+        ExportResearchReportTool().execute(report(), formats=["docx"], minimum_pages=24)
+    )
+    assert receipt["pdf_pages"] == 23
+    assert receipt["ok"] is True
+    assert receipt["status"] == "partial"
     assert receipt["error"]["code"] == "INSUFFICIENT_REPORT_DEPTH"
     assert receipt["download_links"]
+    assert receipt["depth_shortfall"]["pdf_pages"] == 23
+
+
+def test_export_tool_without_a_depth_gate_does_not_measure_pages(monkeypatch):
+    """No gate requested means no page count and no shortfall note."""
+    monkeypatch.setattr("src.reporting.service.export_report", renderer(23, []))
+    receipt = json.loads(ExportResearchReportTool().execute(report(), formats=["docx"]))
+    assert receipt["ok"] is True
+    assert receipt["status"] == "succeeded"
+    assert receipt["pdf_pages"] is None
+    assert "depth_shortfall" not in receipt
 
 
 def test_export_api_defaults_to_24_and_rejects_non_integer_requirements():

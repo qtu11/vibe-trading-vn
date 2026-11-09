@@ -22,11 +22,128 @@ from src.tools.report_artifacts import publish_report_artifact
 
 _LOG = logging.getLogger(__name__)
 
+#: Cap on how many individual field errors are echoed back to the model. The
+#: raw dump ran past 50KB and pushed the whole export failure out of the
+#: model's effective attention; the tail errors were the actionable ones.
+_MAX_VALIDATION_ERRORS = 12
+
+
+def _condense_validation_errors(exc: ValidationError) -> str:
+    """Summarise schema errors compactly, grouped by pattern.
+
+    A long list of near-identical errors (``paragraphs.0`` .. ``paragraphs.6``
+    all "Input should be a valid string") tells the model far less than one
+    line naming the group and the fix.
+    """
+    errors = exc.errors()
+    groups: dict[str, list[str]] = {}
+    for err in errors:
+        loc = ".".join(str(part) for part in err.get("loc", ())) or "(root)"
+        # Collapse the index of a repeated element: paragraphs.0..6 -> paragraphs.*
+        parts = loc.split(".")
+        if len(parts) >= 2 and parts[-1].isdigit():
+            loc = ".".join(parts[:-1]) + ".*"
+        groups.setdefault(f"{loc}: {err.get('msg', '')}", []).append(loc)
+    lines = []
+    for summary, locs in list(groups.items())[:_MAX_VALIDATION_ERRORS]:
+        count = len(locs)
+        lines.append(summary if count == 1 else f"{summary} (×{count})")
+    if len(groups) > _MAX_VALIDATION_ERRORS:
+        lines.append(f"... và {len(groups) - _MAX_VALIDATION_ERRORS} nhóm lỗi khác")
+    return "; ".join(lines)
+
+
+def _structured_validation_errors(exc: ValidationError) -> list[dict[str, str]]:
+    """Turn schema errors into per-field repair instructions.
+
+    The model can act on ``{"field": "analysis_sections.0.paragraphs",
+    "problem": "...", "fix": "..."}``; it cannot act on a prose sentence
+    that buried the same information inside a 12-line dump. Every entry names
+    one place to look and one change to make.
+    """
+    hints: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for err in exc.errors()[:_MAX_VALIDATION_ERRORS]:
+        loc = ".".join(str(part) for part in err.get("loc", ())) or "(root)"
+        message = str(err.get("msg", ""))
+        key = (loc, message)
+        if key in seen:
+            continue
+        seen.add(key)
+        hints.append({"field": loc, "problem": message, "fix": _field_fix_hint(loc, message)})
+    return hints
+
+
+#: Per-field repair hints for the schema errors a model actually hits. The
+#: normalizer already repairs the *shape* near-misses; what reaches this
+#: table is a genuine content problem, so the hint must name the content.
+_FIELD_FIX_HINTS: tuple[tuple[str, str], ...] = (
+    ("paragraphs", "Mỗi phần tử của paragraphs phải là một chuỗi văn bản thuần (không phải object {text, source_ids})."),
+    ("bullets", "Mỗi phần tử của bullets phải là một chuỗi văn bản thuần."),
+    ("source_ids", "Danh sách source_ids phải chứa các id có thật trong trường sources của báo cáo."),
+    ("value", "Trường value phải là số (không phải chuỗi) hoặc null; đơn vị/scale nằm ở trường unit."),
+    ("unit", "Trường unit phải là chuỗi, ví dụ 'tỷ VND', 'VND', '%'."),
+    ("as_of", "Trường as_of phải là ngày ISO (YYYY-MM-DD) và không được vượt quá data_as_of."),
+    ("observed_at", "Trường observed_at phải là thời điểm ISO có múi giờ."),
+    ("evidence_kind", "evidence_kind phải là một trong: observed, cited, derived, assumption."),
+    ("input_keys", "input_keys phải liệt kê đúng các key metric đã khai báo ở financial_metrics/valuation_metrics."),
+    ("methodology", "Giá trị derived/assumption cần methodology mô tả công thức hoặc giả định."),
+    ("url", "Mỗi nguồn cần một url http(s) hợp lệ trỏ tới trang đã thu thập."),
+    ("provider", "Mỗi nguồn cần provider (tên nhà cung cấp/nhóm bài)."),
+    ("id", "Mỗi nguồn cần id duy nhất, ví dụ S1, S2."),
+    ("categories", "Biểu đồ cần ít nhất 2 categories và các series phải cùng độ dài với categories."),
+    ("bars", "bars phải là một object duy nhất {label, unit, decimals, values, source_ids}."),
+    ("values", "values phải là mảng số, cùng độ dài với categories của biểu đồ."),
+    ("key", "Mỗi metric cần key duy nhất, ví dụ revenue, eps, target_price."),
+    ("data_as_of", "data_as_of phải là ngày ISO (YYYY-MM-DD)."),
+    ("market", "market phải là một trong: VN_EQUITY, US_EQUITY, FOREX, CRYPTO, COMMODITY."),
+    ("symbol", "symbol phải là mã có hậu tố sàn, ví dụ VIC.VN, AAPL, BTCUSDT."),
+    ("exchange", "exchange phải là tên sàn, ví dụ HOSE, HNX, NASDAQ."),
+    ("title", "title/subtitle phải dài từ 5 ký tự trở lên."),
+    ("subtitle", "title/subtitle phải dài từ 5 ký tự trở lên."),
+    ("overview", "overview và executive_summary phải dài từ 15 ký tự trở lên."),
+    ("executive_summary", "overview và executive_summary phải dài từ 15 ký tự trở lên."),
+    ("recommendation", "recommendation phải là một trong: MUA, THEO DÕI, BÁN, CHƯA XẾP HẠNG."),
+    ("symbol", "symbol phải là mã có hậu tố sàn, ví dụ VIC.VN, AAPL, BTCUSDT."),
+)
+
+
+def _field_fix_hint(loc: str, message: str) -> str:
+    """Best repair instruction for one schema error location."""
+    tail = loc.split(".")[-1]
+    for key, hint in _FIELD_FIX_HINTS:
+        if tail == key:
+            return hint
+    if "date" in message.lower():
+        return "Giá trị phải là ngày ISO (YYYY-MM-DD)."
+    if "string" in message.lower():
+        return "Trường này phải là chuỗi văn bản."
+    if "number" in message.lower() or "float" in message.lower() or "int" in message.lower():
+        return "Trường này phải là số."
+    return "Sửa đúng kiểu dữ liệu của trường này theo ResearchReport schema."
+
+
 class ReportJobError(Exception):
-    def __init__(self, code: str, message: str):
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        details: list[dict[str, str]] | None = None,
+        normalized_report: dict[str, Any] | None = None,
+        normalization_warnings: list[str] | None = None,
+    ):
         super().__init__(message)
         self.code = code
         self.message = message
+        #: Per-field repair instructions. Empty for codes that are not about
+        #: the report payload (bad format list, bad page count).
+        self.details = details or []
+        #: The payload after shape normalisation, echoed back so the model can
+        #: see what the server already accepted instead of re-deriving it.
+        self.normalized_report = normalized_report
+        #: What the normalizer repaired, so a retry does not re-attempt it.
+        self.normalization_warnings = normalization_warnings or []
 
 
 class ReportJobService:
@@ -65,7 +182,21 @@ class ReportJobService:
             raise ReportJobError("INVALID_FORMAT", "Report formats must not contain duplicates")
 
         # 1. Validate structured research
+        normalize_warnings: list[str] = []
+        normalized_payload: dict[str, Any] | None = None
         try:
+            from src.reporting.normalize import normalize_report_payload
+
+            if isinstance(report_data, ResearchReport):
+                raw_payload = report_data.model_dump(mode="python")
+            elif isinstance(report_data, dict):
+                raw_payload = report_data
+            else:
+                raw_payload = report_data
+            if isinstance(raw_payload, dict):
+                raw_payload, normalize_warnings = normalize_report_payload(raw_payload)
+                report_data = raw_payload
+                normalized_payload = raw_payload
             if isinstance(report_data, ResearchReport):
                 report = ResearchReport.model_validate(
                     report_data.model_dump(mode="python")
@@ -75,12 +206,30 @@ class ReportJobService:
             audit = validate_report_evidence(report, evidence_context)
             report = audit.report
         except ValidationError as exc:
-            msg = "; ".join(f"{err['loc']}: {err['msg']}" for err in exc.errors())
-            raise ReportJobError("SCHEMA_VALIDATION_FAILED", f"Dữ liệu báo cáo không đúng chuẩn: {msg}") from exc
+            msg = _condense_validation_errors(exc)
+            raise ReportJobError(
+                "SCHEMA_VALIDATION_FAILED",
+                f"Dữ liệu báo cáo không đúng chuẩn: {msg}",
+                details=_structured_validation_errors(exc),
+                normalized_report=normalized_payload,
+                normalization_warnings=normalize_warnings,
+            ) from exc
         except ValueError as exc:
-            raise ReportJobError("EVIDENCE_VALIDATION_FAILED", str(exc)) from exc
+            raise ReportJobError(
+                "EVIDENCE_VALIDATION_FAILED",
+                str(exc),
+                normalized_report=normalized_payload,
+                normalization_warnings=normalize_warnings,
+            ) from exc
+        except ReportJobError:
+            raise
         except Exception as exc:
-            raise ReportJobError("INVALID_PAYLOAD", f"Lỗi nạp dữ liệu báo cáo: {exc}") from exc
+            raise ReportJobError(
+                "INVALID_PAYLOAD",
+                f"Lỗi nạp dữ liệu báo cáo: {exc}",
+                normalized_report=normalized_payload,
+                normalization_warnings=normalize_warnings,
+            ) from exc
 
         job_id = uuid.uuid4().hex
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -96,7 +245,8 @@ class ReportJobService:
             "updated_at": now_iso,
             "run_id": run_id,
             "quote_verified": audit.quote_verified,
-            "warnings": list(audit.warnings),
+            "warnings": [*normalize_warnings, *audit.warnings],
+            "normalization_warnings": list(normalize_warnings),
             "minimum_pages": minimum_pages,
             "pdf_pages": None,
         }
