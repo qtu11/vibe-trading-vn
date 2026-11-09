@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.3.2"
+    "version": "v0.3.3"
   },
   "charts": {
     "noCompleteBars": "Grafik kullanılamıyor: eksiksiz OHLC mumları alınamadı. Hiçbir mum tahmin edilmedi.",

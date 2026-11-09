@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.3.2"
+    "version": "v0.3.3"
   },
   "charts": {
     "noCompleteBars": "Diagramm nicht verfügbar: Es wurden keine vollständigen OHLC-Kerzen abgerufen. Es wurden keine Kerzen geschätzt.",

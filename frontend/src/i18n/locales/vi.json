@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.3.2"
+    "version": "v0.3.3"
   },
   "charts": {
     "noCompleteBars": "Chưa thể vẽ biểu đồ: chưa lấy được nến OHLC đầy đủ. Không tự ước lượng dữ liệu nến.",

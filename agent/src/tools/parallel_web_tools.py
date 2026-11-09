@@ -18,6 +18,7 @@ import json
 import logging
 import time
 from typing import Any, List, Optional, Sequence, Union
+from urllib.parse import urlparse
 
 from src.agent.tools import BaseTool
 from src.security.scanner import with_security_warnings
@@ -55,6 +56,34 @@ def _run_async_safely(coro: Any) -> Any:
             return pool.submit(asyncio.run, coro).result()
     else:
         return asyncio.run(coro)
+
+
+def _extract_domain(url: str) -> str:
+    try:
+        netloc = urlparse(url).netloc.lower()
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        return netloc or url
+    except Exception:
+        return url
+
+
+def _apply_domain_diversity(
+    rows: Sequence[SearchResult],
+    max_per_domain: int = 2,
+    limit: int = 10,
+) -> list[SearchResult]:
+    domain_counts: dict[str, int] = {}
+    selected: list[SearchResult] = []
+    for r in rows:
+        dom = _extract_domain(r.url)
+        count = domain_counts.get(dom, 0)
+        if count < max_per_domain:
+            domain_counts[dom] = count + 1
+            selected.append(r)
+            if len(selected) >= limit:
+                break
+    return selected
 
 
 async def parallel_web_search_async(
@@ -130,18 +159,26 @@ async def parallel_web_search_async(
 
     try:
         if len(all_queries) == 1:
-            results = await aggregator.search(all_queries[0], max_results=max_results)
+            raw_results = await aggregator.search(all_queries[0], max_results=max_results)
+            results = _apply_domain_diversity(raw_results, max_per_domain=max_per_domain, limit=max_results)
         else:
-            # Parallel query dispatch
-            tasks = [aggregator.search(q, max_results=max_results) for q in all_queries]
-            batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+            # Parallel query dispatch with shared global deadline
+            tasks = [asyncio.create_task(aggregator.search(q, max_results=max_results)) for q in all_queries]
+            done, pending = await asyncio.wait(tasks, timeout=global_deadline)
+            for p in pending:
+                p.cancel()
             combined_map: dict[str, SearchResult] = {}
-            for r_list in batch_results:
-                if isinstance(r_list, list):
-                    for r in r_list:
-                        if r.url not in combined_map or r.score > combined_map[r.url].score:
-                            combined_map[r.url] = r
-            results = sorted(combined_map.values(), key=lambda x: x.score, reverse=True)[:max_results]
+            for t in done:
+                try:
+                    r_list = t.result()
+                    if isinstance(r_list, list):
+                        for r in r_list:
+                            if r.url not in combined_map or r.score > combined_map[r.url].score:
+                                combined_map[r.url] = r
+                except Exception:
+                    pass
+            ranked = sorted(combined_map.values(), key=lambda x: x.score, reverse=True)
+            results = _apply_domain_diversity(ranked, max_per_domain=max_per_domain, limit=max_results)
     finally:
         await aggregator.close()
 
@@ -287,6 +324,7 @@ async def concurrent_scrape_and_synthesize_async(
     # Step 4: Semantic Token Pruning & Budgeting
     active_query = query or ("Thông tin tài chính doanh nghiệp " + " ".join(target_tickers or []))
     pruned_docs: list[PrunedDocument] = prune_documents(
+        # pyrefly: ignore[bad-argument-type]
         docs=deduped_docs,
         query=active_query,
         tickers=target_tickers,

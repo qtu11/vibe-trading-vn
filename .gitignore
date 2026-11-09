@@ -208,6 +208,8 @@ tools/libreoffice/
 artifacts/full-source-audit-*/
 artifacts/*-audit-*/
 artifacts/chart-replay-*/
+agent/artifacts/
+agent/_measure_tokens.py
 
 
 

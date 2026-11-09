@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.3.2"
+    "version": "v0.3.3"
   },
   "charts": {
     "noCompleteBars": "Grafik tidak tersedia: candle OHLC lengkap belum diperoleh. Tidak ada candle yang diperkirakan.",

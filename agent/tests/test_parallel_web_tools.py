@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -801,3 +802,216 @@ def test_concurrent_scraper_tool_execute():
         assert parsed["status"] == "ok"
         assert parsed["token_stats"]["reduction_pct"] == 85.0
         assert "[S1]" in parsed["summary_markdown"]
+
+
+# ===========================================================================
+# 7. MULTI-QUERY BATCH: DEADLINE AND DOMAIN DIVERSITY
+# ===========================================================================
+
+class _FakeAggregator:
+    """Aggregator stand-in whose per-query answers are scripted.
+
+    ``delays`` maps a query to a sleep before it answers. A query that is
+    not in the map answers immediately.
+
+    ``fallback_calls`` counts how many times a query was searched *after*
+    the batch deadline had already passed. A re-run of the primary query
+    is the sign that the completed work was thrown away.
+    """
+
+    def __init__(
+        self,
+        answers: dict[str, list[SearchResult]],
+        delays: dict[str, float] | None = None,
+    ):
+        self.answers = answers
+        self.delays = delays or {}
+        self.closed = False
+        self.search_calls: list[str] = []
+        self.fallback_calls = 0
+
+    async def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
+        self.search_calls.append(query)
+        await asyncio.sleep(self.delays.get(query, 0.0))
+        return list(self.answers.get(query, []))[:max_results]
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_multi_query_batch_keeps_answers_that_landed_before_the_deadline():
+    """A slow query must not erase the queries that already answered.
+
+    Regression: the batch was wrapped in ``asyncio.wait_for(gather(...))``.
+    On timeout the gather was cancelled and the handler paid for a second
+    full search from scratch, throwing away everything that had already
+    arrived. The batch now waits for the finished tasks and keeps them.
+    """
+    fast_result = SearchResult(
+        title="VIC BCTC Q3",
+        url="https://cafef.vn/vic-q3.chn",
+        snippet="Doanh thu 34.100 tỷ đồng",
+        source="duckduckgo",
+    )
+    aggregator = _FakeAggregator(
+        answers={"kết quả kinh doanh VIC": [fast_result]},
+        delays={"VIC lịch sử giá": 30.0},
+    )
+
+    with patch("src.tools.parallel_web_tools.MultiSearchAggregator", return_value=aggregator):
+        result = await parallel_web_search_async(
+            query="kết quả kinh doanh VIC",
+            queries=["VIC lịch sử giá"],
+            max_results=5,
+            global_deadline=1.0,
+        )
+
+    urls = [row["url"] for row in result["results"]]
+    assert "https://cafef.vn/vic-q3.chn" in urls, (
+        "The query that answered before the deadline must be kept: " + str(urls)
+    )
+    # The answered query must not have been searched a second time. A
+    # fallback re-run shows up as a repeat of the primary query.
+    assert aggregator.search_calls.count("kết quả kinh doanh VIC") == 1, (
+        "The answered query must not be re-run: " + str(aggregator.search_calls)
+    )
+
+
+@pytest.mark.asyncio
+async def test_multi_query_batch_does_not_restart_the_search_after_the_deadline():
+    """The deadline must cut the batch short, not restart it.
+
+    Regression: when the shared deadline expired the handler searched the
+    primary query again from scratch. The user waited for the deadline and
+    then waited for a whole second search, and the answers the first
+    search had already produced were discarded.
+    """
+    answered = SearchResult(
+        title="VIC BCTC Q3",
+        url="https://cafef.vn/vic-q3.chn",
+        snippet="Doanh thu 34.100 tỷ đồng",
+        source="duckduckgo",
+    )
+    aggregator = _FakeAggregator(
+        answers={"kết quả kinh doanh VIC": [answered]},
+        delays={"VIC lịch sử giá": 30.0},
+    )
+
+    with patch("src.tools.parallel_web_tools.MultiSearchAggregator", return_value=aggregator):
+        await parallel_web_search_async(
+            query="kết quả kinh doanh VIC",
+            queries=["VIC lịch sử giá"],
+            max_results=5,
+            global_deadline=1.0,
+        )
+
+    # Exactly one search per query: no fallback re-run.
+    assert aggregator.search_calls == ["kết quả kinh doanh VIC", "VIC lịch sử giá"], (
+        "The batch must not restart the search: " + str(aggregator.search_calls)
+    )
+
+
+@pytest.mark.asyncio
+async def test_multi_query_batch_returns_at_the_deadline():
+    """A query that never answers must not hold the whole batch open.
+
+    Regression: the batch ran a bare ``asyncio.gather`` with no deadline,
+    so one unresponsive query held the tool open for as long as that query
+    took -- the user watched the spinner instead of getting the answers
+    the other queries had already produced.
+    """
+    answered = SearchResult(
+        title="VIC BCTC Q3",
+        url="https://cafef.vn/vic-q3.chn",
+        snippet="Doanh thu 34.100 tỷ đồng",
+        source="duckduckgo",
+    )
+
+    class _NeverAnswers(_FakeAggregator):
+        async def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
+            self.search_calls.append(query)
+            if query == "kết quả kinh doanh VIC":
+                return [answered]
+            await asyncio.Event().wait()  # never resolves
+            return []
+
+    aggregator = _NeverAnswers(answers={})
+
+    started = time.perf_counter()
+    with patch("src.tools.parallel_web_tools.MultiSearchAggregator", return_value=aggregator):
+        result = await parallel_web_search_async(
+            query="kết quả kinh doanh VIC",
+            queries=["VIC lịch sử giá"],
+            max_results=5,
+            global_deadline=1.0,
+        )
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < 5.0, f"The batch must return at the deadline, took {elapsed:.1f}s"
+    urls = [row["url"] for row in result["results"]]
+    assert "https://cafef.vn/vic-q3.chn" in urls, (
+        "The answered query must survive the deadline: " + str(urls)
+    )
+
+
+@pytest.mark.asyncio
+async def test_multi_query_batch_respects_the_domain_diversity_gate():
+    """Merging several queries must not undo the per-domain cap.
+
+    Regression: each query was capped on its own, but the union of the
+    queries was sorted and truncated with no cap, so a batch could return
+    eight links from one domain.
+    """
+    def _row(url: str) -> SearchResult:
+        return SearchResult(
+            title=f"Result {url}",
+            url=url,
+            snippet="snippet",
+            source="duckduckgo",
+        )
+
+    query_a = [
+        _row("https://cafef.vn/a1.chn"),
+        _row("https://cafef.vn/a2.chn"),
+        _row("https://cafef.vn/a3.chn"),
+    ]
+    query_b = [
+        _row("https://cafef.vn/b1.chn"),
+        _row("https://vietstock.vn/b2.htm"),
+    ]
+    aggregator = _FakeAggregator(
+        answers={"kết quả kinh doanh VIC": query_a, "VIC báo cáo tài chính": query_b}
+    )
+
+    with patch("src.tools.parallel_web_tools.MultiSearchAggregator", return_value=aggregator):
+        result = await parallel_web_search_async(
+            query="kết quả kinh doanh VIC",
+            queries=["VIC báo cáo tài chính"],
+            max_results=8,
+        )
+
+    urls = [row["url"] for row in result["results"]]
+    cafef = [u for u in urls if "cafef.vn" in u]
+    assert len(cafef) <= 2, (
+        f"At most 2 results per domain, got {len(cafef)}: {urls}"
+    )
+
+
+def test_apply_domain_diversity_caps_and_trims():
+    """The helper caps per-domain counts and honours the result limit."""
+    from src.tools.parallel_web_tools import _apply_domain_diversity
+
+    rows = [
+        SearchResult(title=f"R{i}", url=f"https://cafef.vn/{i}.chn", snippet="s", source="e")
+        for i in range(4)
+    ] + [
+        SearchResult(title="V1", url="https://vietstock.vn/v1.htm", snippet="s", source="e"),
+    ]
+
+    kept = _apply_domain_diversity(rows, max_per_domain=2, limit=10)
+    assert len(kept) == 3, kept
+    assert sum(1 for r in kept if "cafef.vn" in r.url) == 2
+
+    trimmed = _apply_domain_diversity(rows, max_per_domain=2, limit=2)
+    assert len(trimmed) == 2

@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.3.2"
+    "version": "v0.3.3"
   },
   "charts": {
     "noCompleteBars": "Gráfico indisponível: não foram obtidos candles OHLC completos. Nenhum candle foi estimado.",
