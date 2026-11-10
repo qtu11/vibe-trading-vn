@@ -1,59 +1,86 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowLeft, ArrowRight, ExternalLink, Globe, Loader2, RotateCw, X } from "lucide-react";
 import type { SourceBrowserState } from "@/desktop";
 import { useReportPreviewStore } from "@/stores/reportPreview";
+import { evidenceUrl } from "@/lib/research";
 
-export function SourceBrowserPanel() {
-  const selected = useReportPreviewStore((state) => state.selection);
-  const selection = selected && "sourceUrl" in selected ? selected : null;
-  const close = useReportPreviewStore((state) => state.close);
+/**
+ * The source browser for one tab.
+ *
+ * The panel stays mounted while other tabs are shown, so the page the user
+ * was reading is still open when they switch back.
+ */
+export function SourceBrowserPanel({ tabId, resizing = false }: { tabId?: string; resizing?: boolean }) {
+  const tab = useReportPreviewStore((state) => state.tabs.find((item) => item.id === (tabId ?? state.activeId)) ?? null);
+  const selection = tab && tab.kind === "source" && tab.selection.kind === "source" ? tab.selection : null;
+  const active = useReportPreviewStore((state) => state.activeId === tab?.id);
+  const closeTab = useReportPreviewStore((state) => state.closeTab);
   const viewport = useRef<HTMLDivElement>(null), closeRef = useRef<HTMLButtonElement>(null);
   const [state, setState] = useState<SourceBrowserState | null>(null);
+  const lastState = useRef<SourceBrowserState | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const browser = window.vibeDesktop?.sourceBrowser;
+  const titleId = useId();
+
+  useEffect(() => { setState(null); lastState.current = null; }, [selection]);
 
   useEffect(() => {
-    if (!selection) return;
-    setState(null);
+    if (!selection || tabId) return;
     const previous = document.activeElement;
     closeRef.current?.focus();
     const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      event.preventDefault(); event.stopImmediatePropagation(); close();
+      event.preventDefault(); event.stopImmediatePropagation(); closeTab(tab!.id);
     };
     document.addEventListener("keydown", escape, true);
     return () => {
       document.removeEventListener("keydown", escape, true);
       if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
     };
-  }, [selection, close]);
+  }, [selection, tab, tabId, closeTab]);
 
   useEffect(() => {
-    if (!selection || !browser || !viewport.current) return;
-    let active = true;
+    if (!selection || !browser || !viewport.current || !active) return;
+    let mounted = true;
     const bounds = () => {
       const rect = viewport.current!.getBoundingClientRect();
       return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     };
-    const unsubscribe = browser.onState((next) => { if (active) { if (next.closed) close(); else setState(next); } });
-    void browser.open(selection.sourceUrl, bounds()).catch(() => {
-      if (active) setState({ url: selection.sourceUrl, title: selection.title, loading: false, canGoBack: false, canGoForward: false, error: "Không thể mở nguồn. Hãy thử tải lại." });
+    const unsubscribe = browser.onState((next) => {
+      if (!mounted) return;
+      if (next.closed) closeTab(tab!.id);
+      else { lastState.current = next; setState(next); }
     });
-    const resize = () => browser.setBounds(bounds());
+    // shortcut: the native bridge owns one view; restore each tab's last safe URL, upgrade the bridge for independent navigation history.
+    const url = evidenceUrl(lastState.current?.url) || selection.sourceUrl;
+    void browser.open(url, bounds()).catch(() => {
+      if (mounted) setState({ url, title: selection.title, loading: false, canGoBack: false, canGoForward: false, error: "Không thể mở nguồn. Hãy thử tải lại." });
+    });
+    return () => { mounted = false; unsubscribe(); browser.close(); };
+  }, [selection, browser, tab, active, closeTab]);
+
+  useLayoutEffect(() => {
+    if (!selection || !browser || !viewport.current || !active) return;
+    const resize = () => {
+      const { x, y, width, height } = viewport.current!.getBoundingClientRect();
+      // Native views sit above DOM pointer capture, so hide the view while the divider moves.
+      browser.setBounds({ x, y, width: resizing ? 0 : width, height: resizing ? 0 : height });
+    };
+    resize();
     const observer = new ResizeObserver(resize);
     observer.observe(viewport.current);
     window.addEventListener("resize", resize);
-    return () => { active = false; observer.disconnect(); window.removeEventListener("resize", resize); unsubscribe(); browser.close(); };
-  }, [selection, browser, close]);
+    return () => { observer.disconnect(); window.removeEventListener("resize", resize); };
+  }, [selection, browser, active, resizing]);
 
   if (!selection) return null;
   const url = state?.url || selection.sourceUrl;
   const buttonClass = "rounded-md p-2 hover:bg-muted disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
-  return <aside aria-labelledby="source-browser-title" className="z-20 flex h-full w-[48%] min-w-[22rem] max-w-3xl shrink-0 flex-col border-l border-border bg-background max-lg:absolute max-lg:inset-0 max-lg:w-full max-lg:min-w-0 max-lg:max-w-none">
+  return <aside aria-labelledby={titleId} className="flex h-full min-h-0 w-full flex-col bg-background">
     <header className="flex items-center gap-2 border-b border-border px-3 py-2">
       <Globe aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-      <h2 id="source-browser-title" className="min-w-0 flex-1 truncate text-sm font-semibold">{state?.title || selection.title}</h2>
-      <button ref={closeRef} type="button" aria-label="Đóng trình duyệt nguồn" className={buttonClass} onClick={close}><X aria-hidden="true" className="h-4 w-4" /></button>
+      <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold">{state?.title || selection.title}</h2>
+      <button ref={closeRef} type="button" aria-label="Đóng trình duyệt nguồn" className={buttonClass} onClick={() => closeTab(tab!.id)}><X aria-hidden="true" className="h-4 w-4" /></button>
     </header>
     <nav aria-label="Trình duyệt nguồn" className="flex items-center gap-1 border-b border-border p-2">
       {browser && <>

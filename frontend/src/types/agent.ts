@@ -1,5 +1,6 @@
 import type { ForexTradePlan } from "@/lib/forexTradePlan";
 import type { SourceCitation } from "@/lib/sourceEvidence";
+import type { ResearchArtifact } from "@/stores/reportPreview";
 
 /** Chat message types */
 export type AgentMessageType =
@@ -98,5 +99,10 @@ export interface ToolCallEntry {
     total?: number;
     message?: string;
   };
+  /**
+   * The AI-search result this tool produced, when it was a web search.
+   * The right pane can open it as its own tab.
+   */
+  research?: ResearchArtifact;
   timestamp: number;
 }

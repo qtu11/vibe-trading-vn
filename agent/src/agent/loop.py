@@ -81,6 +81,7 @@ from src.agent.context_compact import (  # noqa: F401  (re-exported so loop impo
     _verification_ledger,
 )
 from src.agent.tool_progress import ToolProgress
+from src.agent.write_targets import append_report_artifacts, missing_report_formats
 from src.agent.tools import ToolRegistry
 from src.agent.trace import TraceWriter
 from src.core.state import RunStateStore
@@ -243,6 +244,8 @@ class AgentLoop(ToolCallLifecycle):
         self._released_fallback = False
         self._released_fallback_reason: str | None = None
         self._written_files: set[str] = set()
+        self._requested_report_formats: set[str] = set()
+        self._report_artifacts: dict[str, dict[str, str]] = {}
         self._stall_reason: str | None = None
         self._budget_stop_reason: str | None = None
         self._last_activity_wall: float = 0.0
@@ -388,6 +391,8 @@ class AgentLoop(ToolCallLifecycle):
         self._released_fallback = False
         self._released_fallback_reason = None
         self._written_files = set()
+        self._requested_report_formats = set()
+        self._report_artifacts = {}
         self._stall_reason = None
         self._budget_stop_reason = None
         self._last_activity_wall = _time.time()
@@ -486,6 +491,7 @@ class AgentLoop(ToolCallLifecycle):
         empty_model_response_iter: int | None = None
         consecutive_empty_responses = 0
         grounding_revisions = 0
+        report_delivery_revisions = 0
         # A normal grounding correction is a text revision, not a new research
         # turn. Explicit grounding recovery (identity / missing price evidence)
         # keeps tools available; ordinary correction turns do not.
@@ -979,6 +985,21 @@ class AgentLoop(ToolCallLifecycle):
                             {"delta": final_content, "iter": current_iter},
                         )
                         syntax_fallback_emitted = True
+                    missing_formats = missing_report_formats(self._requested_report_formats, self._report_artifacts)
+                    if missing_formats:
+                        if iteration < self.max_iterations and report_delivery_revisions < 2:
+                            report_delivery_revisions += 1
+                            messages.append({"role": "assistant", "content": final_content})
+                            messages.append({"role": "user", "content": self._pending_write_directive(user_message, run_started_wall)})
+                            trace.write({"type": "report_delivery_recovery", "iter": current_iter,
+                                         "missing_formats": sorted(missing_formats), "round": report_delivery_revisions})
+                            if stream.streamed_chars:
+                                self._emit("stream_reset", {"iter": current_iter, "reason": "report_delivery_pending"})
+                            grounding_correction_text_only = False
+                            final_content = ""
+                            continue
+                        final_content = "Chưa hoàn tất xuất báo cáo. Chưa tạo được các định dạng: " + ", ".join(sorted(value.upper() for value in missing_formats)) + ". Không có file tải về được xác nhận cho các định dạng này."
+                    final_content = append_report_artifacts(final_content, self._report_artifacts)
                     grounded = validate_and_release(
                         self, final_content=final_content, grounding_revisions=grounding_revisions,
                         grounding_correction_text_only=grounding_correction_text_only,
@@ -1200,6 +1221,7 @@ class AgentLoop(ToolCallLifecycle):
         # Determine final status. The reason is also propagated into the
         # returned dict so SessionService can surface a meaningful UI
         # message instead of "Execution failed: unknown" (issue #114).
+        pending_report_formats = missing_report_formats(self._requested_report_formats, self._report_artifacts)
         outcome = resolve_final_status(
             OutcomeInputs(
                 stall_reason=self._stall_reason,
@@ -1220,6 +1242,8 @@ class AgentLoop(ToolCallLifecycle):
                 empty_response_model=self._llm_runtime.configured_model or "(unset)",
                 max_iterations=self.max_iterations,
                 budget_reason=self._budget_stop_reason,
+                delivery_reason=("report_delivery_incomplete: " + ", ".join(sorted(pending_report_formats)))
+                    if pending_report_formats else None,
             )
         )
         final_reason = outcome.reason
@@ -1347,7 +1371,18 @@ class AgentLoop(ToolCallLifecycle):
         self, user_message: str, run_started_wall: float
     ) -> str:
         """Name task targets not yet written in this run."""
-        from src.agent.write_targets import pending_write_directive
+        from src.agent.write_targets import missing_report_formats, pending_write_directive
+
+        missing = missing_report_formats(self._requested_report_formats, self._report_artifacts)
+        if missing:
+            return (
+                "[REPORT DELIVERY] The attempted research export has not delivered these formats: "
+                + ", ".join(sorted(missing))
+                + ". Repair the existing accepted_report/field_errors and collected evidence, then call "
+                "export_research_report while tools are available. A final prose answer is not file delivery. "
+                "Do not substitute write_file/edit_file or invent artifact IDs. If the evidence cannot be repaired, "
+                "explain the exact missing inputs and unavailable formats."
+            )
 
         return pending_write_directive(
             user_message, run_started_wall, written_files=self._written_files,

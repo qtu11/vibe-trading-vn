@@ -41,6 +41,20 @@ _MARKET_ALIASES = {
 
 _PARAGRAPH_TEXT_KEYS = ("text", "content", "body", "paragraph", "value")
 
+#: Chapter prefixes the model types into a heading. The renderer already adds
+#: its own "06", so "1. Kết luận" renders as "06 1. Kết luận". Only strip a
+#: prefix that is clearly numbering: digits/roman numerals followed by
+#: punctuation, or an explicit "Chương/Chapter/Phần" word. A year such as
+#: "2026 - Triển vọng" is content, not numbering.
+_CHAPTER_NUMBER_PREFIX_RE = re.compile(
+    r"^\s*(?:"
+    r"(?:chương|chapter|phần|section|mục)\s+\d{1,2}\s*[.:\-–—]?\s*"
+    r"|\d{1,2}\s*[.):]\s+"
+    r"|[IVX]{1,5}\s*[.):]\s+"
+    r")",
+    re.IGNORECASE,
+)
+
 
 def _slug(label: str, fallback: str) -> str:
     decomposed = unicodedata.normalize("NFD", label or "")
@@ -298,6 +312,12 @@ def _normalize_sections(payload: dict, all_ids: list[str], warnings: list[str]) 
         for index, section in enumerate(sections):
             if not isinstance(section, dict):
                 continue
+            heading = section.get("heading")
+            if isinstance(heading, str):
+                stripped = _CHAPTER_NUMBER_PREFIX_RE.sub("", heading, count=1).strip()
+                if stripped and stripped != heading.strip():
+                    section["heading"] = stripped
+                    warnings.append(f"{field}[{index}]: bỏ số thứ tự chương khỏi heading")
             texts, text_ids = _extract_text_items(section.get("paragraphs"))
             if texts or isinstance(section.get("paragraphs"), list):
                 section["paragraphs"] = texts

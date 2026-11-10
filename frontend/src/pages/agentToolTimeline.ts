@@ -4,6 +4,7 @@ import {
   type AgentActivity,
   type StoredAgentMessage,
 } from "@/stores/agent";
+import type { ResearchArtifact } from "@/stores/reportPreview";
 
 export interface ToolTimelineEntry {
   id?: string;
@@ -14,6 +15,8 @@ export interface ToolTimelineEntry {
   preview?: string;
   elapsed_ms?: number;
   timestamp?: number;
+  /** The AI-search result, when the tool produced one. */
+  research?: ResearchArtifact;
 }
 
 interface ToolTimelineOptions {
@@ -41,6 +44,9 @@ export function buildToolTimelineMessages(
     status: entry.status || "ok",
     preview: entry.preview,
     elapsed_ms: entry.elapsed_ms,
+    // Carried through so a reloaded session still offers to open the
+    // AI-search result in the right-hand pane.
+    ...(entry.research ? { research: entry.research } : {}),
     timestamp: (
       typeof entry.timestamp === "number" && Number.isFinite(entry.timestamp)
         ? entry.timestamp

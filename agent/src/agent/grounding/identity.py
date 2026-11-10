@@ -582,7 +582,17 @@ class _IdentityMixin:
                     f"call search_symbol('{requested_symbol}') in a separate turn "
                     f"before querying it.]"
                 ]
-            return []
+            # A different base is not a venue rewrite: it is a peer,
+            # subsidiary or unrelated instrument. The VIC run locked VIC.VN,
+            # then fetched VHM.VN/VRE.VN for a peer table and received only
+            # the generic gate message, so it never learned the one call that
+            # would authorize them.
+            return [
+                f"[{requested_symbol} is a different instrument from the locked "
+                f"{', '.join(sorted(authorized))}; peers and subsidiaries need "
+                f"their own search_symbol('{requested_symbol}') call in a "
+                f"separate turn before they can be queried.]"
+            ]
         matches = sorted(
             item
             for item in authorized
@@ -592,6 +602,12 @@ class _IdentityMixin:
             return [
                 f"[{requested_symbol} matches multiple locked identities "
                 f"({', '.join(matches)}); use the full venue-suffixed symbol.]"
+            ]
+        if not matches:
+            return [
+                f"[{requested_symbol} was not resolved in this run; call "
+                f"search_symbol('{requested_symbol}') in a separate turn before "
+                f"querying it.]"
             ]
         return []
 

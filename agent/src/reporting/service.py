@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import shutil
 import uuid
 from datetime import datetime, timezone
@@ -17,15 +18,17 @@ from pypdf import PdfReader
 from src.config.paths import get_runtime_root
 from src.reporting.renderer import export_report
 from src.reporting.schema import ResearchReport
-from src.reporting.evidence import ReportEvidenceContext, validate_report_evidence
+from src.reporting.evidence import ReportEvidenceContext, ReportEvidenceError, validate_report_evidence
 from src.tools.report_artifacts import publish_report_artifact
 
 _LOG = logging.getLogger(__name__)
 
-#: Cap on how many individual field errors are echoed back to the model. The
+#: Cap on how many *grouped* field errors are echoed back to the model. The
 #: raw dump ran past 50KB and pushed the whole export failure out of the
-#: model's effective attention; the tail errors were the actionable ones.
-_MAX_VALIDATION_ERRORS = 12
+#: model's effective attention. Grouping by field pattern means one entry can
+#: stand for every `investment_theses.*.body`, so a higher cap no longer
+#: explodes into dozens of near-identical lines.
+_MAX_VALIDATION_ERRORS = 24
 
 
 def _condense_validation_errors(exc: ValidationError) -> str:
@@ -39,10 +42,11 @@ def _condense_validation_errors(exc: ValidationError) -> str:
     groups: dict[str, list[str]] = {}
     for err in errors:
         loc = ".".join(str(part) for part in err.get("loc", ())) or "(root)"
-        # Collapse the index of a repeated element: paragraphs.0..6 -> paragraphs.*
-        parts = loc.split(".")
-        if len(parts) >= 2 and parts[-1].isdigit():
-            loc = ".".join(parts[:-1]) + ".*"
+        # Collapse every list index, not only the last one:
+        # investment_theses.0.body -> investment_theses.*.body. The old
+        # tail-only collapse left four "body" groups that consumed the whole
+        # error budget before the model saw the real class of failure.
+        loc = ".".join("*" if part.isdigit() else part for part in loc.split("."))
         groups.setdefault(f"{loc}: {err.get('msg', '')}", []).append(loc)
     lines = []
     for summary, locs in list(groups.items())[:_MAX_VALIDATION_ERRORS]:
@@ -53,24 +57,82 @@ def _condense_validation_errors(exc: ValidationError) -> str:
     return "; ".join(lines)
 
 
-def _structured_validation_errors(exc: ValidationError) -> list[dict[str, str]]:
-    """Turn schema errors into per-field repair instructions.
+_ROOT_FIELD_PATTERNS = (
+    re.compile(r"Thiếu phương pháp/giả định:\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Thiếu source_ids:\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Thiếu đầu vào cho số liệu tính toán:\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Thiếu URL nguồn cho\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Đầu vào không tồn tại cho\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Đầu vào tự tham chiếu:\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Thiếu as_of cho metric:\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Không đủ chứng cứ để xếp hạng:\s*([A-Za-z_][\w.]*)"),
+    re.compile(r"Số liệu (?:trong văn bản )?không có trong nội dung nguồn đã thu thập:\s*([A-Za-z_][\w.]*)"),
+)
 
-    The model can act on ``{"field": "analysis_sections.0.paragraphs",
-    "problem": "...", "fix": "..."}``; it cannot act on a prose sentence
-    that buried the same information inside a 12-line dump. Every entry names
-    one place to look and one change to make.
+
+def _root_error_field(message: str) -> str | None:
+    """Extract the payload path a model-level validator named in its message.
+
+    Pydantic reports a ``model_validator`` failure at ``(root)``. The message
+    already contains the exact field (``Thiếu phương pháp/giả định:
+    investment_theses.3``), but without parsing it the repair packet told the
+    model only that "(root)" was wrong -- the same dead end the 50KB dump had.
     """
-    hints: list[dict[str, str]] = []
-    seen: set[tuple[str, str]] = set()
-    for err in exc.errors()[:_MAX_VALIDATION_ERRORS]:
-        loc = ".".join(str(part) for part in err.get("loc", ())) or "(root)"
+    for pattern in _ROOT_FIELD_PATTERNS:
+        match = pattern.search(message)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _structured_validation_errors(exc: ValidationError) -> list[dict[str, str]]:
+    """Turn schema errors into grouped per-field repair instructions.
+
+    The model can act on ``{"field": "analysis_sections.*.paragraphs",
+    "problem": "...", "fix": "..."}``; it cannot act on a prose sentence
+    that buried the same information inside a 12-line dump. Grouping all
+    repeated indices into one entry is what lets one response name every
+    failure class at once instead of revealing them one retry at a time.
+    """
+    grouped: dict[tuple[str, str], dict[str, Any]] = {}
+    order: list[tuple[str, str]] = []
+    for err in exc.errors():
+        raw_loc = ".".join(str(part) for part in err.get("loc", ())) or "(root)"
         message = str(err.get("msg", ""))
+        loc = ".".join("*" if part.isdigit() else part for part in raw_loc.split("."))
+        if loc == "(root)":
+            named = _root_error_field(message)
+            if named:
+                loc = named
         key = (loc, message)
-        if key in seen:
-            continue
-        seen.add(key)
-        hints.append({"field": loc, "problem": message, "fix": _field_fix_hint(loc, message)})
+        entry = grouped.get(key)
+        if entry is None:
+            entry = {
+                "field": loc,
+                "problem": message,
+                "fix": _field_fix_hint(loc, message),
+                "count": 0,
+            }
+            if raw_loc != loc:
+                entry["example_field"] = raw_loc
+            grouped[key] = entry
+            order.append(key)
+        entry["count"] += 1
+
+    hints: list[dict[str, str]] = []
+    for key in order[:_MAX_VALIDATION_ERRORS]:
+        entry = dict(grouped[key])
+        count = entry.pop("count", 1)
+        if count > 1:
+            entry["problem"] = f"{entry['problem']} (×{count} trường)"
+        hints.append(entry)
+    if len(order) > _MAX_VALIDATION_ERRORS:
+        remaining = [grouped[key]["field"] for key in order[_MAX_VALIDATION_ERRORS:]]
+        hints.append({
+            "field": "(còn lại)",
+            "problem": f"{len(remaining)} nhóm lỗi khác: {', '.join(remaining[:10])}",
+            "fix": "Sửa tất cả nhóm còn lại trong cùng một lần gửi; đừng chỉ sửa nhóm đầu tiên rồi thử lại.",
+        })
     return hints
 
 
@@ -88,6 +150,10 @@ _FIELD_FIX_HINTS: tuple[tuple[str, str], ...] = (
     ("evidence_kind", "evidence_kind phải là một trong: observed, cited, derived, assumption."),
     ("input_keys", "input_keys phải liệt kê đúng các key metric đã khai báo ở financial_metrics/valuation_metrics."),
     ("methodology", "Giá trị derived/assumption cần methodology mô tả công thức hoặc giả định."),
+    ("body", "Mỗi investment_theses/risk_factors cần title và body (chuỗi) — không dùng text/description/paragraph thay cho body."),
+    ("price_basis", "price_basis chỉ nhận raw, split_adjusted hoặc total_return; dùng cùng một cơ sở cho cả price_history."),
+    ("heading", "heading phải là chuỗi 1–160 ký tự; không đánh số thứ tự vì renderer tự đánh số chương."),
+    ("charts", "Mỗi section tối đa 2 charts; bars phải là số liệu cited/observed, số liệu tính toán dùng line_formula."),
     ("url", "Mỗi nguồn cần một url http(s) hợp lệ trỏ tới trang đã thu thập."),
     ("provider", "Mỗi nguồn cần provider (tên nhà cung cấp/nhóm bài)."),
     ("id", "Mỗi nguồn cần id duy nhất, ví dụ S1, S2."),
@@ -110,6 +176,24 @@ _FIELD_FIX_HINTS: tuple[tuple[str, str], ...] = (
 
 def _field_fix_hint(loc: str, message: str) -> str:
     """Best repair instruction for one schema error location."""
+    if "phương pháp/giả định" in message:
+        return (
+            "Khai báo evidence_kind=derived hoặc assumption, methodology mô tả công thức/giả định, "
+            "và input_keys trỏ tới metric đã có giá trị hoặc nguồn."
+        )
+    if "source_ids" in message:
+        return "Gán source_ids của mục này bằng id trong sources; id phải là nguồn đã thu thập trong phiên."
+    if "input_keys" in message or "Đầu vào" in message:
+        return "input_keys phải trỏ đúng key metric đã khai báo; thêm metric đầu vào nếu thiếu."
+    if "as_of" in message:
+        return "Thêm as_of dạng YYYY-MM-DD cho metric, không muộn hơn data_as_of."
+    if "URL nguồn" in message:
+        return "Mỗi source_ids phải có source tương ứng với url http(s) đã thu thập."
+    if "bars phải là số liệu có nguồn" in message:
+        return (
+            "Số liệu tính toán không được đặt trong bars; giữ bars là số liệu cited/observed "
+            "và khai báo line_formula/line_numerator để máy tính đường tỷ lệ."
+        )
     tail = loc.split(".")[-1]
     for key, hint in _FIELD_FIX_HINTS:
         if tail == key:
@@ -123,15 +207,49 @@ def _field_fix_hint(loc: str, message: str) -> str:
     return "Sửa đúng kiểu dữ liệu của trường này theo ResearchReport schema."
 
 
+def _structural_depth_warnings(report: ResearchReport) -> list[str]:
+    """Name the analyses that are too thin to read as a research note.
+
+    The VIC run produced a PDF whose table of contents listed eight chapters
+    and whose body held none of them, because each failed export taught the
+    model to delete a section. A rendered document is a success, but an empty
+    analysis is a silent failure: the user receives a file that does not look
+    like research. This warning reaches the model *with* the artifact, so it
+    can deepen the note instead of delivering a shell.
+    """
+    warnings: list[str] = []
+    sections = list(report.analysis_sections) + list(report.appendix_sections)
+    if not sections:
+        warnings.append(
+            "Báo cáo không có analysis_sections: tài liệu chỉ gồm các chương khung "
+            "(tổng quan, kết quả kinh doanh, diễn biến giá, luận điểm, rủi ro, định giá) "
+            "mà không có phân tích chuyên sâu. Bổ sung các chương phân tích có bằng chứng."
+        )
+        return warnings
+    thin = [
+        section.heading
+        for section in sections
+        if not section.paragraphs and not section.bullets and not section.charts
+    ]
+    if thin:
+        warnings.append(
+            "Các chương phân tích sau không có nội dung (paragraphs/bullets/charts): "
+            + ", ".join(thin[:6])
+            + ". Mỗi chương phải trả lời một câu hỏi có bằng chứng."
+        )
+    return warnings
+
+
 class ReportJobError(Exception):
     def __init__(
         self,
         code: str,
         message: str,
         *,
-        details: list[dict[str, str]] | None = None,
+        details: list[dict[str, Any]] | None = None,
         normalized_report: dict[str, Any] | None = None,
         normalization_warnings: list[str] | None = None,
+        collected_sources: list[dict[str, Any]] | None = None,
     ):
         super().__init__(message)
         self.code = code
@@ -144,6 +262,8 @@ class ReportJobError(Exception):
         self.normalized_report = normalized_report
         #: What the normalizer repaired, so a retry does not re-attempt it.
         self.normalization_warnings = normalization_warnings or []
+        #: Pages actually read this run; a source repair chooses from these.
+        self.collected_sources = collected_sources or []
 
 
 class ReportJobService:
@@ -218,6 +338,10 @@ class ReportJobService:
             raise ReportJobError(
                 "EVIDENCE_VALIDATION_FAILED",
                 str(exc),
+                details=exc.details if isinstance(exc, ReportEvidenceError) else None,
+                collected_sources=(
+                    exc.collected_sources if isinstance(exc, ReportEvidenceError) else None
+                ),
                 normalized_report=normalized_payload,
                 normalization_warnings=normalize_warnings,
             ) from exc
@@ -234,6 +358,8 @@ class ReportJobService:
         job_id = uuid.uuid4().hex
         now_iso = datetime.now(timezone.utc).isoformat()
 
+        structural_warnings = _structural_depth_warnings(report)
+
         job_record: dict[str, Any] = {
             "job_id": job_id,
             "status": "running",
@@ -245,7 +371,7 @@ class ReportJobService:
             "updated_at": now_iso,
             "run_id": run_id,
             "quote_verified": audit.quote_verified,
-            "warnings": [*normalize_warnings, *audit.warnings],
+            "warnings": [*normalize_warnings, *audit.warnings, *structural_warnings],
             "normalization_warnings": list(normalize_warnings),
             "minimum_pages": minimum_pages,
             "pdf_pages": None,

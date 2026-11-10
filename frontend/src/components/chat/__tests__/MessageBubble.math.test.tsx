@@ -81,7 +81,8 @@ describe("MessageBubble LaTeX rendering", () => {
     const reportId = "a".repeat(32);
     const { container } = render(<MarkdownContent content={`[research.docx](/api/reports/${reportId})`} streaming />);
     fireEvent.click(container.querySelector("a")!);
-    expect(useReportPreviewStore.getState().selection).toEqual({ reportId });
+    expect(useReportPreviewStore.getState().tabs).toHaveLength(1);
+    expect(useReportPreviewStore.getState().tabs[0].selection).toEqual({ kind: "report", reportId });
     useReportPreviewStore.getState().close();
   });
 });

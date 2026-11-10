@@ -96,8 +96,9 @@ def test_export_tool_without_a_depth_gate_does_not_measure_pages(monkeypatch):
     assert "depth_shortfall" not in receipt
 
 
-def test_export_api_defaults_to_24_and_rejects_non_integer_requirements():
-    assert ReportExportRequest(report={}).minimum_pages == 24
+def test_export_api_defaults_to_one_page_and_rejects_non_integer_requirements():
+    assert ReportExportRequest(report={}).minimum_pages == 1
+    assert ReportExportRequest(report={}, minimum_pages=24).minimum_pages == 24
     for value in (True, "24", 0, 2001):
         with pytest.raises(ValidationError):
             ReportExportRequest(report={}, minimum_pages=value)

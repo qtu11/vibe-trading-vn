@@ -7,7 +7,7 @@ import ast
 from datetime import datetime, timedelta, timezone
 import math
 import re
-from typing import TYPE_CHECKING
+from typing import Any, TYPE_CHECKING
 
 from src.agent.grounding.sources import SourceRecord, canonical_url, numeric_candidates
 from src.reporting.schema import DatumEvidence, Recommendation, ResearchReport, iter_report_evidence
@@ -41,6 +41,59 @@ class ReportEvidenceAudit:
     report: ResearchReport
     quote_verified: bool
     warnings: tuple[str, ...]
+
+
+class ReportEvidenceError(ValueError):
+    """Evidence rejection with the exact payload fields the agent can repair."""
+
+    def __init__(
+        self,
+        message: str,
+        details: list[dict[str, Any]],
+        collected_sources: list[dict[str, Any]] | None = None,
+    ):
+        super().__init__(message)
+        self.details = details
+        #: The URLs this run actually read, so a source repair is a choice from
+        #: a list rather than another guess. Without it the model saw "URL
+        #: không khớp" and invented a replacement URL, failing again.
+        self.collected_sources = collected_sources or []
+
+
+def _collected_catalog(context: ReportEvidenceContext, *, limit: int = 40) -> list[dict[str, Any]]:
+    """Compact list of pages this run can cite, keyed by the id the tool used."""
+    catalog: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for record in context.sources:
+        url = canonical_url(record.url)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        catalog.append({
+            "source_id": record.source_id,
+            "url": url,
+            "title": (record.title or "")[:120],
+            "publisher": (record.publisher or "")[:80],
+            "content_chars": record.content_chars,
+            "cite_allowed": bool(record.cite_allowed),
+            "retrieved_at": record.retrieved_at,
+        })
+        if len(catalog) >= limit:
+            break
+    return catalog
+
+
+#: How many unsupported numbers one response names before summarising the rest.
+#: The point is to repair every class at once, not to dump 200 paragraph hits.
+_MAX_NUMBER_ISSUES = 16
+
+
+def _evidence_issue_summary(issues: list[dict[str, Any]]) -> str:
+    problems = [str(issue.get("problem") or "") for issue in issues if issue.get("problem")]
+    head = "; ".join(problems[:6])
+    if len(problems) > 6:
+        head += f"; … và {len(problems) - 6} lỗi bằng chứng khác"
+    return head or "Báo cáo chưa khớp bằng chứng đã thu thập"
 
 
 def from_grounding_ledger(ledger: GroundingLedger, *, as_of: datetime | None = None) -> ReportEvidenceContext:
@@ -118,8 +171,16 @@ def _record_rank(record: SourceRecord) -> tuple[int, int, int]:
     return (valid, len(record.numbers), record.content_chars)
 
 
-def _supports_numbers(report, path, item, records):
+def _supports_numbers(report, path, item, records) -> list[dict[str, Any]]:
+    """Return every number in ``item`` that its collected sources do not say.
+
+    Returning all failures instead of raising on the first one is what stops
+    the serial repair loop: the VIC run fixed one invented figure per export
+    attempt because each attempt revealed only the next one.
+    """
+    issues: list[dict[str, Any]] = []
     candidates = [number for record in records for number in record.numbers]
+    source_ids = list(item.source_ids)
     for value in _values(report, path, item):
         if isinstance(value, (float, int)):
             raw = float(value)
@@ -135,7 +196,16 @@ def _supports_numbers(report, path, item, records):
                 for target, tol in checks
                 for candidate in candidates
             ):
-                raise ValueError(f"Số liệu không có trong nội dung nguồn đã thu thập: {path} ({value})")
+                issues.append({
+                    "field": path,
+                    "problem": f"Số liệu không có trong nội dung nguồn đã thu thập: {path} ({value})",
+                    "value": value,
+                    "source_ids": source_ids,
+                    "fix": (
+                        "Chỉ dùng số đã đọc trong nguồn của mục này; nếu đây là số tính toán, "
+                        "đổi evidence_kind thành derived và khai báo methodology/input_keys thay vì cited."
+                    ),
+                })
         elif isinstance(value, str):
             # Reuse the source parser's locale/scale readings for each numeric token.
             matches = list(re.finditer(r"(?<![\w])[-+]?\d(?:[\d.,\u00a0]*\d)?", value))
@@ -144,11 +214,21 @@ def _supports_numbers(report, path, item, records):
                 readings = numeric_candidates(value[match.start():end])
                 if readings and not any(math.isclose(number, candidate, rel_tol=0.00001, abs_tol=0.005)
                                         for number in readings for candidate in candidates):
-                    raise ValueError(f"Số liệu trong văn bản không có trong nguồn đã thu thập: {path} ({match.group()})")
+                    issues.append({
+                        "field": path,
+                        "problem": f"Số liệu trong văn bản không có trong nguồn đã thu thập: {path} ({match.group()})",
+                        "text": match.group(),
+                        "source_ids": source_ids,
+                        "fix": (
+                            "Sửa câu chữ để chỉ nêu số có trong nguồn đã thu thập, hoặc thu thập thêm "
+                            "nguồn chứa số đó; không giữ số ước tính dưới nhãn cited."
+                        ),
+                    })
+    return issues
 
 
-def _validate_rating_target(target, metrics):
-    """A rated calculated target must recompute from its declared metric inputs."""
+def _validate_rating_target(target, metrics, *, require_formula=True):
+    """Recompute declared metric formulas; rated targets cannot use prose alone."""
     from src.agent.grounding.policies import _evaluate_formula
 
     checked = set()
@@ -196,9 +276,23 @@ def _validate_rating_target(target, metrics):
         try:
             tree = ast.parse(expression, mode="eval")
         except (SyntaxError, ValueError, RecursionError) as exc:
+            if not require_formula:
+                return canonical
             raise ValueError("Giá mục tiêu tính toán cần công thức theo input_keys trước khi xếp hạng") from exc
         names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
-        if not names or names != set(metric.input_keys):
+        if not names:
+            # The methodology hard-codes its operands ("236.319,4 - 43.167,1")
+            # instead of naming the input metrics. Nothing can be recomputed
+            # from it, so it is a description, not a formula.
+            if require_formula:
+                raise ValueError("Giá mục tiêu tính toán cần công thức theo input_keys trước khi xếp hạng")
+            return canonical
+        if not names.intersection(metrics):
+            # A method label such as DCF/SOTP names no declared metric.
+            if require_formula:
+                raise ValueError("Công thức định giá phải dùng đúng các input_keys đã khai báo")
+            return canonical
+        if names != set(metric.input_keys):
             raise ValueError("Công thức định giá phải dùng đúng các input_keys đã khai báo")
         if any(isinstance(node, ast.Constant) and (isinstance(node.value, bool) or node.value not in (0, 1))
                for node in ast.walk(tree)):
@@ -211,13 +305,23 @@ def _validate_rating_target(target, metrics):
         evaluated = _evaluate_formula(expression)
         if evaluated is None or not math.isclose(evaluated[0], canonical,
                 rel_tol=0, abs_tol=0.5 * 10 ** -metric.decimals * scale / (100 if unit == "%" else 1)):
-            raise ValueError(f"Giá trị định giá không khớp công thức: {metric.key}")
+            issue = {
+                "metric_key": metric.key,
+                "formula": metric.methodology,
+                "inputs": {name: {"value": metrics[name].value, "unit": metrics[name].unit,
+                                  "as_of": metrics[name].as_of.isoformat() if metrics[name].as_of else None}
+                           for name in sorted(names)},
+            }
+            if evaluated is not None:
+                issue["expected_value"] = evaluated[0] / scale * (100 if unit == "%" else 1)
+            raise ReportEvidenceError(f"Giá trị tính toán không khớp công thức: {metric.key}", [issue])
         checked.add(metric.key)
         return canonical
 
     if target.evidence_kind == "assumption":
         raise ValueError("Giá mục tiêu giả định chưa được tính toán; không thể xuất khuyến nghị mua/bán")
     calculate(target)
+    return target.evidence_kind != "derived" or target.key in checked
 
 
 def validate_report_evidence(
@@ -228,7 +332,30 @@ def validate_report_evidence(
         return ReportEvidenceAudit(report, False, ("Dữ liệu giả lập; không dùng để giao dịch.",))
     warnings = []
     sources = {source.id: source for source in report.sources}
+    metrics = {metric.key: metric for metric in [*report.financial_metrics, *report.valuation_metrics]}
+    metric_paths = {metric.key: f"{field}.{index}" for field in ("financial_metrics", "valuation_metrics")
+                    for index, metric in enumerate(getattr(report, field))}
+    calculation_issues = []
+    for metric in metrics.values():
+        if metric.evidence_kind != "derived" or metric.value is None:
+            continue
+        try:
+            checked = _validate_rating_target(metric, metrics, require_formula=(
+                metric.key == "target_price" and report.recommendation != Recommendation.NOT_RATED
+            ))
+        except ValueError as exc:
+            details = getattr(exc, "details", [{"metric_key": metric.key}])
+            for issue in details:
+                issue["field"] = f"{metric_paths[issue.pop('metric_key', metric.key)]}.value"
+                issue["problem"] = str(exc)
+                issue["fix"] = "Đối chiếu kỳ/đơn vị các input_keys và sửa value hoặc methodology theo công thức; không đổi nhãn bằng chứng để bỏ kiểm tra."
+            calculation_issues.extend(details)
+            continue
+        if not checked:
+            warnings.append(f"{metric_paths[metric.key]}: methodology còn là mô tả; chưa kiểm chứng được phép tính. Khai báo công thức theo input_keys để máy kiểm tra.")
     if context is None:
+        if calculation_issues:
+            raise ReportEvidenceError("; ".join(issue["problem"] for issue in calculation_issues), calculation_issues)
         if report.recommendation != Recommendation.NOT_RATED:
             raise ValueError("Chưa có bằng chứng công cụ trong phiên; không thể xuất khuyến nghị mua/bán")
         for source in report.sources:
@@ -238,7 +365,7 @@ def validate_report_evidence(
         for metric in report.financial_metrics + report.valuation_metrics:
             if metric.key == "market_price":
                 metric.label = "Giá tham chiếu chưa xác minh"
-        return ReportEvidenceAudit(report, False, ("Chưa có bằng chứng công cụ trong phiên; tài liệu chưa được xếp hạng.",))
+        return ReportEvidenceAudit(report, False, (*warnings, "Chưa có bằng chứng công cụ trong phiên; tài liệu chưa được xếp hạng."))
 
     snapshots: dict[str, SourceRecord] = {}
     for record in context.sources:
@@ -250,31 +377,85 @@ def validate_report_evidence(
             snapshots[url_key] = record
     by_id = {record.source_id: record for record in context.sources}
     bound = {}
-    for source in report.sources:
+    source_issues = []
+    for index, source in enumerate(report.sources):
         source.status = "user_supplied" if source.status == "user_supplied" else "unverified"
         source_url = canonical_url(str(source.url or ""))
         by_url = snapshots.get(source_url) if source_url else None
         record = by_id.get(source.id)
         if record and canonical_url(record.url) != source_url:
             if by_url is None:
-                raise ValueError(f"URL không khớp nội dung nguồn đã thu thập: {source.id}")
-            record = by_url
+                message = f"URL không khớp nội dung nguồn đã thu thập: {source.id}"
+                source_issues.append({
+                    "field": f"sources.{index}.url", "problem": message,
+                    "source_id": source.id, "expected_url": canonical_url(record.url),
+                    "fix": "Đối chiếu nội dung đã đọc: nếu đây là cùng nguồn, dùng đúng expected_url; nếu là nguồn khác, thu thập URL đó và gán source_id phù hợp. Không đoán URL hoặc đổi status thành verified.",
+                })
+                # The collected page for this id is still the evidence behind
+                # every item that cites it. Binding it by id keeps the report's
+                # content verifiable while the URL field stays repairable.
+                # Reporting it as an unbound source instead produced one
+                # "Nguồn S1 chưa được thu thập" issue per referencing field,
+                # which the model resolved by deleting the analysis rather
+                # than by correcting the URL.
+            else:
+                record = by_url
         else:
             record = record or by_url
         if record and record.text_sha256 and record.content_chars and record.cite_allowed:
             bound[source.id] = record
-    unbound = set()
+    catalog = _collected_catalog(context)
+    declared_ids = {source.id for source in report.sources}
+    unbound_fields: dict[str, list[str]] = {}
+    number_issues: list[dict[str, Any]] = []
     for path, item in iter_report_evidence(report):
-        if item.evidence_kind in {"observed", "cited"}:
-            if not all(sid in bound for sid in item.source_ids):
-                unbound.update(set(item.source_ids) - bound.keys())
-                item.evidence_kind = "cited"
-            else:
+        if item.evidence_kind not in {"observed", "cited"}:
+            continue
+        missing = [sid for sid in item.source_ids if sid not in bound]
+        if missing:
+            for sid in missing:
+                unbound_fields.setdefault(sid, []).append(path)
+            item.evidence_kind = "cited"
+        else:
+            number_issues.extend(
                 _supports_numbers(report, path, item, [bound[sid] for sid in item.source_ids])
-    if unbound:
-        raise ValueError("Nguồn chưa được công cụ thu thập trong phiên: " + ", ".join(sorted(unbound)))
+            )
+    unbound_issues: list[dict[str, Any]] = []
+    for sid in sorted(unbound_fields):
+        fields = unbound_fields[sid]
+        if sid in declared_ids:
+            problem = f"Nguồn {sid} đã khai báo nhưng chưa được công cụ thu thập trong phiên"
+            fix = (
+                "Đọc URL của nguồn này bằng read_url/read_document trong phiên rồi giữ nguyên id, "
+                "hoặc thay source_ids bằng id trong collected_sources. Không đổi status thành verified."
+            )
+        else:
+            problem = f"source_ids tham chiếu id không tồn tại: {sid}"
+            fix = (
+                "Dùng đúng id trong collected_sources hoặc khai báo nguồn mới với URL đã đọc; "
+                "không tạo id cho nguồn chưa thu thập."
+            )
+        unbound_issues.append({
+            "field": fields[0],
+            "problem": problem,
+            "source_id": sid,
+            "referenced_by": fields[:8],
+            "fix": fix,
+        })
+    if len(number_issues) > _MAX_NUMBER_ISSUES:
+        extra = len(number_issues) - _MAX_NUMBER_ISSUES
+        number_issues = number_issues[:_MAX_NUMBER_ISSUES]
+        number_issues.append({
+            "field": "nhiều mục",
+            "problem": f"Còn {extra} số liệu khác không có trong nguồn đã thu thập",
+            "fix": "Rà lại toàn bộ số trong accepted_report và sửa tất cả cùng một lần gửi.",
+        })
+    issues = [*calculation_issues, *source_issues, *unbound_issues, *number_issues]
+    if issues:
+        raise ReportEvidenceError(
+            _evidence_issue_summary(issues), issues, collected_sources=catalog,
+        )
 
-    metrics = {metric.key: metric for metric in [*report.financial_metrics, *report.valuation_metrics]}
     price = metrics.get("market_price")
     quote_verified = False
     if context and price and price.value is not None:

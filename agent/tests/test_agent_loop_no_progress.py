@@ -239,3 +239,113 @@ def test_failure_block_threshold_is_two_sided():
         success=True, is_readonly=False,
     )
     assert not progress.is_blocked(key), "a successful mutation clears the ledger"
+
+
+@pytest.mark.parametrize("new_evidence", [True, False])
+def test_research_progress_reopens_repair_budget_without_repeated_reads_bypassing_it(
+    tmp_path, new_evidence
+):
+    from src.agent.context import ContextBuilder
+    from src.agent.tool_progress import FAILURE_FAMILY_BLOCK_THRESHOLD
+
+    export = DiscoveryTool(
+        [json.dumps({"ok": False, "error_code": "EVIDENCE_VALIDATION_FAILED"})]
+        * FAILURE_FAMILY_BLOCK_THRESHOLD
+        + ['{"status":"ok","artifact":"repaired.pdf"}']
+    )
+    export.name = "export_research_report"
+    export.is_readonly = False
+    loop, _, run_dir = build_loop(tmp_path, export, DiscoveryLLM())
+    evidence = DiscoveryTool([
+        '{"status":"ok","data":"initial evidence"}',
+        json.dumps({"status": "ok", "data": "new source" if new_evidence else "initial evidence"}),
+    ])
+    loop.registry.register(evidence)
+    calls = [(evidence.name, {"path": "initial-source"})]
+    calls += [(export.name, {"path": f"attempt-{i}"}) for i in range(FAILURE_FAMILY_BLOCK_THRESHOLD)]
+    calls += [(evidence.name, {"path": "repair-source"}), (export.name, {"path": "repaired"})]
+    messages = []
+    trace = TraceWriter(run_dir)
+    try:
+        for i, (name, arguments) in enumerate(calls):
+            loop._process_tool_calls(
+                [SimpleNamespace(id=str(i), name=name, arguments=arguments)],
+                ContextBuilder, messages, trace, [], i,
+            )
+            loop._tool_progress.finish_iteration()
+            if name == evidence.name and (i == 0 or new_evidence):
+                assert loop._tool_progress.stalled_iterations == 0
+    finally:
+        trace.close()
+
+    final = json.loads(messages[-1]["content"])
+    assert export.calls == FAILURE_FAMILY_BLOCK_THRESHOLD + int(new_evidence)
+    if new_evidence:
+        assert final["artifact"] == "repaired.pdf"
+    else:
+        assert final["skipped"] is True
+
+
+def test_missing_statement_source_blocks_same_call_without_blocking_a_configured_peer(tmp_path):
+    from src.agent.context import ContextBuilder
+
+    statements = DiscoveryTool([
+        '{"status":"error","error_code":"statement_source_not_configured"}',
+        '{"status":"ok","data":"configured peer statement"}',
+    ])
+    statements.name = "get_financial_statements"
+    loop, _, run_dir = build_loop(tmp_path, statements, DiscoveryLLM())
+    messages = []
+    trace = TraceWriter(run_dir)
+    try:
+        for i, symbol in enumerate(["VIC.VN", "VIC.VN", "MBB.VN"]):
+            loop._process_tool_calls(
+                [SimpleNamespace(id=str(i), name=statements.name, arguments={"symbol": symbol})],
+                ContextBuilder, messages, trace, [], i,
+            )
+    finally:
+        trace.close()
+
+    assert json.loads(messages[1]["content"])["skipped"] is True
+    assert statements.calls == 2
+    assert json.loads(messages[-1]["content"])["data"] == "configured peer statement"
+
+
+@pytest.mark.parametrize("repair", ["shrinking", "reordered", "replaced"])
+def test_structured_validation_repairs_continue_only_when_remaining_errors_shrink(tmp_path, repair):
+    from src.agent.context import ContextBuilder
+    from src.agent.tool_progress import FAILURE_FAMILY_BLOCK_THRESHOLD
+
+    issues = [{"field": f"report.field.{i}", "problem": "missing"} for i in range(5)]
+    failures = []
+    for i in range(FAILURE_FAMILY_BLOCK_THRESHOLD):
+        errors = issues[i:] if repair == "shrinking" else (
+            issues if repair == "reordered" and i % 2 else list(reversed(issues))
+        )
+        if repair == "replaced":
+            errors = [{"field": f"report.replacement.{i}", "problem": "missing"}]
+        failures.append(json.dumps({
+            "ok": False, "error_code": "SCHEMA_VALIDATION_FAILED", "field_errors": errors,
+        }))
+    export = DiscoveryTool(failures + ['{"status":"ok","artifact":"repaired.pdf"}'])
+    export.name = "export_research_report"
+    export.is_readonly = False
+    loop, _, run_dir = build_loop(tmp_path, export, DiscoveryLLM())
+    messages = []
+    trace = TraceWriter(run_dir)
+    try:
+        for i in range(FAILURE_FAMILY_BLOCK_THRESHOLD + 1):
+            loop._process_tool_calls(
+                [SimpleNamespace(id=str(i), name=export.name, arguments={"path": f"attempt-{i}"})],
+                ContextBuilder, messages, trace, [], i,
+            )
+            loop._tool_progress.finish_iteration()
+    finally:
+        trace.close()
+
+    assert export.calls == FAILURE_FAMILY_BLOCK_THRESHOLD + (repair == "shrinking")
+    final = json.loads(messages[-1]["content"])
+    if repair == "shrinking":
+        assert final["artifact"] == "repaired.pdf"
+    else:
+        assert final["skipped"] is True

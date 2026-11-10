@@ -202,6 +202,14 @@ def test_report_without_an_analyst_does_not_imply_a_named_human_review():
     assert "chưa có chuyên viên phê duyệt" in text
 
 
+def test_running_header_does_not_claim_cfa_affiliation():
+    document = renderer.setup_document()
+    renderer._build_running_header(document.sections[0], report())
+    header = document.sections[0].header.tables[0].cell(0, 0).text
+    assert "Equity Research" in header
+    assert "CFA" not in header
+
+
 def test_pdf_export_rejects_a_stale_existing_file(monkeypatch, tmp_path):
     stale = tmp_path / "report.pdf"
     stale.write_bytes(b"previous export" * 100)

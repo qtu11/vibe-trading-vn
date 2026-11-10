@@ -12,7 +12,7 @@ from typing import Any
 from src.agent.tools import BaseTool
 from src.config.limits import TOOL_RESULT_LIMIT
 from src.tools._result_paging import fit_records
-from src.tools.local_financial_statements import load_local_statement
+from src.tools.local_financial_statements import StatementSourceNotConfigured, load_local_statement
 
 _FIELDS = {
     "income": ("revenue", "gross_profit", "net_income", "cogs"),
@@ -238,4 +238,7 @@ class VietnamResearchTool(BaseTool):
                 raise ValueError("A research period exceeds the result budget; shorten source URLs/locators")
             return output
         except (ValueError, ArithmeticError) as exc:
-            return json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+            result = {"ok": False, "error": str(exc)}
+            if isinstance(exc, StatementSourceNotConfigured):
+                result.update(error_code=exc.error_code, remedy=exc.remedy)
+            return json.dumps(result, ensure_ascii=False)

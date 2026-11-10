@@ -163,6 +163,19 @@ describe("ChartBlock", () => {
     expect(option.xAxis[0].data[0]).toBe(bars[0].t);
   });
 
+  it("caps the candle width so a short series cannot render as giant slabs", () => {
+    const bars = [
+      { t: "2026-11-05", o: 19000, h: 19350, l: 19000, c: 19250, v: 1_000_000 },
+      { t: "2026-11-06", o: 19250, h: 19500, l: 19100, c: 19400, v: 1_100_000 },
+      { t: "2026-11-07", o: 19400, h: 19600, l: 19300, c: 19350, v: 900_000 },
+    ];
+    render(<ChartBlock code={JSON.stringify(spec({ bars }))} />);
+    const option = vi.mocked(echarts.init).mock.results.at(-1)?.value.setOption.mock.calls.at(-1)[0];
+    const candles = option.series.find((series: { name: string }) => series.name === "K");
+    expect(candles.barMaxWidth).toBeLessThanOrEqual(24);
+    expect(candles.barMinWidth).toBeGreaterThan(0);
+  });
+
   it("keeps missing volume unavailable while still drawing valid OHLC candles", () => {
     const bars = [{ t: "2026-11-06", o: 19000, h: 19350, l: 19000, c: 19250 }];
     const parsed = parsePriceChartSpec(JSON.stringify(spec({ bars })))!;

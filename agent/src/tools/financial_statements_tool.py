@@ -901,13 +901,15 @@ class FinancialStatementsTool(BaseTool):
             return _error("offset must be an integer")
 
         if market == "vn":
-            from src.tools.local_financial_statements import load_local_statement
+            from src.tools.local_financial_statements import StatementSourceNotConfigured, load_local_statement
 
             source = "local_financial_statements"
             try:
                 result = load_local_statement(code.upper(), statement, period, as_of)
             except ValueError as exc:
                 result = {"error": str(exc)}
+                if isinstance(exc, StatementSourceNotConfigured):
+                    result.update(error_code=exc.error_code, remedy=exc.remedy)
         elif market == "us":
             result = _fetch_sec_statement(code, statement=statement, period=period)
             source = "sec_edgar"
@@ -942,6 +944,11 @@ class FinancialStatementsTool(BaseTool):
                     "period": period,
                     "data": {code: result},
                     "error": result["error"],
+                    # Carried at the top level too, so the caller can tell a
+                    # missing deployment capability from a failed fetch
+                    # without digging into the nested payload.
+                    **({"error_code": result["error_code"]} if result.get("error_code") else {}),
+                    **({"remedy": result["remedy"]} if result.get("remedy") else {}),
                 },
                 ensure_ascii=False,
             )

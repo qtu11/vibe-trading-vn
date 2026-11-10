@@ -26,6 +26,65 @@ from src.agent.tool_results import _TARGET_ACTION_RE, _named_target_paths
 logger = logging.getLogger(__name__)
 
 
+def record_report_export(
+    arguments: Mapping[str, Any], result: str, *,
+    requested_formats: set[str], artifacts: dict[str, dict[str, str]],
+) -> None:
+    """Track attempted formats and only server-registered output files."""
+    from src.tools.report_artifacts import resolve_report_artifact
+
+    formats = arguments.get("formats")
+    if formats is None:
+        formats = ["docx", "pdf", "pptx"]
+    if isinstance(formats, list):
+        requested_formats.update(value for value in formats if isinstance(value, str) and value in {"docx", "pdf", "pptx"})
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        return
+    if not isinstance(payload, dict) or not isinstance(payload.get("artifacts"), list):
+        return
+    for artifact in payload["artifacts"]:
+        if not isinstance(artifact, dict):
+            continue
+        report_id = artifact.get("report_id")
+        if not isinstance(report_id, str):
+            continue
+        resolved = resolve_report_artifact(report_id)
+        if resolved is None:
+            continue
+        path, _ = resolved
+        url = f"/api/reports/{report_id}"
+        if artifact.get("filename") != path.name or artifact.get("download_url") != url:
+            continue
+        artifacts[report_id] = {"filename": path.name, "download_url": url}
+
+
+def missing_report_formats(requested_formats: set[str], artifacts: dict[str, dict[str, str]]) -> set[str]:
+    """Recheck registration so a deleted file cannot satisfy delivery."""
+    from src.tools.report_artifacts import resolve_report_artifact
+
+    delivered = set()
+    for report_id in artifacts:
+        resolved = resolve_report_artifact(report_id)
+        if resolved is not None:
+            delivered.add(resolved[0].suffix.lstrip(".").lower())
+    return requested_formats - delivered
+
+
+def append_report_artifacts(content: str, artifacts: dict[str, dict[str, str]]) -> str:
+    """Delivery links come from receipts even when the model omits them."""
+    from src.tools.report_artifacts import resolve_report_artifact
+
+    links = []
+    for report_id, artifact in artifacts.items():
+        if resolve_report_artifact(report_id) is None or artifact["download_url"] in content:
+            continue
+        label = artifact["filename"].replace("[", "\\[").replace("]", "\\]")
+        links.append(f"[{label}]({artifact['download_url']})")
+    return content + ("\n\n" + "\n\n".join(links) if links else "")
+
+
 def record_written_target(
     arguments: Mapping[str, Any],
     *,

@@ -135,6 +135,59 @@ def test_tool_lifecycle_collects_full_payload_before_result_preview_truncation(m
     assert agent._answer_charts["MBB.VN"]["bars"][-1]["c"] == 19250.0
 
 
+def test_a_narrow_late_fetch_does_not_replace_the_observed_trend(monkeypatch, tmp_path: Path) -> None:
+    """A three-bar "latest quote" fetch must not shrink the attached chart.
+
+    The run fetched a ninety-bar daily window first and then a three-bar
+    window for the same symbol. Taking the last result left the chat with
+    three enormous candles in an empty plot instead of the observed trend.
+    """
+    payload = _captured_payload()
+    wide = json.dumps(payload)
+    narrow_rows = payload["MBB.VN"][-3:]
+    narrow = json.dumps({**payload, "MBB.VN": narrow_rows})
+
+    tool = MarketDataTool()
+    registry = ToolRegistry()
+    registry.register(tool)
+    agent = AgentLoop(registry=registry, llm=SimpleNamespace(), max_iterations=2)
+    agent.memory.run_dir = str(tmp_path)
+    trace = TraceWriter(tmp_path)
+
+    for index, (result, arguments) in enumerate((
+        (wide, {"codes": ["MBB.VN"], "start_date": "2026-08-01", "end_date": "2026-11-07"}),
+        (narrow, {"codes": ["MBB.VN"], "start_date": "2026-11-04", "end_date": "2026-11-07"}),
+    )):
+        def _execute(_payload: str = result, **_kwargs: object) -> str:
+            return _payload
+
+        monkeypatch.setattr(tool, "execute", _execute)
+        agent._process_tool_calls(
+            [SimpleNamespace(id=f"call{index}", name="get_market_data", arguments=arguments)],
+            ContextBuilder, [], trace, [], 1,
+        )
+    trace.close()
+
+    chart = agent._answer_charts["MBB.VN"]
+    assert len(chart["bars"]) == 60, "the narrow fetch replaced the observed trend"
+    assert chart["bars"][-1]["c"] == 19250.0
+
+
+def test_prefer_richer_chart_keeps_the_longer_series() -> None:
+    from src.agent.answer_charts import prefer_richer_chart
+
+    wide = {"bars": [{"t": f"2026-01-{day:02d}"} for day in range(1, 31)]}
+    narrow = {"bars": [{"t": "2026-11-05"}, {"t": "2026-11-06"}, {"t": "2026-11-07"}]}
+    empty = {"bars": []}
+
+    assert prefer_richer_chart(wide, narrow) is wide
+    assert prefer_richer_chart(narrow, wide) is wide
+    assert prefer_richer_chart(None, narrow) is narrow
+    assert prefer_richer_chart(empty, narrow) is narrow
+    assert prefer_richer_chart(narrow, empty) is narrow
+    assert prefer_richer_chart(None, empty) is empty
+
+
 def test_trusted_chart_metadata_survives_same_number_redaction(tmp_path: Path) -> None:
     chart = build_chart_spec("MBB.VN", _captured_payload()["MBB.VN"][-53:])
     assert chart is not None and chart["range"]["returned"] == 53

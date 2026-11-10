@@ -153,8 +153,8 @@ export function Layout() {
       <aside
         aria-label={t('layout.sidebar', { defaultValue: 'Vibe-Trading sidebar' })}
         className={cn(
-          "max-md:w-12 border-e border-border/60 bg-card flex flex-col shrink-0 transition-all duration-200 overflow-visible",
-          collapsed ? "w-12" : "w-64"
+          "w-12 border-e border-border/60 bg-card flex flex-col shrink-0 transition-all duration-200 overflow-visible",
+          !collapsed && "md:w-64"
         )}
       >
         {/* Brand */}

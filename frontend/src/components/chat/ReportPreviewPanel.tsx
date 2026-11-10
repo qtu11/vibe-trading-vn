@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AlertCircle, ChevronLeft, ChevronRight, Download, FileText, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, downloadGeneratedReport, fetchReportPreviewPage } from "@/lib/api";
@@ -7,10 +7,21 @@ import { useReportPreviewStore } from "@/stores/reportPreview";
 
 const FORMATS: ReportFormat[] = ["docx", "pdf", "pptx"];
 
-export function ReportPreviewPanel() {
-  const selected = useReportPreviewStore((state) => state.selection);
-  const selection = selected && !("sourceUrl" in selected) ? selected : null;
-  const close = useReportPreviewStore((state) => state.close);
+/**
+ * The document preview for one tab.
+ *
+ * The pane mounts one panel per open tab and passes `tabId`, so the panel
+ * binds to that one document: its loaded state and its in-flight request
+ * survive a switch to another tab. Without a `tabId` the panel follows
+ * whichever tab is active, which is what a standalone render wants.
+ */
+export function ReportPreviewPanel({ tabId }: { tabId?: string }) {
+  const tab = useReportPreviewStore((state) => {
+    if (tabId) return state.tabs.find((item) => item.id === tabId) ?? null;
+    return state.activeId ? state.tabs.find((item) => item.id === state.activeId) ?? null : null;
+  });
+  const selection = tab && tab.kind === "report" && tab.selection.kind === "report" ? tab.selection : null;
+  const closeTab = useReportPreviewStore((state) => state.closeTab);
   const [job, setJob] = useState<ReportEngineJob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,23 +29,24 @@ export function ReportPreviewPanel() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0), [pages, setPages] = useState(0);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
-    if (!selection) return;
+    if (!selection || tabId) return;
     const previouslyFocused = document.activeElement;
     closeRef.current?.focus();
-    const onEscape = (event: KeyboardEvent) => {
+    const escape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      close();
+      closeTab(tab!.id);
     };
-    document.addEventListener("keydown", onEscape, true);
+    document.addEventListener("keydown", escape, true);
     return () => {
-      document.removeEventListener("keydown", onEscape, true);
+      document.removeEventListener("keydown", escape, true);
       if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus();
     };
-  }, [!!selection, close]);
+  }, [!!selection, tab, tabId, closeTab]);
 
   useEffect(() => {
     if (!selection) return;
@@ -48,9 +60,10 @@ export function ReportPreviewPanel() {
 
     async function load() {
       try {
-        const receipt = "job" in selection!
-          ? selection.job
-          : await api.getReportJobForArtifact(selection!.reportId, controller.signal);
+        const current = selection!;
+        const receipt = current.job
+          ? current.job
+          : await api.getReportJobForArtifact(current.reportId!, controller.signal);
         if (controller.signal.aborted) return;
         setJob(receipt);
         const pdf = receipt.artifacts.find((artifact) => artifactFormat(artifact) === "pdf");
@@ -106,14 +119,14 @@ export function ReportPreviewPanel() {
     ?? job?.artifacts[0]?.filename ?? "Báo cáo nghiên cứu";
 
   return (
-    <aside aria-labelledby="report-preview-title" className="z-20 flex h-full w-[48%] min-w-[22rem] max-w-3xl shrink-0 flex-col border-l border-red-900/15 bg-background shadow-xl max-lg:absolute max-lg:inset-0 max-lg:w-full max-lg:min-w-0 max-lg:max-w-none">
+    <aside aria-labelledby={titleId} className="flex h-full min-h-0 w-full flex-col bg-background">
       <header className="flex items-center gap-3 border-b border-red-900/10 bg-[#641C24] px-4 py-3 text-white">
         <img src="/shrimp-vest-logo.png" alt="Logo tôm đỏ Vibe-Trading" className="h-10 w-10 shrink-0 object-contain" />
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-semibold tracking-[0.15em] text-red-100">VIBE RESEARCH</p>
-          <h2 id="report-preview-title" className="truncate text-sm font-semibold" title={title}>{title}</h2>
+          <h2 id={titleId} className="truncate text-sm font-semibold" title={title}>{title}</h2>
         </div>
-        <button ref={closeRef} type="button" onClick={close} aria-label="Đóng bản xem trước" className="shrink-0 rounded-lg p-2 text-red-100 transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+        <button ref={closeRef} type="button" onClick={() => closeTab(tab!.id)} aria-label="Đóng bản xem trước" className="shrink-0 rounded-lg p-2 text-red-100 transition-colors hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
           <X aria-hidden="true" className="h-4 w-4" />
         </button>
       </header>

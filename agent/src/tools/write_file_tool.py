@@ -3,12 +3,32 @@
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from typing import Any
 
+from src.agent.tool_context import current_grounding
 from src.agent.tools import BaseTool
 from src.tools.path_utils import allowed_write_roots
 from src.tools.path_utils import resolve_safe_path
 from src.tools.redaction import redact_internal_paths
+
+
+def _requires_research_export(path: str, content: str) -> bool:
+    ledger = current_grounding.get()
+    if ledger is not None and any(
+        failure.get("tool") == "export_research_report"
+        for failure in getattr(ledger, "_tool_failures", ())
+    ):
+        return True
+    request = getattr(ledger, "user_message", "")
+    text = f"{request}\n{path}\n{content[:4000]}".casefold().replace("đ", "d")
+    text = "".join(char for char in unicodedata.normalize("NFD", text) if not unicodedata.combining(char))
+    text = text.replace("_", " ")
+    # shortcut: text markers route standalone writes; use a typed document kind if more languages need routing.
+    report = re.search(r"\b(?:research|report|analysis|bao cao|phan tich)\b|研究报告|研报", text)
+    equity = re.search(r"\b(?:equity|stock|co phieu|hose|hnx|upcom|eps)\b|\bp/[eb]\b|股票|证券", text)
+    return bool(report and equity)
 
 
 class WriteFileTool(BaseTool):
@@ -17,7 +37,8 @@ class WriteFileTool(BaseTool):
     name = "write_file"
     description = (
         "Write content to a file in the workspace or configured write roots. "
-        "A .pdf path renders Markdown/text to a real PDF; other paths write UTF-8 text. "
+        "A .pdf path renders general Markdown/text documents; equity research reports must use "
+        "export_research_report with structured evidence-bound content. Other paths write UTF-8 text. "
         "Creates parent directories automatically. Use the returned success/error as "
         "the authoritative outcome; include the returned download URL for PDF reports."
     )
@@ -91,6 +112,14 @@ class WriteFileTool(BaseTool):
             )
 
         try:
+            if resolved.suffix.lower() == ".pdf" and _requires_research_export(str(file_path), content):
+                return json.dumps({
+                    "status": "error",
+                    "error_code": "EQUITY_REPORT_REQUIRES_ENGINE",
+                    "error": "Equity research PDFs must use export_research_report; the generic PDF writer cannot bypass its evidence validation or branded layout.",
+                    "required_tool": "export_research_report",
+                    "hint": "Repair the returned accepted_report/field_errors. Match source URLs to this run's collected sources, correct unsupported figures or mark missing inputs unavailable; never relabel sources as verified. Retry the structured export and deliver only its actual artifacts.",
+                }, ensure_ascii=False)
             resolved.parent.mkdir(parents=True, exist_ok=True)
             artifact = {}
             if resolved.suffix.lower() == ".pdf":

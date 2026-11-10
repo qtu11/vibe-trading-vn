@@ -49,6 +49,17 @@ it("matches the Codex summary shape for a verified window", () => {
   expect(screen.getByText("59% left")).toBeVisible();
 });
 
+it("renders the same card in Vietnamese", async () => {
+  await i18n.changeLanguage("vi");
+  render(<ContextUsageIndicator sessionId="session-one" live={snapshot()} />);
+  fireEvent.click(screen.getByRole("button", { name: "Context đã dùng khoảng 25%" }));
+  expect(screen.getByText("Cửa sổ ngữ cảnh")).toBeVisible();
+  expect(screen.getByText("Đã sử dụng")).toBeVisible();
+  expect(screen.getByText("Còn lại 75%")).toBeVisible();
+  expect(screen.getByText("25k / 100k token được sử dụng")).toBeVisible();
+  await i18n.changeLanguage("en");
+});
+
 it("discovers the selected model window before a chat session exists", async () => {
   vi.mocked(fetch).mockResolvedValue({ ok:true,json:async()=>({model:"model-exact",provider:"custom",window:64000,source:"provider:/models",confidence:"provider_reported", automatic_compaction: true, prompt_cost_cap: 60000}) } as Response);
   render(<ContextUsageIndicator sessionId={null} modelKey="custom:model-exact" />);

@@ -239,6 +239,22 @@ class _ReleaseMixin:
                     and record.status == "observed" and record.value is not None and record.symbol}
         if subjects and subjects <= observed:
             return content
+        # A market with no statement source configured is a missing
+        # deployment capability, not a failed call. Vietnamese issuers have
+        # no automatic statement source at all: the only one is a local
+        # Data Bridge store the operator populates by hand. Leading every
+        # Vietnamese answer with "Thiếu dữ liệu BCTC" said nothing the
+        # reader can act on and pushed the model into retrying a call that
+        # could never succeed.
+        #
+        # A real failure -- a fetch that could have worked and did not --
+        # still earns the warning.
+        unconfigured = all(
+            failure.get("error_code") == "statement_source_not_configured"
+            for failure in failures
+        )
+        if unconfigured:
+            return content
         if self._user_writes_chinese():
             note = "> 数据缺口：财务报表工具未返回可核验报表。下述网页或新闻指标尚未与原始报表核对，财务结论有待确认。"
         elif self._user_writes_vietnamese():

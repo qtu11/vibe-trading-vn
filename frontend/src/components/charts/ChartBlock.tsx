@@ -136,6 +136,14 @@ function metaLine(spec: PriceChartSpec): string {
     .join(" · ");
 }
 
+/** State the unit explicitly, so "234,500" is read as a price and not a count. */
+function unitLine(spec: PriceChartSpec): string | null {
+  const parts: string[] = [];
+  if (spec.price_unit) parts.push(`Đơn vị giá: ${spec.price_unit}`);
+  if (spec.volume_unit) parts.push(`Đơn vị khối lượng: ${spec.volume_unit}`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 export const ChartBlock = memo(function ChartBlock({ code }: { code: string }) {
   const spec = useMemo(() => parsePriceChartSpec(code), [code]);
   const bars = useMemo(() => (spec ? toPriceBars(spec) : []), [spec]);
@@ -158,10 +166,11 @@ export const ChartBlock = memo(function ChartBlock({ code }: { code: string }) {
   return (
     <figure
       dir="ltr"
-      className="my-3 overflow-hidden rounded-xl border border-border/60 bg-card/40 px-3 pt-2 pb-1"
+      className="my-3 min-w-0 overflow-hidden rounded-xl border border-border/60 bg-card/40 px-3 pt-2 pb-1"
     >
       <figcaption className="mb-2 space-y-1 text-[11px] text-muted-foreground">
         <div className="break-words font-mono">{metaLine(spec)}</div>
+        {unitLine(spec) && <div className="break-words">{unitLine(spec)}</div>}
         <div>{i18n.t("charts.historicalNote")}</div>
         {spec.bars.some((bar) => !isFiniteNumber(bar.v)) && <div>{i18n.t("charts.volumeUnavailable")}</div>}
         <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -170,7 +179,7 @@ export const ChartBlock = memo(function ChartBlock({ code }: { code: string }) {
           {spec.volume_unit && <span>{i18n.t("charts.volumeUnit", { value: spec.volume_unit })}</span>}
         </div>
       </figcaption>
-      <CandlestickChart data={bars} height={340} />
+      <CandlestickChart data={bars} height={420} />
     </figure>
   );
 });

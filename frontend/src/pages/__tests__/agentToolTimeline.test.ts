@@ -80,6 +80,52 @@ describe("buildToolTimelineMessages", () => {
       endedAt: 1000,
     });
   });
+
+  it("carries a persisted AI-search result into the activity step", () => {
+    // The right-hand pane can only open what the activity row still holds.
+    // A reloaded session lost the research payload, so the search row came
+    // back with no way to open it.
+    const research = {
+      tool: "parallel_web_search",
+      query: "VIC Q3 2026",
+      summary_markdown: "### Tổng hợp",
+      sources: [{ url: "https://example.com/a", title: "A" }],
+    };
+
+    const [message] = buildToolTimelineMessages(
+      [{
+        tool: "parallel_web_search",
+        call_id: "call-search-1",
+        arguments: { query: "VIC Q3 2026" },
+        status: "ok",
+        elapsed_ms: 3000,
+        preview: '{"status": "ok"}',
+        research,
+        timestamp: 1_785_342_400_000,
+      }],
+      {
+        fallbackTimestamp: 1_785_342_500_000,
+        idPrefix: "message-1_",
+        attemptId: "attempt-1",
+      },
+    );
+
+    expect(message.meta?.activity?.steps[0]?.research).toEqual(research);
+  });
+
+  it("omits the research key for a tool that produced none", () => {
+    const [message] = buildToolTimelineMessages(
+      [{
+        tool: "get_market_data",
+        call_id: "call-market-1",
+        status: "ok",
+        timestamp: 1_785_342_400_000,
+      }],
+      { fallbackTimestamp: 1_785_342_500_000, attemptId: "attempt-1" },
+    );
+
+    expect(message.meta?.activity?.steps[0]).not.toHaveProperty("research");
+  });
 });
 
 describe("buildToolTimelineMessages attempt start", () => {

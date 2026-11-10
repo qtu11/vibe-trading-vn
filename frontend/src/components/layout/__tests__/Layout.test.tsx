@@ -100,7 +100,7 @@ describe("Layout accessibility", () => {
   it("labels landmarks, brand, main content, and the new-chat affordance", () => {
     renderLayout();
 
-    expect(screen.getByRole("complementary", { name: "Vibe-Trading sidebar" })).toHaveClass("max-md:w-12");
+    expect(screen.getByRole("complementary", { name: "Vibe-Trading sidebar" })).toHaveClass("w-12", "md:w-64");
     expect(screen.getByRole("navigation", { name: "Main navigation" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Vibe-Trading" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "New Chat" })).toHaveAttribute("title", "New Chat");
@@ -155,12 +155,13 @@ describe("Layout accessibility", () => {
     window.localStorage.setItem("qa-sidebar", "expanded");
     renderLayout();
     const sidebar = screen.getByRole("complementary", { name: "Vibe-Trading sidebar" });
-    expect(sidebar).toHaveClass("w-64");
+    expect(sidebar).toHaveClass("w-12", "md:w-64");
 
     window.localStorage.setItem("qa-sidebar", "collapsed");
     fireEvent(window, new StorageEvent("storage", { key: "qa-sidebar" }));
 
     expect(sidebar).toHaveClass("w-12");
+    expect(sidebar).not.toHaveClass("md:w-64");
   });
 
   it("shows a connection failure instead of an empty history, and retries", async () => {

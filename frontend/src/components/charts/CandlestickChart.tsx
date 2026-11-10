@@ -111,7 +111,13 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
     const chart = echarts.init(containerRef.current);
     chart.group = CHART_GROUP;
     connectCharts();
+    chartRef.current = null;
+    // The chart is lazily mounted into a flex container whose width is not
+    // known at this point. ECharts measures the container when it is
+    // created, so without this the first paint used a stale width and the
+    // plot stayed collapsed in a corner until a resize happened to fire.
     chartRef.current = chart;
+    const initialResize = requestAnimationFrame(() => chart.resize());
 
     let resizeFrame: number | null = null;
     const ro = new ResizeObserver(() => {
@@ -123,6 +129,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
     });
     ro.observe(containerRef.current);
     return () => {
+      cancelAnimationFrame(initialResize);
       ro.disconnect();
       if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       chart.dispose();
@@ -264,25 +271,48 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
       },
       legend: { data: legendNames, textStyle: { color: t.textColor, fontSize: 10 }, right: 80, top: 2, type: "scroll", itemWidth: 12, itemHeight: 8, itemGap: 8 },
       grid: [
-        { left: 8, right: 8, top: 36, height: "55%", containLabel: true },
-        { left: 8, right: 8, top: "66%", height: "22%", containLabel: true },
+        // The left margin has to fit the widest y-axis label. With
+        // ``containLabel: true`` ECharts folds the labels into the grid, so
+        // a margin of 8px pushed a 6-digit price label ("234,500") past the
+        // container edge, where the figure's overflow clipped it and the
+        // plot looked like it collapsed into the top-left corner.
+        { left: 60, right: 16, top: 36, height: "56%", containLabel: true },
+        { left: 60, right: 16, top: "68%", height: "20%", containLabel: true },
       ],
       xAxis: [
         { type: "category", data: dates, gridIndex: 0, axisLine: { lineStyle: { color: t.axisColor } }, axisLabel: { color: t.textColor, fontSize: 10, formatter: (value: string) => value.replace(/T00:00:00(?:\.0+)?(?:Z|[+-]\d{2}:\d{2})?$/, "") }, boundaryGap: true },
         { type: "category", data: dates, gridIndex: 1, axisLine: { lineStyle: { color: t.axisColor } }, axisLabel: { show: false }, boundaryGap: true },
       ],
       yAxis: [
-        { scale: true, gridIndex: 0, splitLine: { lineStyle: { color: t.gridColor } }, axisLabel: { color: t.textColor, fontSize: 10 } },
+        {
+          scale: true, gridIndex: 0, splitLine: { lineStyle: { color: t.gridColor } },
+          axisLabel: {
+            color: t.textColor, fontSize: 10,
+            // Vietnamese locale renders 234500 as "234.500", which reads as
+            // two hundred thirty-four and a half. Group with a thousands
+            // separator and say what the number is.
+            formatter: (value: number) => value.toLocaleString("en-US"),
+          },
+        },
         subYAxis,
       ],
       dataZoom: [
         { type: "inside", xAxisIndex: [0, 1], startValue: firstVisible, endValue: data.length - 1 },
-        { type: "slider", xAxisIndex: [0, 1], startValue: firstVisible, endValue: data.length - 1, bottom: 4, height: 20, labelFormatter: (val: string) => val },
+        // The slider showed every raw timestamp, so a six-month daily
+        // series squeezed 131 ISO strings into the handle. Show the date.
+        { type: "slider", xAxisIndex: [0, 1], startValue: firstVisible, endValue: data.length - 1, bottom: 4, height: 20, labelFormatter: (val: string) => String(val ?? "").slice(0, 10) },
       ],
       series: [
         {
           name: "K", type: "candlestick", data: candle, xAxisIndex: 0, yAxisIndex: 0,
           itemStyle: { color: t.upColor, color0: t.downColor, borderColor: t.upColor, borderColor0: t.downColor },
+          // ECharts sizes a candle from the category band, so a short series
+          // (a handful of bars) draws slabs that fill the whole plot and read
+          // as a broken chart rather than as sparse data. Capping the width
+          // keeps a candle looking like a candle, and the leftover space
+          // stays empty because the series genuinely is that short.
+          barMaxWidth: 24,
+          barMinWidth: 2,
           markPoint: marks.length > 0 ? { data: marks, symbolSize: 28, tooltip: { formatter: (p: { name?: string; value?: string }) => p.name || p.value || "" } } : undefined,
         },
         ...overlaySeries,
@@ -347,7 +377,7 @@ export function CandlestickChart({ data, markers, indicators, height = 500 }: Pr
           ))}
         </div>
       </div>
-      <div ref={containerRef} style={{ height }} />
+      <div ref={containerRef} style={{ height, width: "100%", minWidth: 0 }} />
     </div>
   );
 }

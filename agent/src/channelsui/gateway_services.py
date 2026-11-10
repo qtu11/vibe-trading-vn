@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -153,9 +154,39 @@ class SimpleHttpRouter:
 class MediaService:
     """Media staging helpers for WebSocket payloads."""
 
+    #: A markdown image whose target is not an absolute http(s) URL cannot be
+    #: loaded by a browser. A local path (``C:\...\chart.png``), a ``file://``
+    #: URL and a relative path all render as a broken-image box.
+    _LOCAL_IMAGE_PATTERN = re.compile(
+        r"!\[(?P<alt>[^\]\n]*)\]\((?P<target>[^)\n]+)\)",
+    )
+
     def rewrite_local_markdown_images(self, text: str) -> str:
-        """Return text unchanged until an HTTP media server is configured."""
-        return text
+        """Drop image markdown the browser cannot load.
+
+        The WebSocket channel has no HTTP media server, so a local file path
+        cannot be served to the client. Passing it through unchanged made
+        every answer containing one show a broken-image placeholder with the
+        model's own alt text -- the "Hình ảnh" box in the report screenshot.
+
+        An http(s) target is left alone: the browser can fetch it directly.
+        Anything else is replaced by a short note, so the reader learns the
+        image did not make it instead of seeing a broken box.
+        """
+        if not text or "![ " not in text and "![" not in text:
+            return text
+
+        def replace(match: re.Match[str]) -> str:
+            target = match.group("target").strip()
+            # Strip an optional markdown title: ``path "title"``.
+            path = target.split(" ", 1)[0].strip().strip("<>")
+            if path.lower().startswith(("http://", "https://")):
+                return match.group(0)
+            alt = (match.group("alt") or "").strip()
+            label = f"{alt}: " if alt else ""
+            return f"*{label}the image could not be delivered to this view.*"
+
+        return self._LOCAL_IMAGE_PATTERN.sub(replace, text)
 
     def sign_or_stage_media_path(self, path: Path) -> dict[str, str] | None:
         """Return metadata for a local media path when it exists."""

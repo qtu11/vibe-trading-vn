@@ -143,6 +143,31 @@ def _url_allowed(url: str) -> tuple[bool, str]:
     return True, ""
 
 
+def _read_failure(code: str, error: str, url: str, *, status_code: int | None = None) -> str:
+    """Failure payload with a next step, not only a status line.
+
+    The VIC run retried the same blocked URLs at iterations 12, 22 and 63-82
+    because the error said "origin fallback is disabled" and nothing else.
+    A reader failure is a source-selection problem: name the alternatives so
+    the model stops spending rounds on one unreachable page.
+    """
+    payload: dict[str, object] = {
+        "status": "error",
+        "error_code": code,
+        "error": error,
+        "url": url,
+        "remedy": (
+            "Không thử lại nguyên URL này. Dùng nguồn thay thế đã công bố: trang quan hệ "
+            "nhà đầu tư của tổ chức phát hành, hồ sơ công bố trên Sở giao dịch (HOSE/HNX), "
+            "hoặc tệp người dùng đã tải lên qua read_document. Ghi rõ nguồn thay thế và "
+            "ngày truy cập; nếu không có nguồn thay thế, ghi rõ dữ liệu chưa thu thập được."
+        ),
+    }
+    if status_code is not None:
+        payload["status_code"] = status_code
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def read_url(url: str, no_cache: bool = False) -> str:
     """Fetch web page content via the Jina Reader API.
 
@@ -219,16 +244,33 @@ def read_url(url: str, no_cache: bool = False) -> str:
                 result_str = json.dumps(with_security_warnings(result, fields=("content",)), ensure_ascii=False)
                 _cache_put(target_url, result_str)
                 return result_str
-            return json.dumps({"status": "error", "error": f"remote reader returned HTTP {resp.status_code}; origin fallback is disabled"}, ensure_ascii=False)
+            status = resp.status_code
+            if status in (401, 403):
+                code = "source_blocked"
+            elif status == 404:
+                code = "source_not_found"
+            elif status == 429:
+                code = "source_rate_limited"
+            elif status in (400, 422):
+                code = "source_unreadable"
+            else:
+                code = "source_unavailable"
+            return _read_failure(
+                code,
+                f"remote reader returned HTTP {status}; origin fallback is disabled",
+                target_url,
+                status_code=status,
+            )
         finally:
             if resp is not None:
                 resp.close()
 
     except Exception as exc:
         logger.warning("read_url request failed (%s)", type(exc).__name__)
-        return json.dumps(
-            {"status": "error", "error": "remote reader request failed; origin fallback is disabled"},
-            ensure_ascii=False,
+        return _read_failure(
+            "source_unreachable",
+            f"remote reader request failed ({type(exc).__name__}); origin fallback is disabled",
+            target_url,
         )
 
 

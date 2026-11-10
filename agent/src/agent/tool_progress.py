@@ -16,8 +16,8 @@ NO_PROGRESS_LIMIT = 8
 #: rejected path ~35 times, so a threshold of 2 still kills it well inside
 #: NO_PROGRESS_LIMIT.
 FAILURE_BLOCK_THRESHOLD = 2
-#: How many times the *same kind* of failure may recur on one tool before the
-#: run is told to stop and change approach. The exact-argument block above
+#: How many times the *same kind* of failure may recur on one tool without a
+#: new observation before the run must change approach. The exact-argument block above
 #: cannot catch a loop where every attempt fixes one field and fails on the
 #: next (the screenshot's export loop: market -> value type -> source_ids ->
 #: input_keys -> as_of, seven different payloads, one failure class). The
@@ -31,6 +31,11 @@ _REPAIRABLE_ERROR_CODES = frozenset({
     "INVALID_PAYLOAD",
     "INVALID_FORMAT",
     "MISSING_FORMATS",
+})
+#: Missing capabilities make an identical retry unproductive; another
+#: issuer or source may still be available through the same tool.
+TERMINAL_ERROR_CODES = frozenset({
+    "statement_source_not_configured",
 })
 #: What the user can do next, whatever stalled: #1363's case was an artifact
 #: the agent could not find, where only the exact path helps.
@@ -79,12 +84,28 @@ def _failure_detail(result: str) -> str:
     )[:120]
 
 
+def _validation_issues(result: str) -> frozenset[tuple[str, str]]:
+    """Stable field/problem pairs; malformed diagnostics cannot imply progress."""
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        return frozenset()
+    errors = payload.get("field_errors") if isinstance(payload, dict) else None
+    if not isinstance(errors, list) or not errors:
+        return frozenset()
+    if any(not isinstance(item, dict) or not isinstance(item.get("field"), str)
+           or not isinstance(item.get("problem"), str) for item in errors):
+        return frozenset()
+    return frozenset((item["field"], item["problem"]) for item in errors)
+
+
 class ToolProgress:
     """Bound repeated discovery without treating activity as new evidence."""
 
     def __init__(self) -> None:
         self.failed: dict[tuple[str, str], int] = {}
         self._failed_families: dict[tuple[str, str], int] = {}
+        self._repair_issues: dict[tuple[str, str], frozenset[tuple[str, str]]] = {}
         self._observations: set[tuple[str, str | None, str]] = set()
         self._new_observation = False
         self._context_restored = False
@@ -120,12 +141,25 @@ class ToolProgress:
             code = _failure_code(result)
             if code in _REPAIRABLE_ERROR_CODES:
                 family = (name, code)
+                issues = _validation_issues(result)
+                previous = self._repair_issues.get(family)
+                if issues and (previous is None or issues < previous):
+                    self._repair_issues[family] = issues
+                    if previous is not None:
+                        # Only a shrinking best-known issue set proves a repair made progress.
+                        self._failed_families[family] = 0
+                        self._new_observation = True
                 self._failed_families[family] = self._failed_families.get(family, 0) + 1
+            elif code in TERMINAL_ERROR_CODES:
+                # A missing capability for this payload must not block another issuer/source.
+                if key is not None:
+                    self.failed[key] = FAILURE_BLOCK_THRESHOLD
             self.note("error", name, detail)
             return
         if not is_readonly:
             self.failed.clear()
             self._failed_families.clear()
+            self._repair_issues.clear()
         if not is_readonly and key is None:
             self._new_observation = True
             return
@@ -196,6 +230,9 @@ class ToolProgress:
         if observation not in self._observations:
             self._observations.add(observation)
             self._new_observation = True
+            # New evidence can repair validation failures; exact failed calls stay blocked.
+            self._failed_families.clear()
+            self._repair_issues.clear()
         else:
             self.note("repeat", name)
 
@@ -230,9 +267,8 @@ class ToolProgress:
         """The error code whose repeated repairs have exhausted their budget.
 
         A repair loop changes the arguments every round, so the exact-call
-        block never fires. Grouping by tool + error code catches that loop:
-        the model has already tried the same class of fix several times and
-        the next attempt will not be different.
+        block never fires. Grouping by tool + error code bounds repairs until
+        a genuinely new tool observation supplies grounds for another attempt.
 
         Args:
             name: Tool name.

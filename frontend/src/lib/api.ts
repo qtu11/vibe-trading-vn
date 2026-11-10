@@ -5,6 +5,7 @@ import type { ForexCostStressRequest, ForexTradePathsRequest, ForexExperimentDet
 import type { ResearchObject } from "@/lib/research";
 import type { ResearchAttemptList, ResearchKind, ResearchRevision, ResearchRevisionList } from "@/lib/researchArtifacts";
 import { authHeaders, withAuthTicket } from "@/lib/apiAuth";
+import type { ResearchArtifact } from "@/stores/reportPreview";
 import type {
   OptionsChainResponse,
   OptionsPayoffRequest,
@@ -576,7 +577,7 @@ export const api = {
       return value.pages;
     });
   },
-  exportReportJob: (report: Record<string, unknown>, formats: ReportFormat[] = ["docx", "pdf", "pptx"], runId?: string, minimumPages = 24) =>
+  exportReportJob: (report: Record<string, unknown>, formats: ReportFormat[] = ["docx", "pdf", "pptx"], runId?: string, minimumPages = 1) =>
     request<ReportEngineJob>("/api/reports/jobs", {
       method: "POST",
       body: JSON.stringify({ report, formats, run_id: runId, minimum_pages: minimumPages }),
@@ -2318,6 +2319,9 @@ export interface ToolTrailItem {
   preview?: string;
   call_id?: string;
   timestamp?: number;
+  /** The AI-search result a web-search tool produced, kept so a reloaded
+   *  session can still open it in the right-hand preview pane. */
+  research?: ResearchArtifact;
 }
 
 export interface OfficeSnapshot {

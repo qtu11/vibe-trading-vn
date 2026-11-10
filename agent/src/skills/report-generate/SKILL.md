@@ -8,20 +8,48 @@ category: tool
 
 ## Overview
 
-Generate structured, professional-grade financial research reports. Follow the conventions used by securities firms and asset managers, and output complete Markdown reports that can be used directly for investment research reference.
+Generate structured, evidence-bound financial research. Use readable Markdown in chat and the shared report renderer for exported equity documents.
 
 ## Saving and Delivering a PDF
 
-When the user requests a PDF, send the complete Markdown report to `write_file`
-with a `.pdf` target (prefer `artifacts/report.pdf` under the active run directory).
-The tool renders a real, paginated PDF without requiring system Pango/Cairo.
-Check its returned `status`, `path`, and `bytes_written`; include the returned
-`download_url` as a Markdown link labelled with the report's filename. The Web
-chat downloads it with authentication and IM channels attach the generated PDF.
-A successful write is evidence that the returned path exists; another path's
-earlier rejection does not invalidate it. If rendering fails, report that tool
-error instead of claiming the PDF was created. Do not write HTML or base64 data
-as the content of a `.pdf` file.
+For equity research documents, call `export_research_report` with structured
+`ResearchReport` content and the requested DOCX/PDF/PPTX formats. This shared
+renderer owns the VIBE masthead, KPI band, tables, charts and chapter layout.
+`write_file(...pdf)` is for unrelated general documents; it cannot substitute
+for an equity report or bypass a failed evidence check. If export fails, repair
+the returned `accepted_report` and fix every `field_errors` entry in one pass.
+`collected_sources` lists the URLs this run actually read: use `expected_url`
+when an issue supplies it, and never invent a replacement URL. Repair the
+number/source binding inside an `analysis_sections` chapter instead of deleting
+the chapter. Headings are plain text without "1."/"Chương 1" numbering because
+the renderer numbers chapters. A `read_url` failure (`source_blocked`,
+`source_not_found`, `source_rate_limited`, `source_unreadable`,
+`source_unreachable`) is terminal for that URL; use its `remedy` or mark the
+data unavailable. Never relabel evidence as verified or erase a missing-data
+marker to force publication. Deliver only returned artifacts and download URLs;
+if a format is unavailable, say so.
+
+## Evidence and Analytical Discipline
+
+Apply the research practices in CFA Institute [Standard V(A)](https://www.cfainstitute.org/standards/professionals/code-ethics-standards/standards-of-practice-v-a)
+and [Standard V(B)](https://www.cfainstitute.org/standards/professionals/code-ethics-standards/standards-of-practice-v-b):
+assess the research basis, explain the methods and material risks/limitations,
+and separate observed facts from calculations, assumptions and opinions. These
+practices do not imply CFA endorsement, certification or a prescribed page count.
+
+- Bind each figure to its source, period, currency/unit and consolidation basis;
+  compare like periods and distinguish intraday trades from closing prices.
+- Separate group profit, minority interests and profit attributable to parent
+  shareholders. Reconcile profit to operating cash flow, capex and free cash
+  flow; show debt, maturities, guarantees and funding needs. Recompute ratios.
+- Select valuation by business model. Holding-company SOTP/NAV must address
+  ownership percentages, minorities, parent net debt and double counting;
+  banking ratios are not a substitute for that analysis.
+- Populate `financial_table`, `peer_comparison`, `valuation_scenarios`,
+  `risk_factors`, `catalysts` and `analysis_sections` only with supported inputs.
+  Show bear/base/bull assumptions, sensitivity and the strongest counterargument.
+  If necessary inputs are missing, omit a target, stay `CHƯA XẾP HẠNG`, and name
+  what evidence would change the conclusion. Never pad pages or manufacture data.
 
 ## Report Types and Structure
 
@@ -29,7 +57,7 @@ as the content of a `.pdf` file.
 
 | Type | Length | Core Content | Trigger Scenario |
 |------|------|---------|---------|
-| Deep-dive stock report | 3000-5000 words | Company analysis + valuation + rating | "Analyze stock XX" |
+| Deep-dive stock report | 3000-5000 words | Company analysis + valuation + supported rating or unrated conclusion | "Analyze stock XX" |
 | Industry research | 2000-4000 words | Industry structure + trend + recommended names | "How is sector XX?" |
 | Strategy report | 1500-3000 words | Macro + strategy + allocation recommendation | "What is the market outlook?" |
 | Backtest report | 1000-2000 words | Strategy performance + risk + improvement suggestions | After a backtest is completed |
@@ -40,13 +68,14 @@ as the content of a `.pdf` file.
 ```markdown
 # [Report Title]
 
-> **Rating**: Buy | **Target Price**: ¥XX | **Current Price**: ¥XX
-> **Analyst**: Vibe-Trading | **Date**: 2026-03-28
+> **Rating**: [MUA / THEO DÕI / BÁN / CHƯA XẾP HẠNG]
+> **Target price**: [only if supported; currency/unit and horizon] | **Reference price**: [observed value, currency/unit, date/time and price basis, or unavailable]
+> **Prepared by**: Vibe-Trading AI | **Data as of**: [actual cutoff date]
 
 ## Summary
 
 3-5 key points, each 1-2 sentences, covering the core conclusion.
-Use explicit language such as bullish / bearish / neutral. Do not be vague.
+State the evidence-backed view and its limits. If evidence is insufficient, state what is missing and remain unrated.
 
 ## Core Views
 
@@ -82,7 +111,9 @@ Key data tables...
 
 ## Investment Recommendation
 
-Clear action recommendation, including direction, position size, and time horizon.
+State a supported view, horizon, conditional scenarios and invalidation evidence.
+If price or valuation inputs are missing, remain unrated and identify the next evidence required.
+Include position sizing only when the user supplied portfolio and risk constraints.
 
 ---
 *Disclaimer: This report is generated by an AI quantitative system for research reference only and does not constitute investment advice.*
@@ -92,12 +123,11 @@ Clear action recommendation, including direction, position size, and time horizo
 
 ### Equity Ratings
 
-| Rating | Definition | Expected Return (12 months) | Use Case |
-|------|------|-----------------|---------|
-| Strong Buy | Clearly bullish, high conviction | >30% | Undervalued + catalyst + favorable trend |
-| Buy | Bullish, reasonably high conviction | 15%-30% | Improving fundamentals + fair valuation |
-| Neutral | No clear directional edge | -5%~15% | Fair valuation but lacks catalysts |
-| Avoid | Bearish | <-5% | Overvaluation / deteriorating fundamentals |
+Use exactly the structured report's supported labels: `MUA`, `THEO DÕI`, `BÁN`,
+or `CHƯA XẾP HẠNG`. Explain the benchmark, horizon, methodology and risks behind
+any rating; a return threshold alone does not establish investment suitability.
+Missing verified price, source or reproducible valuation inputs means
+`CHƯA XẾP HẠNG`. A `BÁN` view does not authorize a short sale or an order.
 
 ### Strategy Ratings
 
@@ -131,7 +161,7 @@ Clear action recommendation, including direction, position size, and time horizo
 
 **Table rules**:
 - Right-align numbers where possible (when Markdown cannot do so, at least keep visual alignment clean)
-- Put units in the header (`100m / 10k / RMB`)
+- Put the actual source currency and unit in the header; never copy example units into another market
 - Forecast values use `E` (`2025E`), actual values use `A` (`2024A`)
 - Keep 1 decimal place for percentages and 1-2 decimal places for monetary values
 
@@ -148,7 +178,10 @@ Clear action recommendation, including direction, position size, and time horizo
 
 ### Chart Substitute (Text Description + Data Table)
 
-Since Markdown output cannot embed images, use the following substitute:
+For exported equity reports, supply validated `price_history`, `quarterly_results`
+or `analysis_sections.charts`; the shared renderer builds charts from those inputs.
+In chat, accompany chart discussion with a source-bound data table when useful.
+The example below illustrates structure only; do not reuse its numbers:
 
 ```markdown
 ### Equity Curve
@@ -251,8 +284,8 @@ Sharpe > 1.0 and max drawdown < 20%, indicating a good risk-reward profile.
 
 1. **Clarify the report type**: stock / industry / strategy / backtest / flash note
 2. **Collect data**: backtest results, fundamentals, industry data
-3. **Determine the core view**: decide the conclusion first, then organize the supporting arguments
-4. **Choose the rating**: based on quantitative metrics + qualitative judgment
+3. **Determine the core view**: evaluate the evidence and counterarguments before writing the conclusion
+4. **Choose the rating**: only when source, quote and reproducible valuation inputs support it; otherwise stay unrated
 
 ### Writing Principles
 
@@ -260,15 +293,15 @@ Sharpe > 1.0 and max drawdown < 20%, indicating a good risk-reward profile.
 2. **Let data speak**: every view should have at least one supporting data point
 3. **Keep logic clear**: because A (data) → therefore B (judgment) → recommendation C (action)
 4. **Argue both sides**: even in bullish reports, discuss risks; even in bearish reports, mention possible catalysts
-5. **Be actionable**: recommendations should specify instruments / position sizing / time frame
+5. **Be specific**: explain conditional scenarios, horizon and invalidation evidence; do not invent portfolio sizing or order authority
 
 ## Output Format
 
-Output the complete Markdown research report directly, following the template structure above. Ensure that:
-- it has a clear rating
+Use the template above for readable chat prose; export requested equity documents through the structured report engine. Ensure that:
+- it has a supported rating or an explicit unrated state
 - it is supported by quantitative data
 - it includes at least 3 risk warnings
-- it contains concrete action recommendations
+- it explains conditional scenarios and what would change the view
 - it ends with a disclaimer
 
 ## Notes

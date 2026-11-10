@@ -75,6 +75,7 @@ class OutcomeInputs:
         max_iterations: The run's iteration budget (for the failure
             message).
         budget_reason: An exhausted research-goal token budget, if any.
+        delivery_reason: Missing formats from an attempted report export, if any.
     """
 
     stall_reason: Optional[str]
@@ -91,6 +92,7 @@ class OutcomeInputs:
     empty_response_model: str
     max_iterations: int
     budget_reason: Optional[str] = None
+    delivery_reason: Optional[str] = None
 
 
 @dataclass
@@ -141,6 +143,8 @@ def resolve_final_status(inputs: OutcomeInputs) -> RunOutcome:
             "responses were blocked by content moderation"
         )
         return RunOutcome("failed", reason, "failure", False)
+    if inputs.delivery_reason is not None:
+        return RunOutcome("failed", inputs.delivery_reason, "failure", False)
     if inputs.has_output:
         if inputs.released_fallback:
             reason = inputs.released_fallback_reason or (

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { ProgressBar } from "@/components/chat/ProgressBar";
 import { localizeToolName } from "@/lib/tools";
+import { useReportPreviewStore } from "@/stores/reportPreview";
 import type { ToolCallEntry } from "@/types/agent";
 
 /* ---------- ETA tracking (per-tool) ---------- */
@@ -150,6 +151,9 @@ function ToolRow({ entries, eta }: RowProps): JSX.Element {
   const localized = localizeToolName(entry.tool);
   const details = [...new Set(entries.map(detailFor).filter(Boolean))];
   const detailText = details.slice(0, 3).join(", ") + (details.length > 3 ? ` +${details.length - 3}` : "");
+  // The newest entry carries the research payload; a run of the same tool
+  // coalesces into one row, so the last one is the one that produced it.
+  const research = [...entries].reverse().find((item) => item.research)?.research;
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center gap-x-2 gap-y-0.5 text-xs min-w-0">
@@ -172,6 +176,16 @@ function ToolRow({ entries, eta }: RowProps): JSX.Element {
           >
             {formatStepElapsed(elapsedSeconds)}
           </span>
+        )}
+        {research && (
+          <button
+            type="button"
+            aria-label="Mở kết quả AI research"
+            onClick={() => useReportPreviewStore.getState().openResearch(research)}
+            className="ml-auto shrink-0 rounded-md border border-border px-2 py-0.5 text-[10px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:ml-0"
+          >
+            Xem kết quả
+          </button>
         )}
       </div>
       {/* Secondary row: stage + progress bar (+ ETA) */}

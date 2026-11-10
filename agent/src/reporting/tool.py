@@ -40,6 +40,16 @@ class ExportResearchReportTool(BaseTool):
                     "analysis, never repeated filler. Include dated price references, explicit valuation "
                     "assumptions and conditional buy/sell rules; never invent prices or erase "
                     "missing-evidence markers."
+                    " Use financial_table for period/currency/unit/consolidation-aligned results; distinguish "
+                    "consolidated profit from profit attributable to parent shareholders and reconcile earnings "
+                    "to operating cash flow, capex and debt. Choose sector-appropriate valuation: for a holding "
+                    "company explain ownership-weighted SOTP/NAV, minorities, net debt and double counting; "
+                    "do not reuse bank ratios as its valuation model. Present facts, derived values, assumptions "
+                    "and opinions separately. Use valuation_scenarios, risk_factors, catalysts and analysis_sections "
+                    "for bear/base/bull drivers, sensitivities, counterarguments and missing inputs. A target needs "
+                    "sourced inputs and reproducible math; otherwise omit it and leave the report unrated. "
+                    "These research practices do not establish CFA certification or a universal page minimum."
+                    " investment_theses/risk_factors are {title, body, source_ids}; body is required. "
                     " Every metric needs key, label, value, unit and as_of; every key_stats/forecast_stats "
                     "value is a display STRING, not a number. price_history is an array of "
                     "{date, close, unit, price_basis, source_ids}. All facts require source_ids resolving to "
@@ -56,7 +66,12 @@ class ExportResearchReportTool(BaseTool):
                     "historical adjusted closes cannot substitute for the latest raw trade."
                     " For a rated calculated target_price, methodology must be an arithmetic expression "
                     "using exactly its input_keys (for example eps * target_pe); declare chosen coefficients "
-                    "as assumption metrics with methodology. The server recomputes the target before accepting a rating."
+                    "as assumption metrics with methodology. The server recomputes the target before accepting a rating. "
+                    "All derived financial/valuation metric formulas are checked even in unrated drafts, including "
+                    "currency/display scale and percent ratios. For example methodology='operating_cash_flow - capex' "
+                    "uses those exact input_keys. Prose-only methodologies remain unverified and return a warning. "
+                    "On calculation errors, use field_errors.formula/inputs/expected_value to repair the payload; "
+                    "on a source URL mismatch, compare field_errors.expected_url with the source content before retrying."
                 ),
             },
             "formats": {
@@ -174,6 +189,8 @@ class ExportResearchReportTool(BaseTool):
             # already normalised, so a retry is a diff rather than a rewrite.
             if exc.details:
                 payload["field_errors"] = exc.details
+            if exc.collected_sources:
+                payload["collected_sources"] = exc.collected_sources
             if exc.normalization_warnings:
                 payload["already_repaired"] = exc.normalization_warnings
             if exc.normalized_report is not None:
@@ -197,14 +214,19 @@ class ExportResearchReportTool(BaseTool):
 #: one field fixed and the loop continued.
 _REPAIR_HINTS = {
     "SCHEMA_VALIDATION_FAILED": (
-        "Sửa đúng các trường nêu trong message theo schema ResearchReport: "
+        "Sửa TẤT CẢ nhóm trong field_errors trong cùng một lần gửi, không chỉ nhóm đầu tiên. "
         "market phải là VN_EQUITY/FOREX/CRYPTO; mỗi metric cần key, label, value, unit, as_of; "
         "key_stats/forecast_stats.value phải là chuỗi; price_history là mảng các {date, close, unit, price_basis, source_ids}; "
-        "mỗi metric có value đều cần as_of; các đoạn văn cần source_ids khớp với sources."
+        "mỗi metric có value đều cần as_of; investment_theses/risk_factors cần title + body; "
+        "các đoạn văn cần source_ids khớp với sources. Giữ nguyên analysis_sections đã có; "
+        "không xoá mục để né lỗi schema."
     ),
     "EVIDENCE_VALIDATION_FAILED": (
-        "Số liệu phải xuất hiện đúng trong nội dung nguồn đã thu thập trong phiên này. "
-        "Sửa giá trị về đúng con số trong nguồn, bỏ số không có trong nguồn, hoặc bỏ hẳn mục đó."
+        "Đối chiếu từng field_errors với collected_sources (các URL công cụ đã đọc trong phiên này): "
+        "dùng đúng expected_url/source_id, hoặc đọc thêm nguồn chứa số đó trước khi xuất. "
+        "Sửa toàn bộ field_errors cùng lúc, giữ nguyên analysis_sections và chỉ thay số/nguồn sai; "
+        "không xoá cả mục phân tích, không đoán URL và không đổi nhãn verified. "
+        "Sửa accepted_report rồi gọi lại export_research_report; không thay bằng write_file PDF."
     ),
     "INVALID_PAYLOAD": "Kiểm tra lại cấu trúc JSON của report trước khi gửi lại.",
     "INVALID_FORMAT": "formats chỉ nhận docx, pdf, pptx.",

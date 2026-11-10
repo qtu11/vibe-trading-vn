@@ -40,10 +40,9 @@ import {
   type ComposerHandle,
 } from "@/components/chat/Composer";
 import { GoalPanel } from "@/components/chat/GoalPanel";
-import { ReportPreviewPanel } from "@/components/chat/ReportPreviewPanel";
-import { SourceBrowserPanel } from "@/components/chat/SourceBrowserPanel";
+import { PreviewPane } from "@/components/chat/PreviewPane";
 import { sourceReferencesMarkdown, sourceResolutionMarkdown } from "@/lib/sourceEvidence";
-import { useReportPreviewStore } from "@/stores/reportPreview";
+import { useReportPreviewStore, type ResearchArtifact } from "@/stores/reportPreview";
 import {
   LiveActionChip,
   LiveRuntimePanel,
@@ -125,6 +124,29 @@ interface GroundingRevision {
 
 function toolProgressKey(callId: string | undefined, tool: string): string {
   return callId ? `call:${callId}` : `tool:${tool}`;
+}
+
+/**
+ * Validate the AI-search payload before it reaches the preview pane.
+ *
+ * It arrives over SSE, so it is untrusted input like any other. The URLs
+ * are re-checked at render time by ``evidenceUrl``; this gate only keeps
+ * obviously wrong shapes out of the store.
+ */
+function isResearchPayload(value: unknown): value is ResearchArtifact {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const candidate = value as Partial<ResearchArtifact>;
+  if (!Array.isArray(candidate.sources)) return false;
+  if (candidate.sources.length === 0) return false;
+  if (!candidate.sources.every((source) => (
+    source
+    && typeof source === "object"
+    && typeof source.url === "string"
+    && source.url.startsWith("http")
+  ))) return false;
+  if (candidate.query !== undefined && typeof candidate.query !== "string") return false;
+  if (candidate.summary_markdown !== undefined && typeof candidate.summary_markdown !== "string") return false;
+  return true;
 }
 
 // i18n hook for Agent component — used inside the component below
@@ -289,7 +311,7 @@ export function Agent() {
   const streamingText = useAgentStore(s => s.streamingText);
   const status = useAgentStore(s => s.status);
   const sessionId = useAgentStore(s => s.sessionId);
-  const reportPreviewOpen = useReportPreviewStore((state) => state.selection !== null);
+  const reportPreviewOpen = useReportPreviewStore((state) => state.tabs.length > 0);
   useEffect(() => {
     useReportPreviewStore.getState().close();
     return () => useReportPreviewStore.getState().close();
@@ -901,6 +923,9 @@ export function Agent() {
           elapsed_ms: Number(d.elapsed_ms || 0),
           elapsed_s: undefined,
           progress: undefined,
+          // A web search produced a real result. Carry it so the tool row
+          // can offer to open it in the right-hand pane.
+          ...(isResearchPayload(d.research) ? { research: d.research } : {}),
         });
         if (toolName === "run_swarm") {
           const fallback = buildSwarmStatusFromToolResultPreview(String(d.preview || ""));
@@ -1913,7 +1938,7 @@ export function Agent() {
       >
         <div
           className={[
-            "max-w-3xl mx-auto space-y-8",
+            reportPreviewOpen ? "w-full space-y-8" : "max-w-3xl mx-auto space-y-8",
             !sessionLoading && messages.length === 0 ? "min-h-full flex flex-col" : "",
           ].join(" ")}
         >
@@ -2066,7 +2091,7 @@ export function Agent() {
         data-agent-composer
         className="border-t border-white/[0.06] dark:border-white/[0.04] px-4 pt-2 pb-3.5 bg-gradient-to-t from-background/95 via-background/90 to-background/50 backdrop-blur-xl"
       >
-        <div className="max-w-2xl mx-auto">
+        <div className={reportPreviewOpen ? "w-full" : "max-w-2xl mx-auto"}>
           <LiveRuntimePanel
             ref={liveRuntimeRef}
             sessionId={sessionId}
@@ -2115,8 +2140,7 @@ export function Agent() {
         </div>
       </div>
     </div>
-    <ReportPreviewPanel />
-    <SourceBrowserPanel />
-    </div>
+    <PreviewPane />
+  </div>
   );
 }

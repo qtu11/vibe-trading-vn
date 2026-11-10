@@ -241,3 +241,163 @@ def test_run_with_agent_consolidates_tool_events_by_call_id(
             "preview": "MSFT",
         },
     ]
+
+
+def test_web_search_research_payload_survives_a_reload(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """A reloaded session can still open the AI-search result.
+
+    The research payload used to travel only over the live SSE stream, so a
+    reloaded session rendered the search row again but offered no way to open
+    it: the right-hand pane stayed empty.
+    """
+
+    class _DummyAgentLoop:
+        def __init__(
+            self,
+            *,
+            registry,
+            llm,
+            event_callback,
+            max_iterations,
+            persistent_memory,
+        ) -> None:
+            del registry, llm, max_iterations, persistent_memory
+            self._event_callback = event_callback
+
+        def run(self, *, user_message: str, history, session_id: str):
+            del user_message, history, session_id
+            self._event_callback(
+                "tool_call",
+                {
+                    "tool": "parallel_web_search",
+                    "call_id": "call-search-1",
+                    "arguments": {"query": "VIC Q3 2026"},
+                },
+            )
+            self._event_callback(
+                "tool_result",
+                {
+                    "tool": "parallel_web_search",
+                    "call_id": "call-search-1",
+                    "status": "ok",
+                    "elapsed_ms": 3000,
+                    "preview": '{"status": "ok"}',
+                    "research": {
+                        "tool": "parallel_web_search",
+                        "query": "VIC Q3 2026",
+                        "summary_markdown": "### Tổng hợp",
+                        "sources": [
+                            {"url": "https://example.com/a", "title": "A"},
+                            {"url": "https://example.com/b", "title": "B"},
+                        ],
+                    },
+                },
+            )
+            return {"status": "success", "content": "done"}
+
+        def cancel(self) -> None:
+            pass
+
+    monkeypatch.setattr("src.tools.build_registry", lambda **kwargs: object())
+    monkeypatch.setattr("src.providers.chat.ChatLLM", lambda: object())
+    monkeypatch.setattr("src.memory.persistent.PersistentMemory", lambda: object())
+    monkeypatch.setattr("src.agent.loop.AgentLoop", _DummyAgentLoop)
+    monkeypatch.setattr(
+        "src.config.loader.load_runtime_agent_config",
+        lambda overrides=None: object(),
+    )
+    monkeypatch.setattr(
+        "src.config.loader.sanitize_session_overrides",
+        lambda overrides: dict(overrides),
+    )
+    service = _service(tmp_path, monkeypatch)
+    attempt = Attempt(session_id="abcdef012345", prompt="research")
+
+    result = asyncio.run(
+        service._run_with_agent(attempt, messages=[], session_config={})
+    )
+
+    entry = result["tool_trail"][0]
+    assert entry["research"] == {
+        "tool": "parallel_web_search",
+        "query": "VIC Q3 2026",
+        "summary_markdown": "### Tổng hợp",
+        "sources": [
+            {"url": "https://example.com/a", "title": "A"},
+            {"url": "https://example.com/b", "title": "B"},
+        ],
+    }
+
+
+def test_failed_tool_result_keeps_no_research_payload(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    """Only a successful search produced a result, so only it carries one."""
+
+    class _DummyAgentLoop:
+        def __init__(
+            self,
+            *,
+            registry,
+            llm,
+            event_callback,
+            max_iterations,
+            persistent_memory,
+        ) -> None:
+            del registry, llm, max_iterations, persistent_memory
+            self._event_callback = event_callback
+
+        def run(self, *, user_message: str, history, session_id: str):
+            del user_message, history, session_id
+            self._event_callback(
+                "tool_call",
+                {
+                    "tool": "parallel_web_search",
+                    "call_id": "call-search-2",
+                    "arguments": {"query": "VIC"},
+                },
+            )
+            self._event_callback(
+                "tool_result",
+                {
+                    "tool": "parallel_web_search",
+                    "call_id": "call-search-2",
+                    "status": "error",
+                    "elapsed_ms": 10,
+                    "preview": "boom",
+                    "research": {
+                        "tool": "parallel_web_search",
+                        "query": "VIC",
+                        "sources": [{"url": "https://example.com/a"}],
+                    },
+                },
+            )
+            return {"status": "success", "content": "done"}
+
+        def cancel(self) -> None:
+            pass
+
+    monkeypatch.setattr("src.tools.build_registry", lambda **kwargs: object())
+    monkeypatch.setattr("src.providers.chat.ChatLLM", lambda: object())
+    monkeypatch.setattr("src.memory.persistent.PersistentMemory", lambda: object())
+    monkeypatch.setattr("src.agent.loop.AgentLoop", _DummyAgentLoop)
+    monkeypatch.setattr(
+        "src.config.loader.load_runtime_agent_config",
+        lambda overrides=None: object(),
+    )
+    monkeypatch.setattr(
+        "src.config.loader.sanitize_session_overrides",
+        lambda overrides: dict(overrides),
+    )
+    service = _service(tmp_path, monkeypatch)
+    attempt = Attempt(session_id="abcdef012345", prompt="research")
+
+    result = asyncio.run(
+        service._run_with_agent(attempt, messages=[], session_config={})
+    )
+
+    assert "research" not in result["tool_trail"][0]

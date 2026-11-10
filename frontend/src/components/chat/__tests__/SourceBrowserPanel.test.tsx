@@ -17,28 +17,33 @@ it("opens source links beside chat and closes with Escape while restoring focus"
   expect(screen.getByRole("button", { name: "Đóng trình duyệt nguồn" })).toHaveFocus();
   const cancelChat = vi.fn(); document.addEventListener("keydown", cancelChat);
   fireEvent.keyDown(document, { key: "Escape" });
-  expect(useReportPreviewStore.getState().selection).toBeNull();
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(0);
   expect(cancelChat).not.toHaveBeenCalled();
   expect(link).toHaveFocus();
   document.removeEventListener("keydown", cancelChat);
 });
 
-it("routes Markdown sources to the browser and document handles to report preview", () => {
+it("routes Markdown sources to the browser and document handles to report preview without dropping either", () => {
   render(<MarkdownContent streaming content={`[Nguồn](https://example.com/page) [Word](/api/reports/${"a".repeat(32)})`} />);
   fireEvent.click(screen.getByRole("link", { name: "Nguồn" }));
-  expect(useReportPreviewStore.getState().selection).toEqual({ sourceUrl: "https://example.com/page", title: "Nguồn" });
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(1);
+  expect(useReportPreviewStore.getState().tabs[0].selection).toEqual({ kind: "source", sourceUrl: "https://example.com/page", title: "Nguồn" });
   fireEvent.click(screen.getByRole("link", { name: "Word" }));
-  expect(useReportPreviewStore.getState().selection).toEqual({ reportId: "a".repeat(32) });
+  // The document joins the source as a second tab. It used to replace it,
+  // which is why the pane could only ever show one preview.
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(2);
+  expect(useReportPreviewStore.getState().tabs[1].selection).toEqual({ kind: "report", reportId: "a".repeat(32) });
+  expect(useReportPreviewStore.getState().activeId).toBe(useReportPreviewStore.getState().tabs[1].id);
 });
 
 it("rejects executable URLs and URLs with credentials at the selection boundary", () => {
   for (const url of ["javascript:alert(1)", "file:///secret", "https://user:password@example.com/page", "not a URL"]) {
     useReportPreviewStore.getState().openSource(url);
-    expect(useReportPreviewStore.getState().selection).toBeNull();
+    expect(useReportPreviewStore.getState().tabs).toHaveLength(0);
   }
 });
 
-it("controls the isolated desktop browser and releases it when a document replaces it", async () => {
+it("controls the isolated desktop browser and releases its overlay when a document is shown", async () => {
   let listener!: (state: SourceBrowserState) => void;
   const unsubscribe = vi.fn();
   const browser = { open: vi.fn().mockResolvedValue(undefined), setBounds: vi.fn(), close: vi.fn(), navigate: vi.fn(), openExternal: vi.fn(),
@@ -55,7 +60,12 @@ it("controls the isolated desktop browser and releases it when a document replac
   expect(browser.navigate).toHaveBeenCalledWith("reload");
   fireEvent.click(screen.getByRole("link", { name: "Mở nguồn bằng trình duyệt ngoài" }));
   expect(browser.openExternal).toHaveBeenCalledWith("https://example.com/next");
+  // Retain the source tab while removing its native overlay from the document.
   act(() => useReportPreviewStore.getState().openArtifact("b".repeat(32)));
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(2);
+  expect(browser.close).toHaveBeenCalledOnce();
+  const sourceTabId = useReportPreviewStore.getState().tabs[0].id;
+  act(() => useReportPreviewStore.getState().closeTab(sourceTabId));
   await waitFor(() => expect(browser.close).toHaveBeenCalledOnce());
   expect(unsubscribe).toHaveBeenCalledOnce();
 });
@@ -68,5 +78,5 @@ it("shows desktop errors and handles Escape from the native page", async () => {
   render(<SourceBrowserPanel />);
   expect(await screen.findByRole("alert")).toHaveTextContent("Không thể mở nguồn");
   act(() => listener({ url: "https://example.com/report", title: "", loading: false, canGoBack: false, canGoForward: false, closed: true }));
-  expect(useReportPreviewStore.getState().selection).toBeNull();
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(0);
 });

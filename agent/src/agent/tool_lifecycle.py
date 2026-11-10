@@ -65,6 +65,63 @@ def _attach_source_index(result: str, sources: list[dict[str, Any]]) -> str:
 # identical re-runs still ends at the no-progress limit.
 MAX_READONLY_REPLAY_RECOVERIES = 6
 
+#: How many sources a research payload may carry to the client. The pane
+#: lists them; past this the list stops being readable and the citation
+#: ledger in the answer remains the authoritative index.
+MAX_RESEARCH_SOURCES = 40
+
+
+def _research_payload(tool_name: str, result: str) -> dict[str, Any] | None:
+    """Extract an AI-search result the right pane can open.
+
+    The search tools disagree on their key names -- ``parallel_web_search``
+    returns ``results`` and ``concurrent_scraper`` returns ``sources`` -- so
+    both are read here. Anything that is not a usable, non-empty result
+    yields ``None`` rather than an empty tab.
+    """
+    try:
+        payload = json.loads(result)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+
+    raw_sources = payload.get("sources")
+    if not isinstance(raw_sources, list):
+        raw_sources = payload.get("results")
+    if not isinstance(raw_sources, list):
+        return None
+
+    sources: list[dict[str, str]] = []
+    for entry in raw_sources:
+        if not isinstance(entry, dict):
+            continue
+        url = entry.get("url")
+        if not isinstance(url, str) or not url.strip():
+            continue
+        title = entry.get("title")
+        snippet = entry.get("snippet")
+        publisher = entry.get("source") or entry.get("publisher")
+        sources.append({
+            "url": url.strip(),
+            "title": (title.strip() if isinstance(title, str) else url.strip())[:300],
+            **({"snippet": snippet.strip()[:600]} if isinstance(snippet, str) and snippet.strip() else {}),
+            **({"publisher": publisher.strip()[:120]} if isinstance(publisher, str) and publisher.strip() else {}),
+        })
+        if len(sources) >= MAX_RESEARCH_SOURCES:
+            break
+    if not sources:
+        return None
+
+    query = payload.get("primary_query") or payload.get("query") or payload.get("original_query")
+    summary = payload.get("summary_markdown")
+    return {
+        "tool": tool_name,
+        "query": query.strip()[:300] if isinstance(query, str) else "",
+        **({"summary_markdown": summary} if isinstance(summary, str) and summary.strip() else {}),
+        "sources": sources,
+    }
+
 
 def _format_timeout(seconds: float) -> str:
     """Return a human-readable timeout label."""
@@ -180,8 +237,7 @@ class ToolCallLifecycle:
                 continue
             # A repair loop changes the arguments on every round, so the
             # exact-call block above never fires for it. The family block
-            # catches it: several repairs of the same failure class have
-            # already been tried and the next one will not differ.
+            # catches repairs of the same failure class without new evidence.
             family_code = self._tool_progress.blocked_family(tc.name)
             if family_code is not None:
                 failed_result = json.dumps(
@@ -189,9 +245,9 @@ class ToolCallLifecycle:
                         "status": "error",
                         "skipped": True,
                         "reason": (
-                            f"{tc.name} đã thất bại {family_code} nhiều lần với các tham số khác nhau. "
-                            "Sửa lỗi hình dạng dữ liệu một lần nữa sẽ không có tác dụng: hãy kiểm tra "
-                            "lại schema của công cụ, hoặc dừng lại và trả lời bằng những gì đã thu thập được."
+                            f"{tc.name} đã lặp lỗi {family_code} đến giới hạn thử lại mà chưa có kết quả mới. "
+                            "Hãy kiểm tra schema hoặc thu thập dữ liệu còn thiếu bằng công cụ khác trước "
+                            "khi thử lại với đầu vào đã sửa; nếu không thể, nêu rõ phần chưa hoàn thành."
                         ),
                     },
                     ensure_ascii=False,
@@ -894,14 +950,31 @@ class ToolCallLifecycle:
         # Scrub before caching, truncation and model context, not just the
         # downstream trace/event preview. Shell stdout may hold credentials.
         result = redact_tool_result(result)
+        if tc.name == "export_research_report":
+            from src.reporting.tool import ExportResearchReportTool
+
+            if isinstance(self.registry.get(tc.name), ExportResearchReportTool):
+                from src.agent.write_targets import record_report_export
+
+                record_report_export(
+                    tc.arguments, result,
+                    requested_formats=self._requested_report_formats,
+                    artifacts=self._report_artifacts,
+                )
         if tc.name in {"get_market_data", "build_price_chart"}:
-            from src.agent.answer_charts import collect_observed_charts
+            from src.agent.answer_charts import collect_observed_charts, prefer_richer_chart
 
             for symbol, chart in collect_observed_charts(self.registry.get(tc.name), tc.arguments, result).items():
                 if symbol not in self._answer_charts and len(self._answer_charts) >= 3:
                     continue
-                if chart.get("bars") or symbol not in self._answer_charts:
-                    self._answer_charts[symbol] = chart
+                # Keep the richest series seen for this symbol. A run often
+                # fetches a wide daily window first and a narrow "latest
+                # quote" window last; taking the last one replaced ninety
+                # candles with three, and the chart rendered as a handful of
+                # enormous bars in an otherwise empty plot.
+                self._answer_charts[symbol] = prefer_richer_chart(
+                    self._answer_charts.get(symbol), chart
+                )
         if update_memory:
             self._update_memory(tc.name)
 
@@ -1027,6 +1100,7 @@ class ToolCallLifecycle:
         )
         preview = trace_result[:200]
         artifact = None
+        research = None
         if status == "ok" and tc.name in {"write_file", "render_shadow_report"}:
             try:
                 payload = json.loads(trace_result)
@@ -1038,6 +1112,13 @@ class ToolCallLifecycle:
                                 "download_url": f"/api/reports/{report_id}"}
             except (ValueError, TypeError, AttributeError, OSError):
                 pass
+        elif status == "ok" and tc.name in {"parallel_web_search", "concurrent_scraper", "web_search"}:
+            # A web search produced a real result -- the agent's synthesis
+            # plus the pages it read. Only the first 200 characters reached
+            # the client, so the user could see that a search happened but
+            # never read it. Ship it as a structured payload so the right
+            # pane can open it as its own tab.
+            research = _research_payload(tc.name, trace_result)
         react_trace.append({"type": "tool_call", "tool": tc.name, "result_preview": preview})
         self._emit(
             "tool_result",
@@ -1048,6 +1129,7 @@ class ToolCallLifecycle:
                 "preview": preview,
                 "call_id": tc.id,
                 **({"artifact": artifact} if artifact else {}),
+                **({"research": research} if research else {}),
             },
         )
 

@@ -24,7 +24,9 @@ it("shows partial export warning, shrimp logo, and opens Word in the preview sid
   expect(screen.getByRole("img", { name: /tôm đỏ/ })).toBeVisible();
   expect(screen.queryByText("Báo cáo chính thức")).not.toBeInTheDocument();
   fireEvent.click(word);
-  expect(useReportPreviewStore.getState().selection).toEqual({ job: receipt() });
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(1);
+  expect(useReportPreviewStore.getState().tabs[0].selection).toEqual({ kind: "report", job: receipt() });
+  expect(useReportPreviewStore.getState().activeId).toBe(useReportPreviewStore.getState().tabs[0].id);
 });
 
 it("labels simulated documents visibly", async () => {

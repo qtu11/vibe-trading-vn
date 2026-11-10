@@ -41,7 +41,7 @@ it("previews the PDF from a clicked DOCX handle and keeps all three downloads in
   await waitFor(() => expect(downloadGeneratedReport).toHaveBeenCalledWith(job.artifacts[2].report_id, "research.pptx"));
 });
 
-it("closes on Escape without propagating cancellation, restores focus and releases bytes", async () => {
+it("closes the active tab on Escape without propagating cancellation, restores focus and releases bytes", async () => {
   const trigger = document.createElement("button"); document.body.append(trigger); trigger.focus();
   useReportPreviewStore.getState().openJob(receipt());
   render(<ReportPreviewPanel />);
@@ -49,7 +49,8 @@ it("closes on Escape without propagating cancellation, restores focus and releas
   expect(screen.getByRole("button", { name: "Đóng bản xem trước" })).toHaveFocus();
   const cancellation = vi.fn(); document.addEventListener("keydown", cancellation);
   fireEvent.keyDown(document, { key: "Escape" });
-  expect(useReportPreviewStore.getState().selection).toBeNull();
+  expect(useReportPreviewStore.getState().tabs).toHaveLength(0);
+  expect(useReportPreviewStore.getState().activeId).toBeNull();
   expect(cancellation).not.toHaveBeenCalled();
   expect(trigger).toHaveFocus();
   expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:report-preview");
@@ -69,7 +70,7 @@ it("keeps Word downloadable when preview export failed and disables unavailable 
   expect(fetchReportPreviewPage).not.toHaveBeenCalled();
 });
 
-it("aborts stale requests on another selection and never shows their response", async () => {
+it("aborts the request of the tab it leaves when following another one", async () => {
   let resolveOld: (value: ReportEngineJob) => void = () => {};
   vi.mocked(api.getReportJobForArtifact).mockReturnValue(new Promise((resolve) => { resolveOld = resolve; }));
   useReportPreviewStore.getState().openArtifact("b".repeat(32));
@@ -77,10 +78,11 @@ it("aborts stale requests on another selection and never shows their response", 
   const signal = vi.mocked(api.getReportJobForArtifact).mock.calls[0][1]!;
   act(() => useReportPreviewStore.getState().openJob(receipt()));
   await screen.findByRole("img", { name: "Xem trước research.docx, trang 1" });
+  // A standalone panel follows the active tab, so the document it left is
+  // no longer needed and its request is released.
   expect(signal.aborted).toBe(true);
   await act(async () => resolveOld({ ...receipt(), artifacts: [] }));
   expect(screen.getByRole("img", { name: "Xem trước research.docx, trang 1" })).toBeVisible();
-  expect(fetchReportPreviewPage).toHaveBeenCalledOnce();
   unmount();
   expect(vi.mocked(fetchReportPreviewPage).mock.calls[0][2]?.aborted).toBe(true);
 });

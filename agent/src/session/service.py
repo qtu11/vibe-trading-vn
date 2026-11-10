@@ -716,6 +716,22 @@ class SessionService:
         match["preview"] = str(data.get("preview") or "")
         if match["status"] == "ok" and isinstance(data.get("artifact"), dict):
             match["artifact"] = dict(data["artifact"])
+        # The AI-search payload reaches the client only over the live SSE
+        # stream. Without persisting it here, a reloaded session lost the
+        # "Xem kết quả" affordance entirely: the tool row rendered again but
+        # the right-hand pane had nothing to open.
+        if match["status"] == "ok" and isinstance(data.get("research"), dict):
+            research = data["research"]
+            match["research"] = {
+                "tool": str(research.get("tool") or tool),
+                "query": str(research.get("query") or ""),
+                **({"summary_markdown": research["summary_markdown"]}
+                   if isinstance(research.get("summary_markdown"), str) else {}),
+                "sources": [
+                    source for source in research.get("sources", [])
+                    if isinstance(source, dict) and isinstance(source.get("url"), str)
+                ],
+            }
         if call_id:
             match["call_id"] = call_id
 

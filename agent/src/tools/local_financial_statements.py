@@ -23,6 +23,20 @@ _RECORD_FIELDS = {
 }
 
 
+class StatementSourceNotConfigured(ValueError):
+    """No local source is configured for the requested issuer."""
+
+    error_code = "statement_source_not_configured"
+    remedy = (
+        "This symbol has no configured local statement source. Do not retry this local call. "
+        "Search issuer/exchange filings with parallel_web_search, then read the original filing "
+        "with read_url or read_document and retain its URL, page, period, scope and units. "
+        "Until an original filing is collected, mark that evidence missing and financial figures "
+        "from news or aggregators unverified. Do not configure or write a local statement store "
+        "from inferred figures."
+    )
+
+
 def _text(value: object, field: str, limit: int = 256) -> str:
     if not isinstance(value, str) or not value.strip() or len(value) > limit:
         raise ValueError(f"{field} must be a non-empty string (max {limit} characters)")
@@ -60,7 +74,9 @@ def _configured_path(code: str) -> Path:
     if not isinstance(entries, list) or any(not isinstance(entry, dict) for entry in entries):
         raise ValueError("financial_statements configuration must be a list of objects")
     matches = [entry for entry in entries if entry.get("symbol") == code]
-    if len(matches) != 1:
+    if not matches:
+        raise StatementSourceNotConfigured("Configure exactly one financial_statements source for this symbol in Data Bridge")
+    if len(matches) > 1:
         raise ValueError("Configure exactly one financial_statements source for this symbol in Data Bridge")
     path = Path(_text(matches[0].get("path"), "Configured source path", 4096)).expanduser()
     if not path.is_absolute():

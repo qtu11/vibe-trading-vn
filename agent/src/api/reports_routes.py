@@ -26,7 +26,7 @@ class ReportExportRequest(BaseModel):
     report: dict
     formats: list[Literal["docx", "pdf", "pptx"]] = Field(default=["docx", "pdf", "pptx"], min_length=1, max_length=3)
     run_id: Annotated[str, Field(strict=True, pattern=r"^[A-Za-z0-9_-]{1,100}$")] | None = None
-    minimum_pages: Annotated[int, Field(strict=True, ge=1, le=2000)] = 24
+    minimum_pages: Annotated[int, Field(strict=True, ge=1, le=2000)] = 1
 
 
 def register_reports_routes(app: FastAPI) -> None:

@@ -570,7 +570,7 @@ def _build_running_header(section, report: ResearchReport | None = None):
     p_left_sub = left.add_paragraph()
     p_left_sub.alignment = WD_ALIGN_PARAGRAPH.LEFT
     set_para_spacing(p_left_sub, before=0, after=0, line=1.0)
-    p_text(p_left_sub, "CFA Institutional Equity Research", size=6.8, color=BRAND.muted)
+    p_text(p_left_sub, "Equity Research", size=6.8, color=BRAND.muted)
 
     p_right = right.paragraphs[0]
     p_right.alignment = WD_ALIGN_PARAGRAPH.RIGHT

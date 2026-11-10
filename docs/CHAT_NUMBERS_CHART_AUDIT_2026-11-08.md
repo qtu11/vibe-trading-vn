@@ -57,7 +57,8 @@ Không thể gọi bản phân tích này là báo cáo được CFA chứng nh�
 
 - Backend: `answer_charts.py`, `tool_lifecycle.py`, `loop.py`, `loop_grounding.py`, `tools/price_chart_tool.py`, các mô-đun `grounding/{ledger,figures,figures_checks,policies,release}.py`.
 - Frontend: `MessageBubble`, `ChartBlock`, `CandlestickChart`, `legacyGrounding.ts`, bản dịch đủ 14 ngôn ngữ, bộ chọn model/mức suy nghĩ trong `Composer` và nơi gọi tại `Agent`.
-- Chống trùng lặp model: `ModelRuntimeBar` tự ẩn khi provider/model/effort trùng cấu hình composer; trigger trong composer không còn lặp nhãn "Nhà cung cấp mặc định" khi không có effort rõ ràng.
+- Chống trùng lặp model: `ModelRuntimeBar` tự ẩn khi provider/model/effort trùng cấu hình composer. Model runtime có tiền tố nhà cung cấp (`vendor/model`) được so khớp với model đã cấu hình; nếu chỉ khác mức suy nghĩ, thanh trên chỉ còn chip mức suy nghĩ và không lặp lại tên model/provider. Trigger trong composer không còn lặp nhãn "Nhà cung cấp mặc định" khi không có effort rõ ràng.
+- Thẻ context: `ContextUsageIndicator` được làm lại theo bố cục Codex — tiêu đề "Cửa sổ ngữ cảnh", phần trăm đã dùng/còn lại, thanh tiến trình, dòng `196k / 475k token được sử dụng`, lưới thống kê và phần chẩn đoán đóng gói sau nút "Chi tiết". Trạng thái chưa xác định cửa sổ model vẫn không suy ra phần trăm; thay vào đó hiện ngân sách dự phòng và hướng dẫn rõ ràng.
 - Câu trả lời cũ: đoạn, tiêu đề, hàng bảng và fence phụ thuộc marker bị rút; chỉ còn một thông báo cục bộ. Chart fence cũ được giữ cho `ChartBlock` hiện trạng thái "không thể dựng lại" thay vì JSON hỏng.
 - Prompt/skill: `context.py` và `vietnam-deep-research/SKILL.md` nêu cấu trúc equity research kiểu CFA (kết luận, bằng chứng thị trường, cơ bản, định giá, kịch bản, rủi ro/phản biện, khoảng trống dữ liệu, nguồn) và bắt buộc chart nến quan sát được cho câu hỏi giá/xu hướng; không tuyên bố chứng chỉ CFA.
 - Kiểm tra: dữ liệu MB đã ghi nhận trong fixtures, hồi quy bộ kiểm chứng, gắn chart qua lifecycle/SSE, render chat đã lưu, trạng thái chart hỏng, composer với chuột/bàn phím và chế độ provider không hỗ trợ.
@@ -80,7 +81,7 @@ UI review sử dụng cấu hình model mô phỏng và dữ liệu chart đã g
 - Bộ grounding rộng: 1.349 đạt, 2 bỏ qua; sau sửa hàng bảng/citation cùng hàng, 169 kiểm thử liên quan đạt.
 - Chart backend: 20 kiểm thử gắn chart và công cụ đạt sau thay vị trí chart lên đầu câu trả lời.
 - Lần chạy lại 08/11: `pytest agent/tests -k "grounding or chart"` đạt 1.470, bỏ qua 10; riêng `test_answer_charts`, hồi quy MBB, `test_price_chart_tool` và các bộ grounding liên quan đạt 254.
-- Frontend lần chạy lại 08/11: toàn bộ 122 file / 1.108 kiểm thử đạt; `npm run build` (`tsc -b && vite build`) đạt. Kiểm thử mới phủ `legacyGrounding`, trạng thái chart cũ, ẩn thanh runtime trùng cấu hình và trigger không lặp nhãn mặc định.
+- Frontend lần chạy lại 10/11: toàn bộ 128 file / 1.165 kiểm thử đạt; `npm run build` (`tsc -b && vite build`) đạt. Kiểm thử mới phủ `legacyGrounding`, trạng thái chart cũ, ẩn thanh runtime trùng cấu hình (kể cả model có tiền tố nhà cung cấp), thẻ context kiểu Codex và bản dịch tiếng Việt của thẻ này.
 - Các kiểm tra UI thật ở trên dùng trình duyệt, `MarkdownContent` và ECharts; composer có kiểm tra chế độ sáng/tối, bàn phím và chiều rộng 320 px.
 - Các assertion logo cũ và dấu phân cách số theo locale của máy được cập nhật cho logo PNG hiện dùng và cách hiển thị phụ thuộc locale, không đổi giá trị tiền/tỷ lệ trong production.
 
