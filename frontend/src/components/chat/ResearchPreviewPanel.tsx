@@ -43,12 +43,13 @@ export function ResearchPreviewPanel({ tabId }: { tabId?: string }) {
           <section className="mt-6">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <ExternalLink aria-hidden="true" className="h-3.5 w-3.5" />
-              Nguồn thu thập ({sources.length})
+              Nguồn tìm được ({sources.length})
             </h3>
             <ul className="space-y-2">
               {sources.map((source) => (
                 <li key={source.url} className="rounded-lg border border-border/60 bg-card/40 p-2.5">
                   <SourceLink href={source.url} className="block text-sm font-medium text-foreground hover:underline">
+                    {source.source_id && <span className="mr-2 font-mono text-xs text-primary">[{source.source_id}]</span>}
                     {source.title || source.url}
                   </SourceLink>
                   {source.snippet && <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{source.snippet}</p>}

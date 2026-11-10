@@ -17,6 +17,7 @@ from .rate_limiter import AdaptiveRateLimiter
 from .ssrf_guard import SSRFGuard, SSRFSafeTransport, SSRFSecurityError
 
 logger = logging.getLogger(__name__)
+_MAX_RESPONSE_BYTES = 20 * 1024 * 1024
 
 # Modern desktop User-Agent pool
 _USER_AGENTS = [
@@ -42,6 +43,9 @@ class ScrapeResult:
     error: str | None = None
     success: bool = True
     final_url: str = ""
+    content_bytes: bytes = b""
+    content_type: str = ""
+    truncated: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         """Convert ScrapeResult to dictionary."""
@@ -54,6 +58,9 @@ class ScrapeResult:
             "resolved_ip": self.resolved_ip,
             "error": self.error,
             "content_length": len(self.html_content),
+            "content_bytes": len(self.content_bytes),
+            "content_type": self.content_type,
+            "truncated": self.truncated,
         }
 
 
@@ -148,11 +155,26 @@ class AsyncScrapingEngine:
             client = await self._get_client()
             headers = self._get_random_headers()
             try:
-                resp = await client.get(
-                    url,
-                    headers=headers,
-                    timeout=httpx.Timeout(timeout, connect=min(timeout, 4.0)),
-                )
+                async with asyncio.timeout(timeout):
+                    async with client.stream(
+                        "GET", url, headers=headers,
+                        timeout=httpx.Timeout(timeout, connect=min(timeout, 4.0)),
+                    ) as resp:
+                        body = bytearray()
+                        truncated = False
+                        async for chunk in resp.aiter_bytes():
+                            if len(body) + len(chunk) > _MAX_RESPONSE_BYTES:
+                                body.extend(chunk[:max(0, _MAX_RESPONSE_BYTES - len(body))])
+                                truncated = True
+                                break
+                            body.extend(chunk)
+                        content = bytes(body)
+                        content_type = resp.headers.get("content-type", "text/html").split(";", 1)[0].strip().lower()
+                        if content.lstrip().startswith(b"%PDF-"):
+                            content_type = "application/pdf"
+                        html_content = (content.decode(resp.encoding or "utf-8", errors="replace")
+                                        if content_type in {"text/html", "application/xhtml+xml", "text/plain", "text/markdown"}
+                                        and not truncated else "")
                 latency = (time.monotonic() - start_time) * 1000.0
 
                 # Inform rate limiter of success or failure
@@ -164,13 +186,16 @@ class AsyncScrapingEngine:
                 return ScrapeResult(
                     url=url,
                     final_url=str(resp.url),
-                    html_content=resp.text,
-                    status_code=resp.status_code,
+                    html_content=html_content,
+                    content_bytes=content,
+                    content_type=content_type,
+                    truncated=truncated,
+                    status_code=413 if truncated else resp.status_code,
                     headers=res_headers,
                     latency_ms=latency,
                     resolved_ip=resolved_ip or "",
-                    error=None if resp.is_success else f"HTTP {resp.status_code}",
-                    success=resp.is_success,
+                    error="response_size_limit_exceeded" if truncated else (None if resp.is_success else f"HTTP {resp.status_code}"),
+                    success=resp.is_success and not truncated,
                 )
             except SSRFSecurityError as ssrf_err:
                 latency = (time.monotonic() - start_time) * 1000.0
@@ -183,7 +208,7 @@ class AsyncScrapingEngine:
                     error=f"SSRF violation: {ssrf_err}",
                     success=False,
                 )
-            except httpx.TimeoutException as timeout_err:
+            except (httpx.TimeoutException, TimeoutError) as timeout_err:
                 latency = (time.monotonic() - start_time) * 1000.0
                 self.rate_limiter.report_result(host, is_timeout=True)
                 return ScrapeResult(

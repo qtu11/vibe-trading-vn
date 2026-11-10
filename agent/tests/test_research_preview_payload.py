@@ -89,3 +89,20 @@ def test_the_source_list_is_capped_so_the_pane_stays_readable() -> None:
 
     assert payload is not None
     assert len(payload["sources"]) == MAX_RESEARCH_SOURCES
+
+
+def test_research_sources_share_the_ledgers_ids_and_deduplicate_urls():
+    result = json.dumps({"results": [
+        {"url": "https://example.com/report#page=1", "title": "Report"},
+        {"url": "https://example.com/report", "title": "Report duplicate"},
+    ], "_sources": [{"id": "S17", "url": "https://example.com/report", "title": "Report"}]})
+    payload = _research_payload("parallel_web_search", result)
+    assert len(payload["sources"]) == 1
+    assert payload["sources"][0]["source_id"] == "S17"
+
+
+def test_repeated_search_uses_the_source_id_registered_by_an_earlier_call():
+    result = json.dumps({"results": [{"url": "https://example.com/report", "title": "Report"}]})
+    payload = _research_payload("parallel_web_search", result,
+                                source_index=[{"source_id": "S17", "url": "https://example.com/report"}])
+    assert payload["sources"][0]["source_id"] == "S17"

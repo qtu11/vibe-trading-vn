@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -55,6 +56,20 @@ def test_stream_checkpoint_tracks_deltas_and_resets(tmp_path: Path) -> None:
     )
 
 
+def test_tool_checkpoint_does_not_delay_the_first_streamed_text(tmp_path):
+    store = SessionStore(tmp_path / "sessions")
+    session = Session(title="tool checkpoint")
+    store.create_session(session)
+    attempt = Attempt(session_id=session.session_id)
+    store.create_attempt(attempt)
+    trail = [{"tool": "read_file", "call_id": "source-1", "status": "ok"}]
+    checkpoint = ResponseCheckpoint(store, attempt, min_interval_seconds=60, tool_trail=trail)
+    checkpoint.handle_event("tool_result", {"call_id": "source-1"})
+    assert store.get_partial_tool_trail(session.session_id, attempt.attempt_id) == trail
+    checkpoint.handle_event("text_delta", {"delta": "First answer token"})
+    assert store.get_partial_response(session.session_id, attempt.attempt_id) == "First answer token"
+
+
 def test_service_restart_recovers_partial_reply_once(
     tmp_path: Path, monkeypatch
 ) -> None:
@@ -63,6 +78,7 @@ def test_service_restart_recovers_partial_reply_once(
     store.create_session(session)
     attempt = Attempt(session_id=session.session_id, prompt="analyze")
     attempt.mark_running()
+    attempt.run_dir = str(tmp_path / "runs" / "known-run")
     store.create_attempt(attempt)
     store.save_partial_response(
         session.session_id, attempt.attempt_id, "Partial answer"
@@ -85,6 +101,9 @@ def test_service_restart_recovers_partial_reply_once(
         "status": "interrupted",
         "partial": True,
         "recovery_reason": "service_restart",
+        "run_id": "known-run",
+        "started_at": attempt.started_at,
+        "elapsed_ms": max(0, round((datetime.fromisoformat(recovered.completed_at).timestamp() - attempt.started_at) * 1000)),
     }
     assert store.get_partial_response(session.session_id, attempt.attempt_id) is None
 

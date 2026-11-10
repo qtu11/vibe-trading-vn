@@ -115,3 +115,12 @@ it("opens an AI-search result as its own tab", () => {
   expect(state.tabs[0].kind).toBe("research");
   expect(state.tabs[0].title).toContain("VIC HOSE");
 });
+
+it("refreshes sources when the same research query is opened with new results", () => {
+  const store = useReportPreviewStore.getState();
+  store.openResearch({ query: "TCB", sources: [{ title: "Old", url: "https://example.com/old" }] });
+  store.openResearch({ query: "TCB", sources: [{ title: "New", url: "https://example.com/new", source_id: "S17" }] });
+  const tabs = useReportPreviewStore.getState().tabs;
+  expect(tabs).toHaveLength(1);
+  expect(tabs[0].selection).toMatchObject({ research: { sources: [{ source_id: "S17", title: "New" }] } });
+});

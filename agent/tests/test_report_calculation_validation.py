@@ -153,3 +153,111 @@ def test_unrated_calculation_without_a_value_remains_explicitly_unavailable(tmp_
 
     assert receipt['ok'] is True
     assert rendered[0].financial_metrics[1].value is None
+
+
+def cashflow_payload(tmp_path):
+    report, context = research(tmp_path)
+    context = _collected_page(tmp_path, context, "CFO: 69245 tỷ VND; CAPEX: 74505 tỷ VND")
+    payload = report.model_dump(mode='json')
+    payload['sources'].append({'id': 'IR1', 'title': 'Cash flow statement', 'provider': 'IR',
+                               'url': 'https://ir.example.vn/kqkd-9t-2026'})
+    payload['financial_metrics'].extend([
+        {'key': key, 'label': key, 'value': value, 'unit': 'tỷ VND',
+         'as_of': '2026-09-30', 'source_ids': ['IR1']}
+        for key, value in [('cfo', 69245), ('capex', 74505)]
+    ] + [{'key': 'fcf', 'label': 'Cash flow proxy', 'value': -5260, 'unit': 'tỷ VND',
+          'as_of': '2026-09-30', 'evidence_kind': 'derived',
+          'input_keys': ['cfo', 'capex'], 'methodology': 'cfo - capex'}])
+    return payload, context
+
+
+def test_export_rejects_cash_flow_subtraction_from_different_periods(tmp_path, monkeypatch):
+    payload, context = cashflow_payload(tmp_path)
+    payload['financial_metrics'][2]['as_of'] = '2025-12-31'
+
+    receipt, rendered = export_receipt(tmp_path, monkeypatch, payload, context)
+
+    assert receipt['ok'] is False
+    assert receipt['error_code'] == 'EVIDENCE_VALIDATION_FAILED'
+    assert not rendered
+    issue = receipt['field_errors'][0]
+    assert issue['field'] == 'financial_metrics.3.value'
+    assert {item['as_of'] for item in issue['inputs'].values()} == {'2026-09-30', '2025-12-31'}
+    payload['financial_metrics'][2]['as_of'] = '2026-09-30'
+    retry, rendered = export_receipt(tmp_path, monkeypatch, payload, context)
+    assert retry['ok'] is True
+    assert len(rendered) == 1
+
+
+@pytest.mark.parametrize('methodology', ['cfo - capex; calculated from statements', 'cfo -'])
+def test_export_rejects_malformed_arithmetic_instead_of_downgrading_it_to_prose(
+    tmp_path, monkeypatch, methodology,
+):
+    payload, context = cashflow_payload(tmp_path)
+    payload['financial_metrics'][3].update(value=-96030, methodology=methodology)
+
+    receipt, rendered = export_receipt(tmp_path, monkeypatch, payload, context)
+
+    assert receipt['ok'] is False
+    assert receipt['error_code'] == 'EVIDENCE_VALIDATION_FAILED'
+    assert receipt['field_errors'][0]['field'] == 'financial_metrics.3.value'
+    assert not rendered
+
+
+def test_valuation_can_combine_a_current_quote_with_an_earlier_eps_date(tmp_path, monkeypatch):
+    report, context = research(tmp_path)
+    payload = report.model_dump(mode='json')
+    payload['valuation_metrics'] = [
+        {'key': 'eps', 'label': 'Forecast EPS', 'value': 2540, 'unit': 'VND',
+         'as_of': '2026-09-30', 'evidence_kind': 'assumption', 'methodology': 'Explicit forecast'},
+        {'key': 'pe', 'label': 'Scenario P/E', 'value': 22, 'unit': 'x',
+         'as_of': '2026-11-06', 'evidence_kind': 'assumption', 'methodology': 'Explicit multiple'},
+        {'key': 'target_price', 'label': 'Scenario price', 'value': 55880, 'unit': 'VND',
+         'as_of': '2026-11-06', 'price_basis': 'raw', 'evidence_kind': 'derived',
+         'input_keys': ['eps', 'pe'], 'methodology': 'eps * pe'},
+    ]
+
+    receipt, rendered = export_receipt(tmp_path, monkeypatch, payload, context)
+
+    assert receipt['ok'] is True
+    assert len(rendered) == 1
+
+
+@pytest.mark.parametrize('share_unit,eps_unit', [('shares', 'VND/share'), ('SHARE', 'VND/SHARES'), ('CP', 'VND/CP')])
+@pytest.mark.parametrize('eps_value', [1000, 999])
+def test_export_checks_eps_with_explicit_share_unit_aliases(
+    tmp_path, monkeypatch, share_unit, eps_unit, eps_value,
+):
+    report, context = research(tmp_path)
+    context = _collected_page(tmp_path, context, 'Net profit: 1000000000 VND; Shares: 1000000')
+    payload = report.model_dump(mode='json')
+    payload['sources'].append({'id': 'IR1', 'title': 'Earnings and shares', 'provider': 'IR',
+                               'url': 'https://ir.example.vn/kqkd-9t-2026'})
+    payload['financial_metrics'].extend([
+        {'key': 'net_income', 'label': 'Net profit', 'value': 1000000000, 'unit': 'VND',
+         'as_of': '2026-09-30', 'source_ids': ['IR1']},
+        {'key': 'share_count', 'label': 'Shares', 'value': 1000000, 'unit': share_unit,
+         'as_of': '2026-09-30', 'source_ids': ['IR1']},
+        {'key': 'eps', 'label': 'EPS', 'value': eps_value, 'unit': eps_unit,
+         'as_of': '2026-09-30', 'evidence_kind': 'derived',
+         'input_keys': ['net_income', 'share_count'], 'methodology': 'net_income / share_count'},
+    ])
+
+    receipt, rendered = export_receipt(tmp_path, monkeypatch, payload, context)
+
+    assert receipt['ok'] is (eps_value == 1000)
+    if eps_value == 999:
+        assert not rendered
+        assert receipt['field_errors'][0]['expected_value'] == 1000
+    else:
+        assert len(rendered) == 1
+
+
+def test_render_success_keeps_depth_feedback_for_the_ai(tmp_path, monkeypatch):
+    report, context = research(tmp_path)
+    payload = report.model_dump(mode='json')
+    assert payload['analysis_sections'] == []
+    receipt, rendered = export_receipt(tmp_path, monkeypatch, payload, context)
+    assert receipt['ok'] is True
+    assert len(rendered) == 1
+    assert any('không có analysis_sections' in warning for warning in receipt['warnings'])

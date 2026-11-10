@@ -32,6 +32,92 @@ def _service(tmp_path: Path, monkeypatch) -> SessionService:
     )
 
 
+def test_restart_keeps_tools_observed_before_service_task_shutdown(tmp_path, monkeypatch):
+    import threading
+
+    started, release, finished = threading.Event(), threading.Event(), threading.Event()
+    cancelled = threading.Event()
+
+    class ShutdownAgent:
+        def __init__(self, *, event_callback, **kwargs):
+            from types import SimpleNamespace
+
+            self.callback = event_callback
+            self.memory = SimpleNamespace(run_dir=str(tmp_path / "runs" / "fpt-running"))
+
+        def run(self, **kwargs):
+            self.callback("tool_call", {"tool": "read_file", "call_id": "fpt-source", "arguments": {"path": "fpt.json"}})
+            self.callback("tool_result", {"tool": "read_file", "call_id": "fpt-source", "status": "ok", "preview": "Evidence read"})
+            self.callback("text_delta", {"delta": "Partial FPT analysis"})
+            started.set()
+            release.wait(10)
+            finished.set()
+            return {"status": "success", "content": "Final FPT analysis"}
+
+        def cancel(self):
+            cancelled.set()
+
+    monkeypatch.setattr("src.tools.build_registry", lambda **kwargs: object())
+    monkeypatch.setattr("src.providers.chat.ChatLLM", lambda: object())
+    monkeypatch.setattr("src.memory.persistent.PersistentMemory", lambda: object())
+    monkeypatch.setattr("src.agent.loop.AgentLoop", ShutdownAgent)
+    monkeypatch.setattr("src.config.loader.load_runtime_agent_config", lambda overrides=None: object())
+    monkeypatch.setattr("src.config.loader.sanitize_session_overrides", lambda overrides: dict(overrides))
+
+    async def scenario():
+        service = _service(tmp_path, monkeypatch)
+        session = service.create_session(title="shutdown trail")
+        sent = await service.send_message(session.session_id, "Analyze FPT")
+        task = service._active_tasks[session.session_id]
+        try:
+            assert await asyncio.to_thread(started.wait, 3)
+            assert service.store.get_attempt(session.session_id, sent["attempt_id"]).run_dir == str(tmp_path / "runs" / "fpt-running")
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            assert cancelled.is_set(), "task shutdown must cancel the underlying agent"
+            assert session.session_id in service._active_loops
+            assert session.session_id in service._inflight
+            worker = service._agent_workers[session.session_id]
+            cleanup = next(callback for callback in worker._done_callbacks
+                           if callback.__name__ == "release_finished_worker")
+            second = _service(tmp_path, monkeypatch)
+            assert service.store.get_message_for_attempt(session.session_id, sent["attempt_id"]) is None
+            from src.session.service import SessionBusyError
+
+            with pytest.raises(SessionBusyError):
+                await second.send_message(session.session_id, "Do not overlap the live worker")
+        finally:
+            release.set()
+            assert await asyncio.to_thread(finished.wait, 3)
+            for _ in range(100):
+                if session.session_id not in service._inflight:
+                    break
+                await asyncio.sleep(0.01)
+        assert session.session_id not in service._inflight
+        _service(tmp_path, monkeypatch)
+        reply = service.store.get_message_for_attempt(session.session_id, sent["attempt_id"])
+        assert reply is not None
+        assert [entry["call_id"] for entry in reply.tool_trail] == ["fpt-source"]
+        assert reply.tool_trail[0]["status"] == "ok"
+        # The worker and task both schedule cleanup; a delayed second callback
+        # must not remove a later run's handle or release its execution claim.
+        from concurrent.futures import Future
+
+        replacement = Future()
+        service._reserve_session(session.session_id)
+        service._agent_workers[session.session_id] = replacement
+        try:
+            cleanup(worker)
+            assert service._agent_workers.get(session.session_id) is replacement
+            assert session.session_id in service._inflight
+        finally:
+            service._agent_workers.pop(session.session_id, None)
+            service._release_session(session.session_id)
+
+    asyncio.run(scenario())
+
+
 def test_completed_attempt_tool_trail_round_trips_through_history_endpoint(
     tmp_path: Path,
     monkeypatch,
@@ -129,6 +215,24 @@ def test_unfinished_attempt_keeps_its_tool_trail(
     stored = service.store.get_messages(session.session_id)[0]
     assert stored.metadata["status"] == attempt_status
     assert stored.tool_trail == trail
+
+
+def test_missing_report_format_keeps_the_verified_partial_delivery(tmp_path, monkeypatch):
+    service = _service(tmp_path, monkeypatch)
+    session = Session(session_id="abcdef012349", title="partial export")
+    service.store.create_session(session)
+    attempt = Attempt(attempt_id="attempt00009", session_id=session.session_id, prompt="Export PDF and DOCX")
+    service.store.create_attempt(attempt)
+    content = "Chưa hoàn tất DOCX.\n\n[research.pdf](/api/reports/" + "a" * 32 + ")"
+
+    async def run_with_agent(*args, **kwargs):
+        return {"status": "failed", "reason": "report_delivery_incomplete: docx", "content": content}
+
+    monkeypatch.setattr(service, "_run_with_agent", run_with_agent)
+    asyncio.run(service._run_attempt(session, attempt))
+    stored = service.store.get_messages(session.session_id)[0]
+    assert stored.metadata["status"] == "failed"
+    assert content in stored.content
 
 
 def test_run_with_agent_consolidates_tool_events_by_call_id(

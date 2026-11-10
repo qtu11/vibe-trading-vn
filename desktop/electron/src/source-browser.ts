@@ -34,8 +34,13 @@ export function registerSourceBrowser(window: BrowserWindow, assertSender: (send
     error = "Không thể tải file trong khung nguồn. Chọn mở bằng trình duyệt ngoài để tải.";
     publish();
   });
+  // Chromium's bundled PDF viewer needs its own extension and shared UI resources.
+  // These origins stay unavailable to user navigation and external-window requests.
+  const pdfViewerOrigin = "chrome-extension://mhjfbmdgcfjbbpaeojofohoefgiehjai/";
   isolated.webRequest.onBeforeRequest((details, callback) => {
-    callback({ cancel: !isSourceUrl(details.url) });
+    const bundledPdfResource = details.url.startsWith(pdfViewerOrigin)
+      || (details.url.startsWith("chrome://resources/") && details.frame?.url.startsWith(pdfViewerOrigin));
+    callback({ cancel: !isSourceUrl(details.url) && !bundledPdfResource });
   });
   function publish(closed = false) {
     if (!view || window.isDestroyed()) return;
@@ -75,7 +80,7 @@ export function registerSourceBrowser(window: BrowserWindow, assertSender: (send
     close();
     view = new WebContentsView({ webPreferences: {
       session: isolated, contextIsolation: true, sandbox: true, nodeIntegration: false,
-      webSecurity: true, navigateOnDragDrop: false,
+      webSecurity: true, navigateOnDragDrop: false, plugins: true,
     } });
     const current = view;
     const contents = current.webContents;

@@ -13,13 +13,17 @@ from datetime import date, datetime
 from enum import Enum
 import math
 import re
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, BeforeValidator, Field, HttpUrl, ValidationError, field_validator, model_validator
 
 
 EvidenceKind = Literal["observed", "cited", "derived", "assumption"]
-PriceBasis = Literal["raw", "split_adjusted", "total_return"]
+PriceBasis = Annotated[
+    Literal["raw", "split_adjusted", "total_return"],
+    BeforeValidator(lambda value: {"split": "split_adjusted", "split_dividend": "total_return"}.get(value, value)
+                    if isinstance(value, str) else value),
+]
 
 
 class DatumEvidence(BaseModel):
@@ -431,11 +435,12 @@ class ResearchReport(BaseModel):
         keys = [m.key for m in metrics]
         if len(keys) != len(set(keys)):
             raise ValueError("Trùng metric.key trong báo cáo")
-        for metric in metrics:
-            if metric.as_of is not None and metric.as_of > self.data_as_of:
-                raise ValueError(f"Metric có ngày tương lai so với data_as_of: {metric.key}")
-            if metric.key in ("market_price", "target_price") and metric.value is not None and metric.value <= 0:
-                raise ValueError(f"Giá phải lớn hơn 0: {metric.key}")
+        for field in ("financial_metrics", "valuation_metrics"):
+            for metric in getattr(self, field):
+                if metric.as_of is not None and metric.as_of > self.data_as_of:
+                    raise ValueError(f"Metric có ngày tương lai so với data_as_of: {field}.{metric.key}.as_of")
+                if metric.key in ("market_price", "target_price") and metric.value is not None and metric.value <= 0:
+                    raise ValueError(f"Giá phải lớn hơn 0: {metric.key}")
         important = {m.key: m for m in metrics}
         market_price, target_price, upside = (important.get(key) for key in ("market_price", "target_price", "upside"))
         if market_price and target_price and market_price.value is not None and target_price.value is not None:
@@ -474,28 +479,31 @@ class ResearchReport(BaseModel):
                 # A JSON label is not a server-observed content snapshot.
                 if source.status == "verified":
                     source.status = "unverified"
+            problems = []
             for path, item in items:
                 must_cite = item.evidence_kind in {"observed", "cited"}
                 if must_cite and not item.source_ids:
-                    raise ValueError(f"Thiếu source_ids: {path}")
+                    problems.append(f"Thiếu source_ids: {path}")
                 if item.evidence_kind in {"derived", "assumption"} and not item.methodology.strip():
-                    raise ValueError(f"Thiếu phương pháp/giả định: {path}")
+                    problems.append(f"Thiếu phương pháp/giả định: {path}")
                 if item.evidence_kind == "derived" and not (item.input_keys or item.source_ids):
-                    raise ValueError(f"Thiếu đầu vào cho số liệu tính toán: {path}")
+                    problems.append(f"Thiếu đầu vào cho số liệu tính toán: {path}")
                 for sid in item.source_ids:
                     if sources[sid].url is None:
-                        raise ValueError(f"Thiếu URL nguồn cho {path}: {sid}")
+                        problems.append(f"Thiếu URL nguồn cho {path}: {sid}")
                 unknown_inputs = set(item.input_keys) - set(keys)
                 if unknown_inputs:
-                    raise ValueError(f"Đầu vào không tồn tại cho {path}: {sorted(unknown_inputs)}")
+                    problems.append(f"Đầu vào không tồn tại cho {path}: {sorted(unknown_inputs)}")
                 if path.startswith(("financial_metrics.", "valuation_metrics.")):
                     key = path.split(".", 1)[1]
                     if key in item.input_keys:
-                        raise ValueError(f"Đầu vào tự tham chiếu: {key}")
+                        problems.append(f"Đầu vào tự tham chiếu: {key}")
                 for dep_key in item.input_keys:
+                    if dep_key in unknown_inputs:
+                        continue
                     dep = important[dep_key]
                     if dep.value is None and not dep.source_ids and not dep.input_keys:
-                        raise ValueError(f"Đầu vào '{dep_key}' của {path} chưa có giá trị hoặc nguồn")
+                        problems.append(f"Đầu vào '{dep_key}' của {path} chưa có giá trị hoặc nguồn")
 
             for m in self.financial_metrics + self.valuation_metrics:
                 if m.value is not None and m.as_of is None:
@@ -509,6 +517,12 @@ class ResearchReport(BaseModel):
                 for field in ("market_price", "target_price"):
                     if field not in important or important[field].value is None:
                         raise ValueError(f"Không đủ chứng cứ để xếp hạng: {field}")
+
+            if problems:
+                raise ValidationError.from_exception_data(type(self).__name__, [
+                    {"type": "value_error", "loc": (), "ctx": {"error": ValueError(problem)}}
+                    for problem in problems
+                ])
 
             # Derived inputs form an acyclic graph, otherwise they prove nothing.
             def visit(key, active, complete):

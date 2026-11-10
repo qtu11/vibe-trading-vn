@@ -25,7 +25,7 @@ function SourceRow({ source }: { source: SourceCitation }) {
   const markets = source.market.length > 0 ? source.market.join(", ") : null;
 
   return (
-    <li className="rounded-md border border-border/40 bg-background/40 px-2 py-1.5">
+    <li className="rounded-md border border-border/40 bg-background/40 px-2 py-1.5 has-[[aria-current=page]]:border-primary has-[[aria-current=page]]:bg-primary/5">
       <div className="flex items-start gap-2">
         <span className="mt-px shrink-0 rounded bg-muted px-1 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
           {source.sourceId}

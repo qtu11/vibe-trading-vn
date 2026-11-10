@@ -291,7 +291,8 @@ class SessionStore:
     # ---- Streaming Response Checkpoints ----
 
     def save_partial_response(
-        self, session_id: str, attempt_id: str, content: str
+        self, session_id: str, attempt_id: str, content: str,
+        *, tool_trail: Optional[List[Dict[str, Any]]] = None,
     ) -> None:
         """Atomically persist the current streamed assistant text.
 
@@ -299,10 +300,11 @@ class SessionStore:
             session_id: Session ID.
             attempt_id: Attempt ID.
             content: Assistant text accumulated so far.
+            tool_trail: Observed tool actions to preserve across a restart.
         """
         self._write_json(
             self._partial_response_file(session_id, attempt_id),
-            {"content": content},
+            {"content": content, **({"tool_trail": tool_trail} if tool_trail is not None else {})},
         )
 
     def get_partial_response(self, session_id: str, attempt_id: str) -> Optional[str]:
@@ -320,6 +322,12 @@ class SessionStore:
             return None
         content = data.get("content")
         return content if isinstance(content, str) else None
+
+    def get_partial_tool_trail(self, session_id: str, attempt_id: str) -> List[Dict[str, Any]]:
+        """Read observed tool actions saved with an interrupted response."""
+        data = self._read_json(self._partial_response_file(session_id, attempt_id))
+        trail = data.get("tool_trail") if isinstance(data, dict) else None
+        return [item for item in trail if isinstance(item, dict)] if isinstance(trail, list) else []
 
     def delete_partial_response(self, session_id: str, attempt_id: str) -> None:
         """Remove a response checkpoint after the attempt becomes terminal.

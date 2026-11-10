@@ -27,6 +27,7 @@ export interface ResearchArtifact {
 }
 
 export interface ResearchSource {
+  source_id?: string;
   title: string;
   url: string;
   snippet?: string;
@@ -111,7 +112,10 @@ export const useReportPreviewStore = create<{
     const id = `research:${query || artifact.sources.map((source) => source.url).join("|")}`;
     set((state) => {
       const existing = state.tabs.find((item) => item.id === id);
-      if (existing) return { activeId: id };
+      if (existing) return {
+        tabs: state.tabs.map((item) => item.id === id ? { ...item, selection: { kind: "research" as const, research: artifact } } : item),
+        activeId: id,
+      };
       const tab: PreviewTab = {
         id,
         kind: "research",

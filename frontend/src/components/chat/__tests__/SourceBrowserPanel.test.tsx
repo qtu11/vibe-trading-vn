@@ -43,6 +43,13 @@ it("rejects executable URLs and URLs with credentials at the selection boundary"
   }
 });
 
+it("marks links to the currently opened source consistently", () => {
+  render(<><SourceLink href="https://example.com/report">Nguồn S17</SourceLink><SourceLink href="https://example.com/other">Nguồn khác</SourceLink></>);
+  fireEvent.click(screen.getByRole("link", { name: "Nguồn S17" }));
+  expect(screen.getByRole("link", { name: "Nguồn S17" })).toHaveAttribute("aria-current", "page");
+  expect(screen.getByRole("link", { name: "Nguồn khác" })).not.toHaveAttribute("aria-current");
+});
+
 it("controls the isolated desktop browser and releases its overlay when a document is shown", async () => {
   let listener!: (state: SourceBrowserState) => void;
   const unsubscribe = vi.fn();

@@ -15,8 +15,41 @@ from pathlib import Path
 import pytest
 
 from src.reporting.normalize import normalize_report_payload
+from src.reporting.schema import Metric, PricePoint, Source
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "export_stall_payloads.json"
+
+
+@pytest.mark.parametrize("basis,canonical", [("split", "split_adjusted"), ("split_dividend", "total_return")])
+def test_market_data_basis_names_preserve_adjustment_meaning(basis, canonical):
+    point = PricePoint(date="2026-11-09", close=50000, unit="VND", price_basis=basis)
+    metric = Metric(key="market_price", label="Giá tham chiếu", price_basis=basis)
+    source = Source(id="S1", title="Yahoo Finance", provider="Yahoo", price_basis=basis)
+    assert point.price_basis == metric.price_basis == source.price_basis == canonical
+
+
+def test_additive_adjustment_is_not_silently_relabelled_as_total_return():
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        PricePoint(date="2026-11-09", close=50000, price_basis="split_dividend_additive")
+
+
+def test_financial_table_cells_keep_values_and_per_cell_sources():
+    payload = {"financial_table": {
+        "columns": [{"key": "v", "label": "9T2026"}, {"key": "yoy", "label": "% cùng kỳ"}],
+        "rows": [{"label": "LNTT", "cells": [
+            {"value": 28.9, "source_ids": ["S7"], "evidence_kind": "cited"},
+            {"value": None, "source_ids": ["S8"], "evidence_kind": "cited"},
+        ]}],
+    }}
+    normalized, warnings = normalize_report_payload(payload)
+    table = normalized["financial_table"]
+    assert table["columns"] == ["9T2026", "% cùng kỳ"]
+    assert table["rows"][0]["values"] == ["28.9", "—"]
+    assert [cell["source_ids"] for cell in table["rows"][0]["cell_evidence"]] == [["S7"], ["S8"]]
+    assert "cells" in payload["financial_table"]["rows"][0]
+    assert warnings
 
 
 def load_payloads() -> dict:

@@ -125,8 +125,8 @@ def _unit(unit: str) -> tuple[str, float]:
         if text.casefold().startswith(prefix):
             text, scale = text[len(prefix):], factor
             break
-    for suffix in ("/cp", "/share", "_per_share"):
-        if text.endswith(suffix):
+    for suffix in ("/cp", "/share", "/shares", "_per_share"):
+        if text.casefold().endswith(suffix):
             text = text[:-len(suffix)]
             break
     return text.upper(), scale
@@ -227,7 +227,7 @@ def _supports_numbers(report, path, item, records) -> list[dict[str, Any]]:
     return issues
 
 
-def _validate_rating_target(target, metrics, *, require_formula=True):
+def _validate_rating_target(target, metrics, *, require_formula=True, align_sums=False):
     """Recompute declared metric formulas; rated targets cannot use prose alone."""
     from src.agent.grounding.policies import _evaluate_formula
 
@@ -235,7 +235,7 @@ def _validate_rating_target(target, metrics, *, require_formula=True):
 
     def metric_dimension(metric):
         unit, _ = _unit(metric.unit)
-        if unit in {"%", "X", "1", "LẦN"}:
+        if unit in {"%", "X", "1", "LẦN", "SHARE", "SHARES", "CP"}:
             return {}
         if not re.fullmatch(r"[A-Z][A-Z0-9]*(?:/[A-Z][A-Z0-9]*)?", unit):
             raise ValueError(f"Đơn vị định giá chưa được khai báo rõ hoặc chưa hỗ trợ: {metric.key}")
@@ -276,7 +276,9 @@ def _validate_rating_target(target, metrics, *, require_formula=True):
         try:
             tree = ast.parse(expression, mode="eval")
         except (SyntaxError, ValueError, RecursionError) as exc:
-            if not require_formula:
+            if not require_formula and not any(
+                re.search(r"\b" + re.escape(name) + r"\b", expression) for name in metrics
+            ):
                 return canonical
             raise ValueError("Giá mục tiêu tính toán cần công thức theo input_keys trước khi xếp hạng") from exc
         names = {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
@@ -297,6 +299,20 @@ def _validate_rating_target(target, metrics, *, require_formula=True):
         if any(isinstance(node, ast.Constant) and (isinstance(node.value, bool) or node.value not in (0, 1))
                for node in ast.walk(tree)):
             raise ValueError("Hệ số định giá phải là metric giả định có giải thích, không phải hằng số ẩn")
+        issue = {
+            "metric_key": metric.key,
+            "formula": metric.methodology,
+            "inputs": {name: {"value": metrics[name].value, "unit": metrics[name].unit,
+                              "as_of": metrics[name].as_of.isoformat() if metrics[name].as_of else None}
+                       for name in sorted(names)},
+        }
+        if align_sums:
+            for node in ast.walk(tree):
+                if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Add, ast.Sub)):
+                    dates = {metrics[item.id].as_of for item in ast.walk(node)
+                             if isinstance(item, ast.Name) and metric_dimension(metrics[item.id])}
+                    if len(dates) > 1:
+                        raise ReportEvidenceError(f"Công thức tài chính cộng/trừ đầu vào khác kỳ: {metric.key}", [issue])
         values = {name: calculate(metrics[name]) for name in names}
         if formula_dimension(tree.body) != metric_dimension(metric):
             raise ValueError(f"Đơn vị kết quả định giá không khớp công thức: {metric.key}")
@@ -305,13 +321,6 @@ def _validate_rating_target(target, metrics, *, require_formula=True):
         evaluated = _evaluate_formula(expression)
         if evaluated is None or not math.isclose(evaluated[0], canonical,
                 rel_tol=0, abs_tol=0.5 * 10 ** -metric.decimals * scale / (100 if unit == "%" else 1)):
-            issue = {
-                "metric_key": metric.key,
-                "formula": metric.methodology,
-                "inputs": {name: {"value": metrics[name].value, "unit": metrics[name].unit,
-                                  "as_of": metrics[name].as_of.isoformat() if metrics[name].as_of else None}
-                           for name in sorted(names)},
-            }
             if evaluated is not None:
                 issue["expected_value"] = evaluated[0] / scale * (100 if unit == "%" else 1)
             raise ReportEvidenceError(f"Giá trị tính toán không khớp công thức: {metric.key}", [issue])
@@ -342,7 +351,7 @@ def validate_report_evidence(
         try:
             checked = _validate_rating_target(metric, metrics, require_formula=(
                 metric.key == "target_price" and report.recommendation != Recommendation.NOT_RATED
-            ))
+            ), align_sums=metric_paths[metric.key].startswith("financial_metrics."))
         except ValueError as exc:
             details = getattr(exc, "details", [{"metric_key": metric.key}])
             for issue in details:

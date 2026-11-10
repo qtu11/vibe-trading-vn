@@ -58,6 +58,7 @@ def _condense_validation_errors(exc: ValidationError) -> str:
 
 
 _ROOT_FIELD_PATTERNS = (
+    re.compile(r"Metric có ngày tương lai so với data_as_of:\s*([A-Za-z_][\w.]*)"),
     re.compile(r"Thiếu phương pháp/giả định:\s*([A-Za-z_][\w.]*)"),
     re.compile(r"Thiếu source_ids:\s*([A-Za-z_][\w.]*)"),
     re.compile(r"Thiếu đầu vào cho số liệu tính toán:\s*([A-Za-z_][\w.]*)"),
@@ -176,6 +177,19 @@ _FIELD_FIX_HINTS: tuple[tuple[str, str], ...] = (
 
 def _field_fix_hint(loc: str, message: str) -> str:
     """Best repair instruction for one schema error location."""
+    if "ngày tương lai so với data_as_of" in message:
+        return (
+            "as_of là ngày dữ liệu/giả định đã được biết tại cutoff, không phải ngày kết thúc kỳ kế hoạch. "
+            "Đối chiếu ngày công bố nguồn; giữ kỳ kế hoạch trong label/note và nêu rõ kế hoạch hay dự báo, "
+            "không tự đổi ngày khi chưa có bằng chứng."
+        )
+    if loc == "valuation_scenarios":
+        return (
+            "valuation_scenarios phải là object {title, rows, source_ids/evidence_kind/methodology}; "
+            "rows là mảng {case, assumptions, target_price, upside, source_ids/evidence_kind/methodology}. "
+            "Dùng case thay cho name; giữ phần diễn giải implied trong assumptions/note, "
+            "không biến văn xuôi thành giá mục tiêu."
+        )
     if "phương pháp/giả định" in message:
         return (
             "Khai báo evidence_kind=derived hoặc assumption, methodology mô tả công thức/giả định, "
@@ -393,7 +407,7 @@ class ReportJobService:
             rendered_warnings = (
                 list(raw_warnings) if isinstance(raw_warnings, (list, tuple)) else []
             )
-            warnings = [*audit.warnings, *rendered_warnings]
+            warnings = [*normalize_warnings, *audit.warnings, *structural_warnings, *rendered_warnings]
             job_record["warnings"] = warnings
             depth_error = None
             if minimum_pages > 1:

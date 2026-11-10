@@ -1,6 +1,6 @@
 {
   "app": {
-    "version": "v0.3.3"
+    "version": "v0.3.4"
   },
   "charts": {
     "noCompleteBars": "Gráfico no disponible: no se obtuvieron velas OHLC completas. No se ha estimado ninguna vela.",

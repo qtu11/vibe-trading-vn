@@ -91,7 +91,7 @@ from src.goal.context import (
     goal_needs_continuation,
     goal_progress_tuple,
 )
-from src.providers.chat import ChatLLM, LLMRuntimeSnapshot, ProviderStreamError
+from src.providers.chat import ChatLLM, LLMResponse, LLMRuntimeSnapshot, ProviderStreamError
 from src.providers.session_context import bind_llm_session_id, reset_llm_session_id
 from src.providers.content_filter import (
     CONTENT_FILTER_SKIP_MESSAGE,
@@ -716,24 +716,64 @@ class AgentLoop(ToolCallLifecycle):
                 llm_timeout = _llm_timeout_s if _llm_timeout_s > 0 else None
 
                 def stream_request():
-                    """Count usage from a failed request before any retry."""
+                    """Bound the complete adapter call even while no chunk arrives."""
+                    finished = threading.Event()
+                    abandoned = threading.Event()
+                    callback_lock = threading.Lock()
+                    responses, errors = [], []
+                    turn_stream = stream
+
+                    def forward(callback, *args):
+                        with callback_lock:
+                            if not abandoned.is_set():
+                                callback(*args)
+
+                    def request():
+                        try:
+                            responses.append(self.llm.stream_chat(
+                                messages,
+                                tools=tool_defs,
+                                on_text_chunk=lambda delta: forward(turn_stream.on_text, delta),
+                                on_reasoning_chunk=lambda delta: forward(turn_stream.on_reasoning, delta),
+                                on_waiting_chunk=lambda: forward(turn_stream.on_waiting),
+                                timeout=llm_timeout,
+                                idle_timeout_s=llm_timeout,
+                                should_cancel=lambda: abandoned.is_set() or self._cancel_event.is_set(),
+                            ))
+                        except BaseException as error:  # Relay the worker's original exception unchanged.
+                            errors.append(error)
+                        finally:
+                            finished.set()
+
+                    # shortcut: Python cannot stop a blocked adapter; its daemon exits when the transport returns. Use process isolation if forced termination is needed.
+                    worker = threading.Thread(target=contextvars.copy_context().run,
+                                              args=(request,), name="provider-stream", daemon=True)
+                    worker.start()
+                    deadline = _time.monotonic() + llm_timeout if llm_timeout else None
                     try:
-                        return self.llm.stream_chat(
-                            messages,
-                            tools=tool_defs,
-                            on_text_chunk=stream.on_text,
-                            on_reasoning_chunk=stream.on_reasoning,
-                            on_waiting_chunk=stream.on_waiting,
-                            timeout=llm_timeout,
-                            idle_timeout_s=llm_timeout,
-                            should_cancel=self._cancel_event.is_set,
-                        )
+                        while not finished.is_set():
+                            if self._cancel_event.is_set() or self._budget_stop_reason is not None:
+                                return LLMResponse(content="")
+                            remaining = deadline - _time.monotonic() if deadline else None
+                            if remaining is not None and remaining <= 0:
+                                raise ProviderStreamError(
+                                    provider=self._llm_runtime.provider,
+                                    model=self._llm_runtime.configured_model or "(unset)",
+                                    original=TimeoutError(f"Provider call exceeded {llm_timeout:g}s timeout"),
+                                )
+                            finished.wait(min(0.05, remaining) if remaining is not None else 0.05)
+                        if errors:
+                            raise errors[0]
+                        return responses[0]
                     except ProviderStreamError as error:
                         self._account_llm_usage(
                             run_dir, getattr(error, "usage_metadata", None), current_iter,
                             purpose="failed_stream",
                         )
                         raise
+                    finally:
+                        with callback_lock:
+                            abandoned.set()
 
                 try:
                     response = stream_request()
@@ -998,7 +1038,11 @@ class AgentLoop(ToolCallLifecycle):
                             grounding_correction_text_only = False
                             final_content = ""
                             continue
-                        final_content = "Chưa hoàn tất xuất báo cáo. Chưa tạo được các định dạng: " + ", ".join(sorted(value.upper() for value in missing_formats)) + ". Không có file tải về được xác nhận cho các định dạng này."
+                        final_content = (
+                            "Chưa hoàn tất xuất báo cáo. Chưa tạo được các định dạng: "
+                            + ", ".join(sorted(value.upper() for value in missing_formats))
+                            + ". Không có file tải về được xác nhận cho các định dạng này."
+                        )
                     final_content = append_report_artifacts(final_content, self._report_artifacts)
                     grounded = validate_and_release(
                         self, final_content=final_content, grounding_revisions=grounding_revisions,

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 
 from src.session.checkpoint import ResponseCheckpoint
 from src.session.events import EventBus
+from src.session.execution_lock import acquire_execution_lock
 from src.session.models import (
     Attempt,
     AttemptStatus,
@@ -83,6 +84,7 @@ class SessionService:
         # concurrency gate, so in-flight sessions are tracked separately and
         # reserved synchronously in send_message.
         self._active_loops: Dict[str, "AgentLoop"] = {}
+        self._agent_workers: Dict[str, concurrent.futures.Future] = {}
         # Task handles are kept from the moment the run is scheduled, so a run
         # still building its registry can be cancelled. _active_loops only
         # exists once construction finished, which is far too late to be the
@@ -94,6 +96,7 @@ class SessionService:
         # that attempt must remain recoverable on the next process start.
         self._user_cancel_requests: set[str] = set()
         self._inflight: set[str] = set()
+        self._execution_claims: dict[str, Any] = {}
         self._inflight_lock = threading.Lock()
         self._search_index = get_shared_index()
         self._recover_interrupted_attempts()
@@ -101,55 +104,74 @@ class SessionService:
     def _recover_interrupted_attempts(self) -> None:
         """Finalize attempts that could not outlive the previous process.
 
-        A newly constructed service has no live AgentLoop instances. Any
-        attempt still marked pending or running therefore belongs to the
-        previous process. Convert it to an explicit terminal state and expose
-        the most recent durable response snapshot in conversation history.
+        A second service or process can share this store while the first is
+        still running. Only recover attempts whose session claim is free.
         """
         recoverable = {AttemptStatus.PENDING, AttemptStatus.RUNNING}
         for attempt in self.store.list_attempts():
             if attempt.status not in recoverable:
                 continue
-            partial = self.store.get_partial_response(
-                attempt.session_id, attempt.attempt_id
-            )
-            has_partial = bool(partial)
-            existing_reply = self.store.get_message_for_attempt(
-                attempt.session_id, attempt.attempt_id
-            )
-            if existing_reply is None:
-                reply = Message(
-                    session_id=attempt.session_id,
-                    role="assistant",
-                    content=self._format_interrupted_message(partial),
-                    linked_attempt_id=attempt.attempt_id,
-                    metadata={
-                        "status": AttemptStatus.INTERRUPTED.value,
-                        "partial": has_partial,
-                        "recovery_reason": "service_restart",
-                    },
-                )
-                attempt.mark_interrupted("service restarted before attempt completed")
-                self._commit_terminal_reply(attempt, reply)
+            try:
+                self._reserve_session(attempt.session_id)
+            except SessionBusyError:
                 continue
+            try:
+                current = self.store.get_attempt(attempt.session_id, attempt.attempt_id)
+                if current is not None and current.status in recoverable:
+                    self._recover_interrupted_attempt(current)
+            finally:
+                self._release_session(attempt.session_id)
+
+    def _recover_interrupted_attempt(self, attempt: Attempt) -> None:
+        # The caller holds the session claim through both terminal writes.
+        partial = self.store.get_partial_response(
+            attempt.session_id, attempt.attempt_id
+        )
+        has_partial = bool(partial)
+        existing_reply = self.store.get_message_for_attempt(
+            attempt.session_id, attempt.attempt_id
+        )
+        if existing_reply is None:
+            reply = Message(
+                session_id=attempt.session_id,
+                role="assistant",
+                content=self._format_interrupted_message(partial),
+                linked_attempt_id=attempt.attempt_id,
+                metadata={
+                    "status": AttemptStatus.INTERRUPTED.value,
+                    "partial": has_partial,
+                    "recovery_reason": "service_restart",
+                },
+                tool_trail=self.store.get_partial_tool_trail(attempt.session_id, attempt.attempt_id),
+            )
+            attempt.mark_interrupted("service restarted before attempt completed")
+            if attempt.run_dir:
+                reply.metadata["run_id"] = Path(attempt.run_dir).name
+            if attempt.started_at is not None:
+                reply.metadata["started_at"] = attempt.started_at
+                reply.metadata["elapsed_ms"] = max(0, round(
+                    (datetime.fromisoformat(attempt.completed_at).timestamp() - attempt.started_at) * 1000,
+                ))
+            self._commit_terminal_reply(attempt, reply)
+            return
+        else:
+            # The append-only reply is committed before attempt.json. If a
+            # process exits between those writes, finish the second half
+            # from the reply's terminal metadata instead of mislabelling a
+            # complete response as interrupted.
+            reply_status = existing_reply.metadata.get("status")
+            if reply_status == AttemptStatus.COMPLETED.value:
+                attempt.mark_completed(summary=existing_reply.content)
+            elif reply_status == AttemptStatus.CANCELLED.value:
+                attempt.mark_cancelled(reason="cancelled by user")
+            elif reply_status == AttemptStatus.FAILED.value:
+                attempt.mark_failed(error="execution failed")
             else:
-                # The append-only reply is committed before attempt.json. If a
-                # process exits between those writes, finish the second half
-                # from the reply's terminal metadata instead of mislabelling a
-                # complete response as interrupted.
-                reply_status = existing_reply.metadata.get("status")
-                if reply_status == AttemptStatus.COMPLETED.value:
-                    attempt.mark_completed(summary=existing_reply.content)
-                elif reply_status == AttemptStatus.CANCELLED.value:
-                    attempt.mark_cancelled(reason="cancelled by user")
-                elif reply_status == AttemptStatus.FAILED.value:
-                    attempt.mark_failed(error="execution failed")
-                else:
-                    attempt.mark_interrupted(
-                        "service restarted before attempt completed"
-                    )
-            self.store.update_attempt(attempt)
-            self.store.delete_partial_response(attempt.session_id, attempt.attempt_id)
+                attempt.mark_interrupted(
+                    "service restarted before attempt completed"
+                )
+        self.store.update_attempt(attempt)
+        self.store.delete_partial_response(attempt.session_id, attempt.attempt_id)
 
     def _commit_terminal_reply(self, attempt: Attempt, reply: Message) -> None:
         # A durable transcript must exist before its recovery checkpoint is removed.
@@ -198,6 +220,12 @@ class SessionService:
                 raise SessionBusyError(
                     f"Session {session_id} already has a run in progress"
                 )
+            try:
+                self._execution_claims[session_id] = acquire_execution_lock(
+                    self.store.base_dir / session_id / '.execution.lock'
+                )
+            except (ImportError, OSError) as exc:
+                raise SessionBusyError(f"Session {session_id} execution claim is unavailable") from exc
             self._inflight.add(session_id)
 
     def _release_session(self, session_id: str) -> None:
@@ -207,6 +235,9 @@ class SessionService:
             session_id: Session to release.
         """
         with self._inflight_lock:
+            claim = self._execution_claims.pop(session_id, None)
+            if claim is not None:
+                claim.close()
             self._inflight.discard(session_id)
 
     def create_session(
@@ -396,7 +427,7 @@ class SessionService:
                 attempt.mark_cancelled(reason=result.get("reason", "cancelled by user"))
             else:
                 attempt.mark_failed(error=result.get("reason", "unknown"))
-            attempt.run_dir = result.get("run_dir")
+            attempt.run_dir = result.get("run_dir") or attempt.run_dir
             if result.get("metrics"):
                 # Metrics were loaded from the run directory but never reached
                 # the attempt, so the reply metadata below was always empty.
@@ -437,6 +468,8 @@ class SessionService:
 
             partial = (self.store.get_partial_response(session.session_id, attempt.attempt_id)
                        if attempt.status != AttemptStatus.COMPLETED else None)
+            if status == "failed" and str(result.get("reason", "")).startswith("report_delivery_incomplete:"):
+                partial = result.get("content") or partial
             if partial:
                 reply_metadata["partial"] = True
             reply = Message(
@@ -478,7 +511,8 @@ class SessionService:
                 partial = self.store.get_partial_response(session.session_id, attempt.attempt_id)
                 reply = Message(session_id=session.session_id, role="assistant",
                                 content=self._format_result_message(attempt, partial), linked_attempt_id=attempt.attempt_id,
-                                metadata={"status": attempt.status.value, "partial": bool(partial)})
+                                metadata={"status": attempt.status.value, "partial": bool(partial)},
+                                tool_trail=self.store.get_partial_tool_trail(session.session_id, attempt.attempt_id))
                 try:
                     self._commit_terminal_reply(attempt, reply)
                 except OSError:
@@ -503,7 +537,8 @@ class SessionService:
             partial = self.store.get_partial_response(session.session_id, attempt.attempt_id)
             reply = Message(session_id=session.session_id, role="assistant",
                             content=self._format_result_message(attempt, partial), linked_attempt_id=attempt.attempt_id,
-                            metadata={"status": attempt.status.value, "partial": bool(partial)})
+                            metadata={"status": attempt.status.value, "partial": bool(partial)},
+                            tool_trail=self.store.get_partial_tool_trail(session.session_id, attempt.attempt_id))
             try:
                 self._commit_terminal_reply(attempt, reply)
             except OSError:
@@ -511,10 +546,11 @@ class SessionService:
             self.event_bus.emit(session.session_id, "attempt.failed", {"attempt_id": attempt.attempt_id, "status": attempt.status.value,
                                 "summary": reply.content, "partial": bool(partial), "error": str(exc)})
         finally:
-            # The only release path for the claim taken in send_message.
             self._active_tasks.pop(session.session_id, None)
             self._user_cancel_requests.discard(session.session_id)
-            self._release_session(session.session_id)
+            if session.session_id not in self._agent_workers:
+                self._active_loops.pop(session.session_id, None)
+                self._release_session(session.session_id)
 
     async def _run_with_agent(
         self,
@@ -551,13 +587,24 @@ class SessionService:
         attempt_id = attempt.attempt_id
         loop = asyncio.get_running_loop()
         tool_trail: list[Dict[str, Any]] = []
-        checkpoint = ResponseCheckpoint(self.store, attempt)
+        checkpoint = ResponseCheckpoint(self.store, attempt, tool_trail=tool_trail)
+        agent = None
 
         safe_overrides = sanitize_session_overrides(session_config) if session_config else session_config
         agent_config = load_runtime_agent_config(overrides=safe_overrides)
 
         def event_callback(event_type: str, data: Dict[str, Any]) -> None:
             """Forward AgentLoop events to the SSE event bus."""
+            if event_type in {"tool_call", "tool_result"}:
+                self._record_tool_trail_event(tool_trail, event_type, data)
+            run_dir = getattr(getattr(agent, "memory", None), "run_dir", None)
+            if run_dir and not attempt.run_dir:
+                attempt.run_dir = str(run_dir)
+                try:
+                    self.store.update_attempt(attempt)
+                except OSError:
+                    attempt.run_dir = None
+                    logger.warning("Could not persist run directory for %s", attempt_id, exc_info=True)
             try:
                 checkpoint.handle_event(event_type, data)
             except OSError as exc:
@@ -568,8 +615,6 @@ class SessionService:
                     attempt_id,
                     exc,
                 )
-            if event_type in {"tool_call", "tool_result"}:
-                self._record_tool_trail_event(tool_trail, event_type, data)
             data["attempt_id"] = attempt_id
             self.event_bus.emit(session_id, event_type, data)
 
@@ -614,17 +659,49 @@ class SessionService:
         agent._session_context_stats = packed["stats"]
         agent._session_compaction_memory = compaction_memory
 
+        worker = _AGENT_EXECUTOR.submit(
+            agent.run, user_message=attempt.prompt, history=history, session_id=session_id,
+        )
+        self._agent_workers[session_id] = worker
+        task = asyncio.current_task()
+        detached = False
+        cleanup_lock = threading.Lock()
+        released = False
+
+        def release_finished_worker(_completed) -> None:
+            nonlocal released
+            # Both task and worker invoke this; an old callback must never clear a new run.
+            with cleanup_lock:
+                if released or not worker.done() or (task is not None and not task.done()):
+                    return
+                if self._agent_workers.get(session_id) is not worker:
+                    return
+                released = True
+                self._agent_workers.pop(session_id)
+            try:
+                checkpoint.flush()
+            except OSError:
+                logger.warning("Could not flush stopped worker %s", attempt_id, exc_info=True)
+            finally:
+                self._active_loops.pop(session_id, None)
+                self._release_session(session_id)
+
+        wrapped = asyncio.wrap_future(worker)
         try:
-            result = await loop.run_in_executor(
-                _AGENT_EXECUTOR,
-                lambda: agent.run(
-                    user_message=attempt.prompt,
-                    history=history,
-                    session_id=session_id,
-                ),
-            )
+            result = await asyncio.shield(wrapped)
+        except asyncio.CancelledError:
+            # Cancelling an await does not stop its thread or release its session claim.
+            detached = True
+            worker.add_done_callback(release_finished_worker)
+            if task is not None:
+                task.add_done_callback(release_finished_worker)
+            wrapped.add_done_callback(lambda done: done.exception() if not done.cancelled() else None)
+            agent.cancel()
+            raise
         finally:
-            self._active_loops.pop(session_id, None)
+            if not detached:
+                self._agent_workers.pop(session_id, None)
+                self._active_loops.pop(session_id, None)
             try:
                 checkpoint.flush()
             except OSError as exc:

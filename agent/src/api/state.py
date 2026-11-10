@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
+import threading
 
 from fastapi import HTTPException
 
@@ -16,6 +18,7 @@ from src.config.accessor import get_env_config
 # ============================================================================
 
 _session_service = None
+_session_service_lock = threading.Lock()
 _channel_runtime = None
 _channel_bus = None
 _channel_manager = None
@@ -28,6 +31,12 @@ _channel_manager = None
 
 def _get_session_service():
     """Lazy-init session service when ENABLE_SESSION_RUNTIME=true."""
+    with _session_service_lock:
+        return _initialize_session_service()
+
+
+def _initialize_session_service():
+    """Construct and publish the shared service under the startup lock."""
     global _session_service
 
     import sys as _sys
@@ -36,8 +45,19 @@ def _get_session_service():
         host_val = getattr(_host, "_session_service")
         if host_val is not None:
             return host_val
-    elif _session_service is not None:
-        return _session_service
+    # A cleared compatibility slot must not reconstruct the same live runtime;
+    # tests/operators can still select a different storage root explicitly.
+    sessions_dir = _host_attr("SESSIONS_DIR", SESSIONS_DIR)
+    runs_dir = _host_attr("RUNS_DIR", RUNS_DIR)
+    if _session_service is not None:
+        cached_store = getattr(getattr(_session_service, "store", None), "base_dir", None)
+        cached_runs = getattr(_session_service, "runs_dir", None)
+        if (_host is None or not hasattr(_host, "_session_service")
+                or (cached_store is not None and cached_runs is not None
+                    and Path(cached_store).resolve() == Path(sessions_dir).resolve()
+                    and Path(cached_runs).resolve() == Path(runs_dir).resolve())):
+            _set_host_attr("_session_service", _session_service)
+            return _session_service
 
     if not get_env_config().api.enable_session_runtime:
         return None
@@ -47,10 +67,6 @@ def _get_session_service():
     from src.session.events import EventBus
     from src.session.service import SessionService
     from src.session.store import SessionStore
-
-    # Honor monkeypatched SESSIONS_DIR / RUNS_DIR on api_server.
-    sessions_dir = _host_attr("SESSIONS_DIR", SESSIONS_DIR)
-    runs_dir = _host_attr("RUNS_DIR", RUNS_DIR)
 
     store = SessionStore(base_dir=sessions_dir)
     event_bus = EventBus()

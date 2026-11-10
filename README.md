@@ -63,7 +63,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
   <tr>
     <td width="33%" valign="top">
       <h4>Chứng khoán Việt Nam</h4>
-      Nghiên cứu HOSE, HNX, UPCoM từ nguồn dữ liệu đã cấu hình. Xuất dự thảo DOCX/PDF/PPTX có nguồn URL và biểu đồ; luồng nghiên cứu sâu yêu cầu đo PDF tối thiểu 24 trang. Thiếu BCTC hoặc bằng chứng định giá phải được thông báo rõ.
+      Nghiên cứu HOSE, HNX, UPCoM từ nguồn dữ liệu đã cấu hình. Xuất dự thảo DOCX/PDF/PPTX có nguồn URL và biểu đồ; chỉ áp dụng yêu cầu số trang cao hơn khi người dùng yêu cầu. Thiếu BCTC hoặc bằng chứng định giá phải được thông báo rõ.
     </td>
     <td width="33%" valign="top">
       <h4>Forex & Vàng (XAUUSD Lab)</h4>
@@ -77,7 +77,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
   <tr>
     <td width="33%" valign="top">
       <h4>Sổ cái Bằng chứng & Kiểm toán</h4>
-      Cơ chế Grounding Ledger khóa chặt mọi chỉ số tài chính vào nguồn gốc dữ liệu thực tế ([S1], [S2]). Nguyên tắc fail-closed chống ảo giác số liệu và xử lý chống bẫy pha loãng cổ tức.
+      Grounding Ledger lưu bằng chứng công cụ và mã nguồn ([S1], [S2]); kiểm tra số liệu, đơn vị, thời điểm và cơ sở điều chỉnh tại các gate được triển khai. Kết quả vẫn cần kiểm tra ý nghĩa kế toán và chất lượng phân tích.
     </td>
     <td width="33%" valign="top">
       <h4>Hội đồng AI Tự trị (Swarm Council)</h4>
@@ -98,7 +98,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 
 ## 1. Tổng quan nền tảng & Điểm đột phá kiến trúc
 
-**Vibe-Trading** là nền tảng điện toán tài chính định lượng và điều phối AI đa tác nhân thế hệ mới, biến các mô hình ngôn ngữ lớn (LLM) thành một **hội đồng chuyên gia đầu tư có cấu trúc kiểm toán**. Hệ thống loại bỏ hoàn toàn hiện tượng ảo giác số liệu (hallucination) trong phân tích tài chính bằng việc kết hợp giữa suy luận ngôn ngữ tự nhiên và động cơ tính toán toán học xác định (deterministic compute).
+**Vibe-Trading** là nền tảng nghiên cứu tài chính, tính toán định lượng và điều phối AI. Mô hình chọn công cụ, diễn giải dữ liệu và xây nội dung; mã Python kiểm các điều kiện về bằng chứng, phép tính và giao file. Các kiểm tra này giảm lỗi có thể phát hiện, chưa bảo đảm loại bỏ mọi số liệu sai hoặc thay thế thẩm định của chuyên viên.
 
 > [!NOTE]
 > **Mục tiêu cốt lõi**: Khắc phục triệt để các hạn chế của AI tạo sinh thông thường trong tài chính. Mọi số liệu trong báo cáo và quyết định giao dịch bắt buộc phải có chứng từ dữ liệu gốc, thời điểm chốt số liệu (`as_of`), đơn vị đo lường và đường dẫn kiểm toán minh bạch.
@@ -107,14 +107,14 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 
 1. **Khóa bằng chứng kiểm toán (Grounding Ledger & Evidence Verification):**
    - Mọi dữ liệu tài chính (doanh thu, lợi nhuận ròng, P/E, EPS, chỉ tiêu định giá) bắt buộc gắn với nguồn thu thập thực tế (`evidence_kind: observed / cited`), có mốc thời gian chốt (`as_of`), đơn vị tính và mã trích dẫn liên kết siêu văn bản `[S1]`, `[S2]`.
-   - Cơ chế fail-closed tự động phát hiện và chặn đứng mọi hành vi tự bịa số liệu, chống bẫy lệch ngày và bẫy pha loãng do chia tách cổ tức hay phát hành cổ phiếu thưởng.
+   - Gate từ chối số liệu không khớp bằng chứng và các phép tính có cấu trúc không hợp lệ. Việc một số xuất hiện trong nguồn chưa chứng minh nó đúng kỳ, đúng phạm vi hợp nhất hoặc đúng dòng kế toán; các điểm này vẫn cần đối chiếu tài liệu gốc.
 
 2. **Hội đồng AI Đa tác nhân (Swarm Autonomous Trading Council):**
    - Thay thế việc ra quyết định đơn lẻ bằng mạng lưới chuyên viên AI đa nhiệm: Chuyên viên Phân tích Vĩ mô (Macro), Chuyên viên BCTC (Fundamental), Chuyên viên Phân tích Kỹ thuật & SMC (Technical), Giám đốc Quản trị Rủi ro (Risk Manager), Nhà Quản lý Danh mục (Portfolio Manager) và Chuyên viên Thực thi (Execution Agent).
-   - Mô hình tranh biện đa chiều (Bull/Bear debate) bắt buộc trước khi đưa ra khuyến nghị phân bổ vốn hoặc giải ngân lệnh.
+   - Công cụ `run_swarm` cung cấp luồng chuyên gia và tranh biện khi được gọi; một yêu cầu chat thông thường chạy qua `AgentLoop`, không mặc nhiên đi qua toàn bộ hội đồng.
 
 3. **Engine xuất dự thảo nghiên cứu vốn cổ phần:**
-   - Tool/API nghiên cứu mặc định yêu cầu tối thiểu 24 trang PDF đã đo. File ngắn hơn hoặc chưa đo được trả trạng thái chưa hoàn tất và giữ liên kết tải các file sẵn sàng; cần bổ sung nội dung có bằng chứng để đạt yêu cầu.
+   - Tool/API xuất báo cáo mặc định `minimum_pages=1`; chỉ tăng khi người dùng yêu cầu độ dài cụ thể. Nếu chưa đạt số trang đã yêu cầu hoặc thiếu định dạng, receipt ghi rõ phần thiếu và giữ liên kết các file có thật; không thêm nội dung lặp để đủ trang.
    - Cùng nội dung được xuất ra DOCX, PDF và PPTX, với logo tôm đỏ, bảng, biểu đồ và URL nguồn. Số biểu đồ phụ thuộc dữ liệu đầu vào. Dữ liệu BCTC Việt Nam hiện cần nguồn JSON có provenance trong Data Bridge; báo cáo giữ nhãn dự thảo, chưa được CFA hay tổ chức tài chính nào chứng nhận.
 
 ---
@@ -123,7 +123,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 
 | Thị trường | Sàn giao dịch & Sản phẩm | Năng lực phân tích chuyên sâu | Bộ công cụ định lượng | Sản phẩm đầu ra |
 | --- | --- | --- | --- | --- |
-| **Chứng khoán Việt Nam** | HOSE, HNX, UPCoM | Nghiên cứu BCTC từ nguồn đã cấu hình; cần kiểm chứng kỳ, phạm vi hợp nhất và cơ sở cổ phiếu | P/E, P/B, DCF và Reverse DCF theo đầu vào/giả định được khai báo | Dự thảo DOCX/PDF/PPTX có nguồn; nghiên cứu sâu mặc định yêu cầu PDF ít nhất 24 trang |
+| **Chứng khoán Việt Nam** | HOSE, HNX, UPCoM | Nghiên cứu BCTC từ nguồn đã cấu hình; cần kiểm chứng kỳ, phạm vi hợp nhất và cơ sở cổ phiếu | P/E, P/B, DCF và Reverse DCF theo đầu vào/giả định được khai báo | Dự thảo DOCX/PDF/PPTX có nguồn; độ dài theo yêu cầu và bằng chứng |
 | **Forex & Vàng Quốc tế** | XAUUSD, EURUSD, GBPUSD, USDJPY, CFD | Smart Money Concepts (SMC), Order Block, Fair Value Gap (FVG), Liquidity Sweeps, Đa khung thời gian M1-D1 | Bộ lọc tin vĩ mô thời gian thực (NFP, CPI, Lãi suất Fed), Đo lường rủi ro Max Drawdown | Kịch bản phiên giao dịch (London/NY), Tín hiệu vào lệnh có Stop Loss |
 | **Tiền mã hóa (Crypto)** | BTC, ETH, Altcoins, Hợp đồng Tương lai Vĩnh viễn (Perp) | Funding Rate Heatmap, Open Interest (OI), Liquidation Map, Phân tích đường cong cơ sở Futures vs Spot (Basis Curve) | Mô hình rủi ro Perpetual, On-chain token flow tracker, Định giá quyền chọn crypto | Chiến lược Basis Arbitrage, Cảnh báo đòn bẩy và thanh lý vị thế |
 
@@ -133,6 +133,42 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 ---
 
 ## 3. Kiến trúc hệ thống & Luồng xử lý End-to-End
+
+### Luồng chat/nghiên cứu đang chạy trong source
+
+```mermaid
+flowchart TD
+    U[Yêu cầu và lịch sử phiên] --> S[SessionService: giữ quyền chạy phiên, lưu attempt]
+    S --> C[ContextBuilder: hướng dẫn, lịch sử, catalog công cụ]
+    C --> L[AgentLoop: gọi model, chọn bước tiếp theo]
+    L --> T[Resolve mã/sàn rồi tìm web, đọc tài liệu, lấy dữ liệu]
+    T --> E[GroundingLedger: lưu bằng chứng và mã nguồn]
+    E --> K[Kết quả cùng _sources; compact giữ đường dẫn và nguồn]
+    K --> L
+    L --> R[ResearchReport: schema, nguồn, ngày, đơn vị, phép tính]
+    R -->|Lỗi cần sửa| F[field_errors, accepted_report, collected_sources]
+    F --> L
+    R -->|Qua kiểm tra| X[Render và đăng ký file tải]
+    X --> G[Kiểm định dạng và file có thật trước kết thúc]
+    G --> P[Lưu reply và trạng thái rồi phát sự kiện kết thúc]
+    T -.-> D[Checkpoint văn bản, bước công cụ và run_dir]
+    L -.-> D
+    D --> B[Phục hồi tác vụ không còn chủ sở hữu khi khởi động]
+```
+
+1. [API state](agent/src/api/state.py) khởi tạo một dịch vụ phiên dùng chung. [SessionService](agent/src/session/service.py) nhận yêu cầu, giữ quyền chạy phiên bằng khóa hệ điều hành và lưu `pending → running`. Dịch vụ thứ hai không được đánh dấu tác vụ còn chủ sở hữu là bị khởi động lại.
+2. [ContextBuilder](agent/src/agent/context.py) và [AgentLoop](agent/src/agent/loop.py) dựng ngữ cảnh từ yêu cầu, lịch sử đã đóng gói, hướng dẫn và catalog công cụ. Model chọn bước tiếp theo; tìm kiếm chỉ cung cấp đầu mối, cần đọc nội dung nguồn để làm bằng chứng. Mã/sàn phải được resolve trước các công cụ phụ thuộc danh tính.
+3. [Tool lifecycle](agent/src/agent/tool_lifecycle.py) thực thi công cụ, lưu bằng chứng và trả `_sources` cho model. Cache/replay giữ mã nguồn gốc sau compact. Kết quả tìm kiếm ở khung phải dùng cùng `source_id` với ledger trong chat, loại URL trùng và cập nhật khi mở lại truy vấn có kết quả mới. Tìm được một link chưa đồng nghĩa đã đọc/kiểm chứng nội dung. Bằng chứng mới hoặc tập lỗi thực sự giảm cho phép sửa tiếp; lặp cùng lỗi vẫn bị giới hạn. Thiếu nguồn BCTC, lỗi cutoff, lỗi cấu hình và lỗi tính toán được phân biệt.
+4. [Report tool](agent/src/reporting/tool.py) nhận nội dung có cấu trúc do AI tạo. [Schema](agent/src/reporting/schema.py) và [evidence gate](agent/src/reporting/evidence.py) kiểm nguồn đã thu thập, ngày, đơn vị và công thức khai báo; lỗi thiếu nguồn/phương pháp ở nhiều mục được trả cùng lượt, kèm payload cần sửa. Alias `financial_table.rows[].cells` được chuyển thành `values` và `cell_evidence` để giữ số và nguồn từng ô. `as_of` là ngày dữ liệu đã biết tại cutoff; kỳ kế hoạch/dự báo cần ghi riêng trong nhãn/ghi chú. `split_dividend` tương ứng `total_return`, không phải giá chỉ điều chỉnh chia tách.
+5. [Report service](agent/src/reporting/service.py) render và đăng ký artifact. Agent đối chiếu receipt với file thực tế; thiếu định dạng đã thử xuất được sửa trong giới hạn, sau đó trả `report_delivery_incomplete` cùng các link hợp lệ. Câu “đã xong” của model không tự chứng minh đã giao đủ file.
+6. [Checkpoint](agent/src/session/checkpoint.py) lưu văn bản đang stream và lịch sử công cụ; `run_dir` được lưu ngay khi run xuất hiện. Reply/trạng thái cuối được ghi trước sự kiện kết thúc. Khi khởi động lại, phục hồi giữ phần đã lưu và trạng thái gián đoạn, không coi việc có công cụ thành công là đã hoàn thành toàn bộ yêu cầu.
+
+Khung nguồn desktop dùng phiên trình duyệt tạm thời riêng. Electron được ghim **43.4.1** để nhận [bản sửa PDF trong in-memory session](https://releases.electronjs.org/pr/52810); bộ lọc tài nguyên cho phép viewer PDF tích hợp và tài nguyên UI nội bộ của chính viewer đó. Link người dùng vẫn qua kiểm tra URL công khai; nguồn không dùng bridge/cookie của chat. Lời gọi model có deadline theo cấu hình và nhận cancel kể cả khi adapter không trả chunk; hủy task vẫn giữ quyền chạy phiên đến khi worker thực sự kết thúc.
+
+**Giới hạn hiện tại:** gate giao file theo dõi định dạng mà model **đã thử export**, chưa là hợp đồng công việc bảo đảm model luôn bắt đầu export. Khớp số với nguồn chưa chứng minh ý nghĩa kế toán; phương pháp định giá chỉ mô tả bằng văn xuôi vẫn có thể ở dạng draft kèm cảnh báo. Các kiểm thử hồi quy dùng model giả lập, không phải nghiệm thu nhà cung cấp trực tiếp hay chứng nhận CFA. Xem [audit luồng AI và ca VIC/FPT](docs/AI_RESEARCH_WORKFLOW_AUDIT_2026-11-10.md).
+
+### Kiến trúc mục tiêu
+
 > **Architecture overview:** 29 data loaders → Grounding Ledger → Specialist AI Swarm → Quant & Risk Validation → Research Reports / Guarded Execution.  
 > Sơ đồ thể hiện kiến trúc mục tiêu và các cơ chế kiểm soát; không đồng nghĩa tất cả kết nối đều đã được xác minh hoạt động trong môi trường production.
 ```mermaid
@@ -242,7 +278,7 @@ flowchart TB
 ```
 
 
-### Chi tiết 5 bước vận hành của hệ thống:
+### Các khối năng lực trong kiến trúc mục tiêu:
 1. **Thu thập & Chuẩn hóa (Ingestion)**: 29 bộ nạp dữ liệu kết nối nguồn dữ liệu lịch sử và thời gian thực, đồng bộ múi giờ và cấu trúc nến OHLCV.
 2. **Kiểm chứng bằng chứng (Grounding)**: Gắn nguồn `[S1]`, `[S2]` với URL đã thu thập. Số bị bác dẫn đến rút đoạn hoặc hàng bảng phụ thuộc và hiện thông báo thiếu dữ liệu. Chart lấy trực tiếp từ kết quả công cụ và giữ nguyên JSON qua bộ lọc số.
 3. **Phân tích Hội đồng Đa tác nhân (Swarm Intelligence)**: Các chuyên viên AI độc lập phân tích theo từng chuyên môn, thực hiện vòng tranh biện đối nghịch (Bull vs Bear) để kiểm tra độ tin cậy của luận điểm đầu tư.
@@ -263,17 +299,16 @@ Phiên ghi nhận ngày 07/11/2026 có kết quả công cụ chứa 53 nến tu
 
 Các tình huống tiếp theo là ví dụ phương pháp cần đối chiếu dữ liệu gốc, không phải bằng chứng rằng mọi nguồn đang khả dụng hoặc tính năng đã được nghiệm thu toàn bộ.
 
-### Case Study 2: Phân tích Cổ phiếu Ngân hàng Techcombank (TCB HOSE)
-* **Xử lý bẫy pha loãng**: Tự động nhận diện đợt phát hành cổ phiếu thưởng tỷ lệ 1:1 (3.54 tỷ cổ phiếu mới), cập nhật số lượng cổ phiếu lưu hành đạt 7,085 triệu cổ phiếu và vốn điều lệ đạt 70,450 tỷ VND, ngăn chặn lỗi sai lệch EPS lịch sử.
-* **Bóc tách chỉ số ngân hàng chuyên sâu**:
-  - Thu nhập lãi thuần (NII), Thu nhập ngoài lãi (NFI), Tổng thu nhập hoạt động (TOI), Chi phí hoạt động (OPEX).
-  - Tỷ lệ chi phí trên thu nhập (CIR), Biên lãi thuần (NIM), Tỷ lệ tiền gửi không kỳ hạn (CASA 40.5%), Tỷ lệ nợ xấu (NPL), Tỷ lệ bao phủ nợ xấu (LLCR), Tỷ lệ an toàn vốn (CAR 15.2%).
-* **Loại bỏ 100% thẻ ẩn**: Toàn bộ các dòng dữ liệu trong BCTC và phụ lục nguồn đều được giải mã đầy đủ giá trị thực tế, loại bỏ hoàn toàn các ký tự `omitted※`.
+### Case Study 2: Truy vết phiên Techcombank (TCB HOSE)
+
+Phiên ngày 10/11/2026 đã tìm/đọc nhiều nguồn nhưng structured export thất bại vì cấu trúc bảng/kịch bản và nguồn của từng chỉ tiêu còn thiếu. Đây là ca hồi quy cho contract giữa model, ledger và renderer; chưa phải một báo cáo TCB đã được nghiệm thu. Bản sửa giữ số và chứng cứ từng ô, gom lỗi để AI sửa cùng lượt và đồng bộ ID nguồn giữa chat/khung phải. Xem [trace findings và kiểm thử](docs/AI_RESEARCH_WORKFLOW_AUDIT_2026-11-10.md).
+
+Phân tích ngân hàng cần đối chiếu BCTC gốc, kỳ/hợp nhất, cơ sở cổ phiếu và các chỉ tiêu NII, NFI, TOI, OPEX, CIR, NIM, CASA, NPL, LLCR, CAR. Thiếu bằng chứng phải được nêu rõ; không tự điền số hoặc coi việc bỏ thẻ `omitted※` là đã khôi phục dữ liệu.
 
 ### Case Study 3: Phiên họp Hội đồng AI XAUUSD (Vàng Thế Giới)
 * **Khung thời gian**: Đa khung thời gian M15, H1, H4, D1.
-* **Nhận diện cấu trúc SMC**: Xác định vùng Order Block giảm giá khung H4 tại 2,752 - 2,758 USD; vùng quét thanh khoản (Liquidity Sweep) đỉnh Á tại 2,748 USD; khoảng trống giá trị hợp lý (FVG) khung H1 tại 2,735 - 2,739 USD.
-* **Quyết định của Hội đồng**: Tranh luận Bear/Bull đạt đồng thuận thiết lập lệnh Short Limit tại 2,746.5 USD, Stop Loss tại 2,753.0 USD, Take Profit tại 2,725.0 USD (Tỷ lệ Risk/Reward đạt 1:3.3), kiểm soát mức rủi ro tối đa 1.5% NAV tài khoản.
+* **Nhận diện cấu trúc SMC**: Order Block, Liquidity Sweep và Fair Value Gap cần được đối chiếu với snapshot/nến đã quan sát của đúng khung thời gian.
+* **Kịch bản của Hội đồng**: Tranh luận Bear/Bull có thể xây điều kiện vào/thoát và ngân sách rủi ro. Các giá và lệnh cụ thể trong bản README cũ không có receipt kiểm chứng tại đây nên đã được gỡ; ví dụ này không xác nhận một giao dịch đã được thực thi.
 
 ---
 

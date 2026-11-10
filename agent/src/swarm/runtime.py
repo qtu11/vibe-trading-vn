@@ -8,6 +8,7 @@ with cancellation and event callback support.
 from __future__ import annotations
 
 import logging
+import contextvars
 import random
 import shutil
 import threading
@@ -376,8 +377,8 @@ class SwarmRuntime:
                 self._live_callbacks[run.id] = live_callback
 
         thread = threading.Thread(
-            target=self._execute_run,
-            args=(run, cancel_event, include_shell_tools, resume_from),
+            target=contextvars.copy_context().run,
+            args=(self._execute_run, run, cancel_event, include_shell_tools, resume_from),
             name=f"swarm-{run.id}",
             daemon=True,
         )
@@ -458,6 +459,26 @@ class SwarmRuntime:
         )
 
     def _execute_run(
+        self, run: SwarmRun, cancel_event: threading.Event,
+        include_shell_tools: bool = False, resume_from: SwarmRun | None = None,
+    ) -> None:
+        from src.agent.tool_context import current_grounding
+        from src.agent.grounding import GroundingLedger
+        from src.swarm.observations import current_observations, SwarmObservations
+
+        ledger = current_grounding.get()
+        if ledger is None:
+            ledger = GroundingLedger(run_dir=self._store.run_dir(run.id),
+                                     user_message=" ".join(str(v) for v in run.user_vars.values()))
+        grounding_token = current_grounding.set(ledger)
+        observation_token = current_observations.set(SwarmObservations(ledger, self._store.run_dir(run.id), run.id))
+        try:
+            self._execute_run_bound(run, cancel_event, include_shell_tools, resume_from)
+        finally:
+            current_observations.reset(observation_token)
+            current_grounding.reset(grounding_token)
+
+    def _execute_run_bound(
         self,
         run: SwarmRun,
         cancel_event: threading.Event,
@@ -1041,6 +1062,7 @@ class SwarmRuntime:
                         upstream[context_key] = task_summaries[source_task_id]
 
                 future = executor.submit(
+                    contextvars.copy_context().run,
                     self._run_worker_with_retries,
                     agent_spec=agent_spec,
                     task=task,

@@ -5,6 +5,7 @@ import json
 import threading
 from types import SimpleNamespace
 
+import pytest
 
 from src.agent import loop as loop_mod
 from src.agent.context import ContextBuilder
@@ -142,6 +143,40 @@ def test_replay_restores_result_without_external_execution():
     assert trace.events[-1]["type"] == "tool_result_replayed"
     assert loop._tool_progress.finish_iteration() is False
     assert loop._tool_progress.stalled_iterations == 0
+
+
+@pytest.mark.parametrize("deterministic", [False, True])
+def test_cached_source_result_retains_original_citation_index(tmp_path, deterministic):
+    from src.agent.grounding import GroundingLedger
+
+    registry = _Registry(repeatable=True, deterministic=deterministic, replay_after_compaction=True)
+    loop = _loop(registry)
+    loop.memory.run_dir = str(tmp_path)
+    loop._grounding = GroundingLedger(run_dir=tmp_path, user_message="Read the source document.")
+    url = "https://example.test/annual-report"
+    original_execute = registry.execute
+
+    def execute(name, args):
+        original_execute(name, args)
+        return json.dumps({"status": "ok", "url": url, "title": "Annual report",
+                           "content": "Revenue was 100 billion VND in the annual report."})
+
+    registry.execute = execute
+    args = {"url": url}
+    messages, trace = [], _Trace()
+    loop._process_tool_calls([SimpleNamespace(name="read_url", arguments=args, id="original")],
+                             _Context(), messages, trace, [], 1)
+    source_index = json.loads(messages[-1]["content"])["_sources"]
+    assert source_index[0]["url"] == url
+    if not deterministic:
+        key = loop._identical_call_key("read_url", args)
+        messages[-1]["content"] = loop_mod._cleared_text(len(messages[-1]["content"]))
+        loop._unblock_lost_readonly_results(messages, {key})
+    loop._process_tool_calls([SimpleNamespace(name="read_url", arguments=args, id="restored")],
+                             _Context(), messages, trace, [], 2)
+    assert json.loads(messages[-1]["content"]).get("_sources") == source_index
+    assert registry.execute_calls == 1
+    assert len(loop._grounding.sources) == 1
 
 
 def test_repeatable_requires_explicit_compaction_replay_opt_in():

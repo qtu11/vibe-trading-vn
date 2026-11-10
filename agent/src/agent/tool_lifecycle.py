@@ -16,6 +16,7 @@ import time as _time
 from typing import Any, Dict, Mapping
 
 from src.agent.context import ContextBuilder
+from src.agent.grounding.sources import canonical_url
 from src.agent.context_compact import _replay_context_result, _result_data_gone
 from src.agent.progress import HeartbeatTimer, ProgressEvent, _set_emitter
 from src.agent.trace import TraceWriter
@@ -71,7 +72,7 @@ MAX_READONLY_REPLAY_RECOVERIES = 6
 MAX_RESEARCH_SOURCES = 40
 
 
-def _research_payload(tool_name: str, result: str) -> dict[str, Any] | None:
+def _research_payload(tool_name: str, result: str, *, source_index: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     """Extract an AI-search result the right pane can open.
 
     The search tools disagree on their key names -- ``parallel_web_search``
@@ -93,18 +94,28 @@ def _research_payload(tool_name: str, result: str) -> dict[str, Any] | None:
         return None
 
     sources: list[dict[str, str]] = []
+    index = source_index if source_index is not None else payload.get("_sources")
+    source_ids = {canonical_url(item.get("url")): item.get("id") or item.get("source_id")
+                  for item in (index if isinstance(index, list) else []) if isinstance(item, dict)}
+    seen_urls: set[str] = set()
     for entry in raw_sources:
         if not isinstance(entry, dict):
             continue
         url = entry.get("url")
         if not isinstance(url, str) or not url.strip():
             continue
+        key = canonical_url(url)
+        if not key or key in seen_urls:
+            continue
+        seen_urls.add(key)
+        source_id = source_ids.get(key)
         title = entry.get("title")
         snippet = entry.get("snippet")
         publisher = entry.get("source") or entry.get("publisher")
         sources.append({
             "url": url.strip(),
             "title": (title.strip() if isinstance(title, str) else url.strip())[:300],
+            **({"source_id": source_id} if isinstance(source_id, str) and source_id else {}),
             **({"snippet": snippet.strip()[:600]} if isinstance(snippet, str) and snippet.strip() else {}),
             **({"publisher": publisher.strip()[:120]} if isinstance(publisher, str) and publisher.strip() else {}),
         })
@@ -1042,6 +1053,15 @@ class ToolCallLifecycle:
                     }
                 )
 
+        model_result = result
+        if self._grounding is not None:
+            try:
+                source_index = self._grounding.sources_index(tc.id)
+            except (AttributeError, TypeError):
+                source_index = []
+            model_result = _attach_source_index(model_result, source_index)
+
+        # Cache the source index too: replay must retain the original citation IDs.
         # Cache successful deterministic results so an identical later call is
         # served without re-execution (regression: repeated financial_rigor
         # calcs after compaction, 2026-08-20 INTC run). Readonly results use a
@@ -1056,12 +1076,12 @@ class ToolCallLifecycle:
             cache_key = self._identical_call_key(tc.name, tc.arguments)
             if tool_def is not None and getattr(tool_def, "deterministic", False):
                 if cache_key is not None:
-                    self._called_identical[cache_key] = result
+                    self._called_identical[cache_key] = model_result
             elif (
                 cache_key is not None
                 and self._readonly_replay_allowed(tool_def, tc.arguments)
             ):
-                self._readonly_replay_cache[cache_key] = result
+                self._readonly_replay_cache[cache_key] = model_result
             # Its payload is visible again, so nothing is waiting to be restored.
             self._readonly_replay_ready.discard(cache_key)
             # A write can change what a readonly call reads (a factor file, a
@@ -1072,13 +1092,6 @@ class ToolCallLifecycle:
                 self._readonly_replay_protected.clear()
 
         status = "ok" if success else "error"
-        model_result = result
-        if self._grounding is not None:
-            try:
-                source_index = self._grounding.sources_index(tc.id)
-            except (AttributeError, TypeError):
-                source_index = []
-            model_result = _attach_source_index(model_result, source_index)
         if (tc.name == "get_forex_market_snapshot" and tc.arguments.get("trade_plan")
                 and getattr(self, "_forex_trade_plan", None) is not None):
             from src.trading.forex.council import model_summary
@@ -1118,7 +1131,10 @@ class ToolCallLifecycle:
             # the client, so the user could see that a search happened but
             # never read it. Ship it as a structured payload so the right
             # pane can open it as its own tab.
-            research = _research_payload(tc.name, trace_result)
+            research = _research_payload(
+                tc.name, model_result,
+                source_index=self._grounding.source_citations() if self._grounding is not None else None,
+            )
         react_trace.append({"type": "tool_call", "tool": tc.name, "result_preview": preview})
         self._emit(
             "tool_result",

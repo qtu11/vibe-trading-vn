@@ -179,6 +179,41 @@ def test_a_root_validator_message_names_the_payload_field(tmp_path):
     assert "financial_metrics.revenue" in fields, fields
 
 
+def test_future_plan_metric_names_the_date_to_repair_without_changing_it(tmp_path):
+    payload = _load_fixture_payload()
+    payload["financial_metrics"] = [{
+        "key": "plan_revenue_2026", "label": "Kế hoạch doanh thu năm 2026", "value": 100,
+        "unit": "tỷ VND", "as_of": "2026-12-31", "source_ids": [payload["sources"][0]["id"]],
+    }]
+    service = ReportJobService(storage_root=tmp_path)
+    with pytest.raises(ReportJobError) as error:
+        service.create_job(payload, formats=["docx"])
+    issue = error.value.details[0]
+    assert issue["field"] == "financial_metrics.plan_revenue_2026.as_of"
+    assert "kế hoạch" in issue["fix"]
+    assert "không tự" in issue["fix"]
+    plan = next(m for m in error.value.normalized_report["financial_metrics"] if m["key"] == "plan_revenue_2026")
+    assert plan["as_of"] == "2026-12-31"
+
+
+def test_missing_attribution_is_returned_for_all_surfaces_in_one_repair(tmp_path):
+    report, _ = research(tmp_path)
+    payload = report.model_dump(mode="json")
+    payload["financial_metrics"] += [
+        {"key": key, "label": key, "value": 10, "unit": "tỷ VND", "as_of": "2026-09-30"}
+        for key in ("toi_9m26", "pbt_9m26")
+    ]
+    payload["key_stats"] = [{"label": "Lợi nhuận", "value": "10 tỷ VND"}]
+    payload["analysis_sections"] = [{"heading": "Chất lượng tài sản", "paragraphs": ["Phân tích có nội dung cần nguồn."]}]
+    payload["risk_factors"] = [{"title": "Rủi ro tài sản", "body": "Luận điểm rủi ro cần bằng chứng."}]
+    with pytest.raises(ReportJobError) as error:
+        ReportJobService(storage_root=tmp_path).create_job(payload, formats=["docx"])
+    fields = {issue["field"] for issue in error.value.details}
+    assert {"financial_metrics.toi_9m26", "financial_metrics.pbt_9m26", "key_stats.0", "risk_factors.0"} <= fields
+    assert len(error.value.normalized_report["financial_metrics"]) == 3
+    assert error.value.normalized_report["analysis_sections"]
+
+
 # ---------------------------------------------------------------------------
 # 4. The repair packet must carry the pages this run actually read
 # ---------------------------------------------------------------------------

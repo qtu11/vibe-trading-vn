@@ -82,6 +82,7 @@ PROMPT_TABLE_TAIL = 5
 # Symbol patterns understood by the bundled loaders. Anchored on word
 # boundaries so substrings of longer text don't trigger.
 _SYMBOL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\b[A-Z0-9]{2,10}\.VN\b"),
     re.compile(r"\b[A-Z]{1,5}\.US\b"),
     re.compile(r"\b\d{3,5}\.HK\b"),
     re.compile(r"\b\d{6}\.(?:SZ|SH|BJ)\b"),
@@ -101,6 +102,7 @@ _BARE_US_TICKER_PATTERN = re.compile(r"(?<![\w.])[A-Z]{2,5}(?!\w)(?!\.\w)")
 _BARE_TICKER_STOPWORDS = frozenset({
     # geography / venues / index & data providers
     "US", "USA", "UK", "EU", "HK", "CN", "JP", "NYSE", "AMEX", "SSE", "SZSE",
+    "VN", "HOSE", "HNX", "UPCOM", "HSX",
     "HKEX", "TSX", "TSXV", "SPX", "NDX", "DJI", "DJIA", "HSI", "CSI", "FTSE", "MSCI", "VIX",
     # instruments / structures
     "ETF", "ETN", "ADR", "IPO", "REIT", "BOND", "SWAP", "PERP",
@@ -135,7 +137,9 @@ def extract_symbols_from_user_vars(user_vars: dict[str, str]) -> list[str]:
     """
     explicit: dict[str, None] = {}  # ordered set
     promoted: dict[str, None] = {}
-    for value in user_vars.values():
+    market = str(user_vars.get("market") or "")
+    vietnam = bool(re.search(r"vietnam|việt\s*nam|\b(?:VN|HOSE|HSX|HNX|UPCOM)\b", market, re.I))
+    for key, value in user_vars.items():
         if not isinstance(value, str):
             continue
         remainder = value
@@ -147,7 +151,8 @@ def extract_symbols_from_user_vars(user_vars: dict[str, str]) -> list[str]:
             remainder = pattern.sub(" ", remainder)
         for token in _BARE_US_TICKER_PATTERN.findall(remainder):
             if token not in _BARE_TICKER_STOPWORDS:
-                promoted.setdefault(f"{token}.US", None)
+                suffix = "VN" if vietnam and key != "market" else "US"
+                promoted.setdefault(f"{token}.{suffix}", None)
     return list(explicit) + [s for s in promoted if s not in explicit]
 
 

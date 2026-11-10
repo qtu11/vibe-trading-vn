@@ -119,14 +119,40 @@ export function ContextUsageIndicator({ sessionId, live, modelKey = "", compact 
       aria-describedby={showTooltip ? tooltipId : undefined}
       onClick={() => { if (open) close(); else { setOpen(true); setHovered(false); } }}
       onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}
-      className={`inline-flex h-7 items-center gap-1.5 rounded-full ${compact ? "px-2" : "px-2.5"} text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60 motion-reduce:transition-none`}>
-      <svg viewBox="0 0 20 20" className={`h-3.5 w-3.5 shrink-0 -rotate-90 ${tone}`} aria-hidden="true">
-        <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="2.5" className="opacity-20" />
-        {ratio !== null && <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"
-          pathLength="100" strokeDasharray={`${Math.min(100, Math.max(0, ratio * 100))} 100`} className="transition-[stroke-dasharray] duration-500 motion-reduce:transition-none" />}
-        {ratio === null && <circle cx="10" cy="10" r="1.3" fill="currentColor" />}
+      className={`group inline-flex h-[30px] items-center gap-1.5 rounded-full ${compact ? "px-2.5" : "px-3"} text-[12px] font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60 motion-reduce:transition-none ${
+        open
+          ? "border border-primary/40 bg-primary/10 text-primary shadow-xs"
+          : "border border-zinc-200/80 dark:border-zinc-800/80 bg-zinc-100/60 dark:bg-zinc-900/60 hover:bg-zinc-200/60 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 shadow-2xs"
+      }`}>
+      <svg viewBox="0 0 24 24" className={`h-4 w-4 shrink-0 -rotate-90 ${tone}`} aria-hidden="true">
+        <defs>
+          <linearGradient id="ctx-grad-normal" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#10b981" />
+            <stop offset="100%" stopColor="#06b6d4" />
+          </linearGradient>
+          <linearGradient id="ctx-grad-warn" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#f59e0b" />
+            <stop offset="100%" stopColor="#d97706" />
+          </linearGradient>
+          <linearGradient id="ctx-grad-danger" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#ef4444" />
+            <stop offset="100%" stopColor="#dc2626" />
+          </linearGradient>
+        </defs>
+        <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" strokeWidth="2.2" className="text-zinc-300 dark:text-zinc-700/60 opacity-30" />
+        {ratio !== null && (
+          <circle cx="12" cy="12" r="8.5" fill="none"
+            stroke={ratio >= 0.9 ? "url(#ctx-grad-danger)" : ratio >= 0.75 ? "url(#ctx-grad-warn)" : "url(#ctx-grad-normal)"}
+            strokeWidth="2.5" strokeLinecap="round"
+            pathLength="100" strokeDasharray={`${Math.min(100, Math.max(0, ratio * 100))} 100`}
+            className="transition-[stroke-dasharray] duration-500 ease-out motion-reduce:transition-none" />
+        )}
+        {ratio === null && (
+          <circle cx="12" cy="12" r="1.8" fill="currentColor" className="text-zinc-400 dark:text-zinc-500 opacity-60" />
+        )}
       </svg>
-      <span className="tabular-nums">{percentage === null ? null : `${percentage}%`}</span>
+      <span className="text-[11.5px] font-medium tracking-tight">Context</span>
+      {percentage !== null && <span className="text-[11px] font-semibold tabular-nums text-foreground/90">{percentage}%</span>}
     </button>
     {showTooltip && <div id={tooltipId} role="tooltip" className="pointer-events-none absolute bottom-full end-0 z-50 mb-2 w-64 max-w-[calc(100vw-5rem)] rounded-xl border border-border/70 bg-popover/95 p-3 text-popover-foreground shadow-xl backdrop-blur-xl">
       <div className="flex items-center justify-between gap-2">

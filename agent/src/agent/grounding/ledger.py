@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import threading
+from copy import deepcopy
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -115,6 +117,9 @@ class GroundingLedger(
             contextual_identity_constraints: Whether explicit market words in
                 the original conversation may narrow resolver candidates.
         """
+        self._lock = threading.RLock()
+        self._swarm_runs: dict[str, dict[str, Any]] = {}
+        self._shared_observations: list[dict[str, Any]] = []
         self.run_dir = Path(run_dir)
         self.user_message = user_message
         self.resolution_context = ResolutionContext.from_messages(
@@ -284,6 +289,54 @@ class GroundingLedger(
         }
 
     def ingest_tool_result(
+        self, *, tool_name: str, arguments: Mapping[str, Any], result: str,
+        call_id: str, success: bool,
+    ) -> None:
+        """Serialize observed tool intake, including background swarm readers."""
+        with self._lock:
+            self._ingest_tool_result(tool_name=tool_name, arguments=arguments,
+                                     result=result, call_id=call_id, success=success)
+
+    def ingest_observation(self, **kwargs: Any) -> dict[str, Any]:
+        """Return this actual call's source index under the same intake lock.
+
+        A collected source proves what was read, not independent truth.
+        Model-written reports must never enter through this observation seam.
+        """
+        with self._lock:
+            self.ingest_tool_result(**kwargs)
+            call_id = kwargs["call_id"]
+            return {"sources": deepcopy(self.sources_index(call_id)),
+                    "evidence_count": sum(row.call_id == call_id for row in self._evidence)}
+
+    def record_swarm_run(self, run_id: str, preset: str, **receipt: Any) -> None:
+        """Record server-observed swarm state; never consume a model's verdict."""
+        with self._lock:
+            self._swarm_runs[run_id] = deepcopy({**receipt, "run_id": run_id, "preset": preset})
+            self.persist()
+
+    def swarm_run_receipt(self, run_id: str) -> dict[str, Any] | None:
+        """Read a detached receipt owned by this parent run."""
+        with self._lock:
+            return deepcopy(self._swarm_runs.get(run_id))
+
+    def swarm_run_receipts(self) -> list[dict[str, Any]]:
+        """Read detached trusted receipts for the research completion gate."""
+        with self._lock:
+            return deepcopy(list(self._swarm_runs.values()))
+
+    def record_shared_observation(self, receipt: Mapping[str, Any]) -> None:
+        """Retain server-created read receipts separately from model reports."""
+        with self._lock:
+            self._shared_observations.append(deepcopy(dict(receipt)))
+            self.persist()
+
+    def shared_observations(self) -> list[dict[str, Any]]:
+        """Return detached read receipts for source/coverage review."""
+        with self._lock:
+            return deepcopy(self._shared_observations)
+
+    def _ingest_tool_result(
         self,
         *,
         tool_name: str,
@@ -393,6 +446,10 @@ class GroundingLedger(
         return self._validate(content, record=False)
 
     def _validate(self, content: str, *, record: bool) -> ValidationResult:
+        with self._lock:
+            return self._validate_locked(content, record=record)
+
+    def _validate_locked(self, content: str, *, record: bool) -> ValidationResult:
         """Run the gate, optionally without recording the attempt.
 
         ``validation_count`` is the run's checked-DRAFT count: the degraded-run
@@ -446,6 +503,10 @@ class GroundingLedger(
 
     def persist(self) -> None:
         """Atomically persist the current structured ledger."""
+        with self._lock:
+            self._persist_locked()
+
+    def _persist_locked(self) -> None:
         artifact_dir = self.run_dir / "artifacts"
         try:
             artifact_dir.mkdir(parents=True, exist_ok=True)
@@ -464,6 +525,8 @@ class GroundingLedger(
                 "analysis_evidence": list(self._analysis_metrics),
                 "validations": list(self._validations),
                 "released": dict(self._released) if self._released else None,
+                "swarm_runs": self.swarm_run_receipts(),
+                "shared_observations": self.shared_observations(),
             }
             temp.write_text(
                 json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

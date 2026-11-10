@@ -11,7 +11,7 @@ from src.session.store import SessionStore
 
 
 class ResponseCheckpoint:
-    """Persist a bounded-frequency snapshot of streamed assistant text.
+    """Persist streamed text and observed tool actions before live delivery.
 
     The first text chunk is written immediately. Later chunks are coalesced to
     avoid an fsync for every provider token, and :meth:`flush` captures the
@@ -24,6 +24,7 @@ class ResponseCheckpoint:
         attempt: Attempt,
         *,
         min_interval_seconds: float = 0.25,
+        tool_trail: list[Dict[str, Any]] | None = None,
     ) -> None:
         """Create a response checkpoint.
 
@@ -31,12 +32,14 @@ class ResponseCheckpoint:
             store: Session persistence store.
             attempt: Attempt whose response is being streamed.
             min_interval_seconds: Minimum time between snapshot writes.
+            tool_trail: Consolidated observed actions, shared with the event callback.
         """
         self._store = store
         self._session_id = attempt.session_id
         self._attempt_id = attempt.attempt_id
         self._min_interval_seconds = max(0.0, min_interval_seconds)
         self._text = ""
+        self._tool_trail = tool_trail if tool_trail is not None else []
         self._dirty = False
         self._last_flush = 0.0
         self._lock = threading.Lock()
@@ -48,10 +51,14 @@ class ResponseCheckpoint:
             event_type: Agent event name.
             data: Event payload.
         """
-        if event_type not in {"text_delta", "stream_reset"}:
+        if event_type not in {"text_delta", "stream_reset", "tool_call", "tool_result"}:
             return
 
         with self._lock:
+            if event_type in {"tool_call", "tool_result"}:
+                self._dirty = True
+                self._flush_locked()
+                return
             if event_type == "stream_reset":
                 self._text = ""
                 self._dirty = True
@@ -64,11 +71,12 @@ class ResponseCheckpoint:
             delta = data.get("delta")
             if not isinstance(delta, str) or not delta:
                 return
+            first_chunk = not self._text
             self._text += delta
             self._dirty = True
             now = time.monotonic()
             if (
-                self._last_flush == 0.0
+                first_chunk or self._last_flush == 0.0
                 or now - self._last_flush >= self._min_interval_seconds
             ):
                 self._flush_locked(now)
@@ -85,6 +93,7 @@ class ResponseCheckpoint:
             self._session_id,
             self._attempt_id,
             self._text,
+            tool_trail=self._tool_trail,
         )
         self._dirty = False
         self._last_flush = time.monotonic() if now is None else now

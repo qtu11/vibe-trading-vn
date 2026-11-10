@@ -447,6 +447,25 @@ def normalize_report_payload(data: dict) -> tuple[dict, list[str]]:
     _normalize_price_history(payload, all_ids, warnings)
     _normalize_sections(payload, all_ids, warnings)
 
+    table = payload.get("financial_table")
+    if isinstance(table, dict):
+        columns = table.get("columns")
+        if isinstance(columns, list):
+            for index, column in enumerate(columns):
+                if isinstance(column, dict) and isinstance(column.get("label"), str) and set(column) <= {"key", "label"}:
+                    columns[index] = column["label"]
+                    warnings.append(f"financial_table.columns[{index}]: dùng label làm tiêu đề cột")
+        rows = table.get("rows")
+        for index, row in enumerate(rows if isinstance(rows, list) else []):
+            if not isinstance(row, dict) or "values" in row:
+                continue
+            cells = row.get("cells")
+            if isinstance(cells, list) and cells and all(isinstance(cell, dict) and "value" in cell for cell in cells):
+                row["values"] = [str(cell["value"]) if cell["value"] is not None else "—" for cell in cells]
+                row["cell_evidence"] = [{key: value for key, value in cell.items() if key != "value"} for cell in cells]
+                del row["cells"]
+                warnings.append(f"financial_table.rows[{index}]: chuyển cells thành values và cell_evidence")
+
     # A list field that is not a list is dropped by the schema validator
     # with a bare "Input should be a valid list" that names the field but
     # not what was in it. Report the type the model actually sent, so the

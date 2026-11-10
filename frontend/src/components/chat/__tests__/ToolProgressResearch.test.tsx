@@ -14,7 +14,7 @@ const research = {
   tool: "parallel_web_search",
   query: "VIC Q3 2026",
   summary_markdown: "### Tổng hợp kết quả",
-  sources: [{ url: "https://example.com/a", title: "Nguồn A" }],
+  sources: [{ url: "https://example.com/a", title: "Nguồn A", source_id: "S17" }],
 };
 
 beforeEach(() => {
@@ -76,7 +76,8 @@ describe("a reloaded session can still open its AI-search result", () => {
     // The pane opened with the research, not an empty box.
     expect(screen.getByRole("complementary", { name: "VIC Q3 2026" })).toBeVisible();
     expect(screen.getByText("Tổng hợp kết quả")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Nguồn A" })).toBeVisible();
+    expect(screen.getByRole("link", { name: /Nguồn A/ })).toBeVisible();
+    expect(screen.getByText("[S17]")).toBeVisible();
   });
 
   it("offers nothing on a search row that carried no result", () => {

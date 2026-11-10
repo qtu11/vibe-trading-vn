@@ -37,7 +37,8 @@ def record_report_export(
     if formats is None:
         formats = ["docx", "pdf", "pptx"]
     if isinstance(formats, list):
-        requested_formats.update(value for value in formats if isinstance(value, str) and value in {"docx", "pdf", "pptx"})
+        requested_formats.update(value.strip().lower() for value in formats
+                                 if isinstance(value, str) and value.strip().lower() in {"docx", "pdf", "pptx"})
     try:
         payload = json.loads(result)
     except (TypeError, ValueError):
