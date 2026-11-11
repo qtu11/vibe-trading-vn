@@ -20,10 +20,33 @@ def requires_research_review(request: str) -> bool:
     text = _plain(request)
     if re.search(r"\b(source code|codebase|debug|sua code|lap trinh)\b", text):
         return False
+    if re.search(r"\b(deep research|in.depth research|nghien cuu (?:chuyen )?sau)\b", text):
+        return True
+    # Vietnamese prompts often name the listing or the exchange instead of the
+    # words "cổ phiếu"/"equity": "phân tích TCB trên sàn HOSE, xuất báo cáo".
+    # A ticker/exchange is the same equity signal, but only alongside an
+    # explicit analysis/report request -- a price lookup stays out.
+    named_market = re.search(
+        r"\b(hose|hnx|upcom|[a-z]{2,5}\.(?:vn|us|hk|sh|sz|bj))\b", text
+    )
+    analysis = re.search(
+        r"\b(research report|analysis report|bao cao|phan tich|analy[sz]e|valuation|dinh gia)\b",
+        text,
+    )
+    broad_research = re.search(r"\bresearch\b", text)
+    equity = re.search(
+        r"\b(equity|stock|co phieu|doanh nghiep|company|valuation|dinh gia|chung khoan)\b",
+        text,
+    )
+    # "research the company culture" is not equity work. A bare "research"
+    # therefore only counts when the prompt names a market asset or venue;
+    # explicit analysis words still count with a generic company mention.
+    market_asset = re.search(
+        r"\b(equity|stock|co phieu|chung khoan|valuation|dinh gia)\b", text
+    )
     return bool(
-        re.search(r"\b(deep research|in.depth research|nghien cuu (?:chuyen )?sau)\b", text)
-        or (re.search(r"\b(equity|stock|co phieu|doanh nghiep|company|valuation|dinh gia)\b", text)
-            and re.search(r"\b(research report|analysis report|bao cao|phan tich|analy[sz]e)\b", text))
+        (analysis and (equity or named_market))
+        or (broad_research and (market_asset or named_market))
     )
 
 

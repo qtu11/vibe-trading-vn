@@ -272,6 +272,10 @@ async def test_concurrent_scraper_skips_wrapper_urls():
     assert "https://cafef.vn/hpg.chn" in captured[0]
     assert result.get("skipped_wrapper_urls") == [wrapper]
     assert result["token_stats"]["wrapper_urls_skipped"] == 1
+    documents = {doc["url"]: doc for doc in result["source_documents"]}
+    assert documents[wrapper]["read_url_required"] is True
+    assert documents["https://cafef.vn/hpg.chn"]["read_url_required"] is True
+    assert "read_url" in documents["https://cafef.vn/hpg.chn"]["next_step"]
 
 
 @pytest.mark.asyncio
@@ -837,6 +841,34 @@ class _FakeAggregator:
 
     async def close(self) -> None:
         self.closed = True
+
+
+@pytest.mark.asyncio
+async def test_search_results_mark_google_news_wrappers_for_read_url():
+    """A wrapper is not directly fetchable but read_url can still resolve it."""
+    wrapper = (
+        "https://news.google.com/rss/articles/CBMifkFVX3lxTE9CbE9wbEtzNmNRVHlGbE1"
+        "UTUFHQTlIb1ZrVVNhNXQwVHZiT3VJSk5uTUdnQWJOSkRRRVRtOWZNRERBY3BDVW1mSER4?oc=5"
+    )
+    aggregator = _FakeAggregator(
+        answers={
+            "TCB tin tức": [
+                SearchResult(title="TCB lợi nhuận", url=wrapper,
+                             snippet="Lợi nhuận quý III tăng.", source="google"),
+                SearchResult(title="TCB lợi nhuận", url="https://cafef.vn/tcb.chn",
+                             snippet="Lợi nhuận quý III tăng.", source="google"),
+            ]
+        }
+    )
+
+    with patch("src.tools.parallel_web_tools.MultiSearchAggregator", return_value=aggregator):
+        result = await parallel_web_search_async(query="TCB tin tức", max_results=5)
+
+    rows = {row["url"]: row for row in result["results"]}
+    assert rows[wrapper]["readable"] is False
+    assert rows[wrapper]["requires_resolution"] is True
+    assert rows["https://cafef.vn/tcb.chn"]["readable"] is True
+    assert rows["https://cafef.vn/tcb.chn"]["requires_resolution"] is False
 
 
 @pytest.mark.asyncio

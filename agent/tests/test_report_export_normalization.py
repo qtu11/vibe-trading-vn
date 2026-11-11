@@ -10,9 +10,11 @@ collected source text" rejection is correct and must stay.
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 import pytest
+from pydantic import TypeAdapter
 
 from src.reporting.normalize import normalize_report_payload
 from src.reporting.schema import Metric, PricePoint, Source
@@ -33,6 +35,78 @@ def test_additive_adjustment_is_not_silently_relabelled_as_total_return():
 
     with pytest.raises(ValidationError):
         PricePoint(date="2026-11-09", close=50000, price_basis="split_dividend_additive")
+
+
+def test_iso_timestamps_in_date_fields_are_trimmed_not_rejected():
+    """``date`` fields reject timestamps; the normalizer trims the time part.
+
+    The TCB run failed with "Datetimes provided to dates should have zero
+    time" for four spots: ``data_as_of``, metric ``as_of``, source
+    ``published_at`` and ``price_history[*].date``. Each one is a real date
+    with a clock attached, so trimming is lossless for the contract.
+    """
+    payload = {
+        "data_as_of": "2026-09-30T15:04:05+07:00",
+        "financial_metrics": [
+            {"key": "revenue", "label": "Doanh thu", "value": 1.0,
+             "as_of": "2026-09-30T00:00:00"},
+        ],
+        "sources": [
+            {"id": "S1", "title": "CafeF", "provider": "CafeF",
+             "url": "https://cafef.vn/tcb.chn",
+             "published_at": "2026-09-30T10:00:00+07:00"},
+        ],
+        "price_history": [
+            {"date": "2026-09-30T00:00:00", "close": 50000, "unit": "VND",
+             "price_basis": "raw"},
+        ],
+    }
+
+    normalized, warnings = normalize_report_payload(payload)
+
+    assert normalized["data_as_of"] == "2026-09-30"
+    assert normalized["financial_metrics"][0]["as_of"] == "2026-09-30"
+    assert normalized["sources"][0]["published_at"] == "2026-09-30"
+    assert normalized["price_history"][0]["date"] == "2026-09-30"
+    # The schema accepts the repaired values; this is the exact validator that
+    # raised the stall, so exercising it is the regression check.
+    assert TypeAdapter(date).validate_python(normalized["data_as_of"]) == date(2026, 9, 30)
+    assert Metric.model_validate(normalized["financial_metrics"][0]).as_of == date(2026, 9, 30)
+    assert Source.model_validate(normalized["sources"][0]).published_at == date(2026, 9, 30)
+    assert PricePoint.model_validate(normalized["price_history"][0]).date == date(2026, 9, 30)
+    assert len([w for w in warnings if "chỉ giữ ngày" in w]) == 4
+
+
+def test_top_level_market_price_as_of_is_coerced_after_folding():
+    """The folded ``market_price`` is inserted after metric normalization."""
+    payload = {
+        "data_as_of": "2026-09-30T00:00:00",
+        "market_price": {"value": 50000, "as_of": "2026-09-30T00:00:00", "unit": "VND"},
+    }
+
+    normalized, _ = normalize_report_payload(payload)
+
+    metric = normalized["financial_metrics"][0]
+    assert metric["key"] == "market_price"
+    assert metric["as_of"] == "2026-09-30"
+    assert Metric.model_validate(metric).as_of == date(2026, 9, 30)
+
+
+def test_plain_date_strings_are_not_changed_or_warned():
+    payload = {
+        "data_as_of": "2026-09-30",
+        "financial_metrics": [{"key": "revenue", "label": "Doanh thu", "value": 1.0,
+                               "as_of": "2026-09-30"}],
+        "sources": [{"id": "S1", "title": "CafeF", "provider": "CafeF",
+                     "url": "https://cafef.vn/tcb.chn", "published_at": "2026-09-30"}],
+        "price_history": [{"date": "2026-09-30", "close": 50000, "unit": "VND",
+                           "price_basis": "raw"}],
+    }
+
+    normalized, warnings = normalize_report_payload(payload)
+
+    assert normalized["data_as_of"] == "2026-09-30"
+    assert not [w for w in warnings if "chỉ giữ ngày" in w]
 
 
 def test_financial_table_cells_keep_values_and_per_cell_sources():

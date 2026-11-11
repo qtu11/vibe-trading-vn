@@ -9,7 +9,13 @@ from unittest.mock import AsyncMock
 import pytest
 
 from src.agent.grounding import GroundingLedger
-from src.agent.research_workflow import REVIEW_PRESET, REVIEW_ROLES, research_release_error
+from src.agent.grounding.sources import canonical_url
+from src.agent.research_workflow import (
+    REVIEW_PRESET,
+    REVIEW_ROLES,
+    incomplete_documents,
+    research_release_error,
+)
 from src.agent.tool_context import current_grounding
 from src.reporting.service import ReportJobService
 from src.reporting.tool import ExportResearchReportTool
@@ -194,6 +200,60 @@ def test_search_snippet_is_not_a_fully_read_source_for_deep_research(ledger):
         {"agent_id": role, "status": "completed", "iterations": 1, "data_tool_calls": 1} for role in REVIEW_ROLES]})
 
     assert _chat(ledger)["code"] == "SOURCE_READ_INCOMPLETE"
+
+
+def test_google_news_wrapper_citation_passes_after_publisher_read(ledger):
+    """A wrapper link stays the citation key while the publisher is the source.
+
+    The failed TCB run cited a ``news.google.com`` link that ``read_url`` could
+    not decode. The reader now resolves it, saves the publisher snapshot, and
+    keeps the requested wrapper as an alias, so both chat and export can map
+    the citation back to the read document.
+    """
+    wrapper = "https://news.google.com/rss/articles/CBMi-example?oc=5"
+    publisher = "https://cafef.vn/tcb.chn"
+    document = persist_document(
+        source=publisher, requested_url=wrapper, content_type="text/plain",
+        content_bytes=b"TCB profit 10400", full_text="TCB profit 10400",
+        coverage={"extraction_complete": True}, run_dir=ledger.run_dir,
+    )
+    payload = document_result(
+        {"status": "ok", "url": wrapper, "resolved_url": publisher,
+         "source_document": document},
+        text_field="content",
+    )
+    ledger.ingest_tool_result(tool_name="read_url", arguments={"url": wrapper},
+                              result=json.dumps(payload), call_id="wrapper-read", success=True)
+
+    assert ledger.sources[0].url == wrapper
+    assert ledger.sources[0].domain == "cafef.vn"
+    assert _chat(ledger) is None
+    report = {"sources": [{"id": ledger.sources[0].source_id, "url": wrapper}]}
+    assert research_release_error(ledger, report=report) is None
+
+
+def test_wrapper_citation_without_tracking_query_matches_the_read(ledger):
+    """Google's ``?oc=5`` is tracking-only; the article id is the identity."""
+    wrapper = "https://news.google.com/rss/articles/CBMi-example?oc=5"
+    untracked = wrapper.split("?", 1)[0]
+    document = persist_document(
+        source="https://cafef.vn/tcb.chn", requested_url=wrapper, content_type="text/plain",
+        content_bytes=b"TCB profit 10400", full_text="TCB profit 10400",
+        coverage={"extraction_complete": True}, run_dir=ledger.run_dir,
+    )
+    payload = document_result(
+        {"status": "ok", "url": wrapper, "resolved_url": "https://cafef.vn/tcb.chn",
+         "source_document": document},
+        text_field="content",
+    )
+    ledger.ingest_tool_result(tool_name="read_url", arguments={"url": wrapper},
+                              result=json.dumps(payload), call_id="wrapper-read", success=True)
+    # A triggering prompt makes a lookup miss observable: without it the
+    # release check silently skips an unknown URL.
+    ledger.user_message = "Phân tích cổ phiếu TCB và xuất báo cáo"
+
+    assert canonical_url(wrapper) == canonical_url(untracked)
+    assert incomplete_documents(ledger, {untracked}) == []
 
 
 def test_redirected_scraper_source_cannot_bypass_read_gate_via_requested_url(ledger, monkeypatch):

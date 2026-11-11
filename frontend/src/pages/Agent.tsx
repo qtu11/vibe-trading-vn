@@ -324,7 +324,7 @@ export function Agent() {
   const [contextSnapshot, setContextSnapshot] = useState<{ sessionId: string; snapshot: ContextSnapshot }>();
   const contextRunBindingRef = useRef<{ sessionId: string; attemptId: string; runId: string } | null>(null);
 
-  const { connect, disconnect, onStatusChange } = useSSE();
+  const { connect, reconnect, disconnect, onStatusChange } = useSSE();
 
   /* Live token totals for the in-flight attempt, fed by `llm_usage` events. */
   const {
@@ -1496,29 +1496,23 @@ export function Agent() {
     }).catch(() => {});
   }, []);
 
-  /* Safety timeout: if streaming but no SSE event for sseTimeoutMsRef.current ms, reset to idle */
+  /* Silence means the transport needs recovery; only backend events/history end an attempt. */
   useEffect(() => {
     if (status !== "streaming") return;
-    // Arm the clock at the start of every streaming turn. Without this, a turn
-    // whose very first event never arrives (e.g. the LLM provider hangs before
-    // emitting a single token) left lastEventRef at its 0 / stale value, so the
-    // guard below short-circuited and the activity line stayed live forever.
-    // forever. touch() refreshes this on every real event; the no-op heartbeat
-    // deliberately does not, so a connection that only keep-alives still trips.
     lastEventRef.current = Date.now();
     const timer = setInterval(() => {
       if (lastEventRef.current && Date.now() - lastEventRef.current > sseTimeoutMsRef.current && act().status === "streaming") {
         flushPendingStreamUpdate();
-        const partialAnswer = act().streamingText;
-        const timedOutActivity = archiveActivity("timeout");
-        act().clearStreaming();
-        persistPartialAnswer(timedOutActivity, partialAnswer);
-        act().setStatus("idle");
-        toast.warning(t('agent.executionTimedOut'));
+        lastEventRef.current = Date.now();
+        reconnect();
+        const store = act();
+        if (store.sessionId && store.activity) {
+          void syncCompletedAttempt(store.sessionId, store.activity.attemptId);
+        }
       }
     }, 10_000);
     return () => clearInterval(timer);
-  }, [archiveActivity, flushPendingStreamUpdate, persistPartialAnswer, status, t]);
+  }, [flushPendingStreamUpdate, reconnect, status, syncCompletedAttempt]);
 
   const runPrompt = useCallback(async (
     prompt: string,

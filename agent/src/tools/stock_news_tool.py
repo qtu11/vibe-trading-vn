@@ -37,6 +37,7 @@ from backtest.loaders import eastmoney_client, yahoo_client
 from backtest.loaders._http import throttled_get
 
 from src.agent.tools import BaseTool
+from src.tools.scraper.url_resolver import is_unreadable_wrapper
 
 logger = logging.getLogger(__name__)
 
@@ -332,6 +333,14 @@ def _parse_rss_articles(
             "published": _rss_published(item.findtext("pubDate")),
             "snippet": _snippet(snippet),
         }
+        if url:
+            # ``readable`` means a plain direct fetch works. Google News links
+            # are redirect wrappers, so they are not directly readable; they
+            # are still usable because ``read_url`` resolves them first, which
+            # ``requires_resolution`` signals.
+            requires_resolution = is_unreadable_wrapper(url)
+            record["readable"] = not requires_resolution
+            record["requires_resolution"] = requires_resolution
         if publisher_url:
             record["publisher_url"] = publisher_url
         articles.append(record)
@@ -382,9 +391,13 @@ class StockNewsTool(BaseTool):
         "(title/url/source/published/snippet) under 'articles'. US (.US), Hong "
         "Kong (.HK) and Brazil (B3 .SA) return Yahoo Finance news articles with "
         "the same fields. Vietnam (.VN) returns Vietnamese-language articles "
-        "from Google News RSS, with CafeF's market RSS as fallback. Use "
-        "scope 'stock' with a 'code', or scope 'global' (no code) for broad "
-        "China-market finance articles. "
+        "from Google News RSS, with CafeF's market RSS as fallback. Each article "
+        "carries 'readable': true when a plain direct fetch works, and "
+        "'requires_resolution': true for a Google News redirect wrapper. A "
+        "wrapper is still usable: read_url resolves it to the publisher before "
+        "fetching, and the report may cite the feed URL. Use scope 'stock' with "
+        "a 'code', or scope 'global' (no code) for broad China-market finance "
+        "articles. "
         'Example: {"code": "600519.SH", "scope": "stock", "limit": 10}.'
     )
     parameters = {

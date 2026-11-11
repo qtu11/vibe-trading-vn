@@ -40,7 +40,7 @@ const PHASE_RULES: Array<{ id: ExecutionPhaseId; pattern: RegExp }> = [
   },
   {
     id: "collection",
-    pattern: /(market_data|read_url|read_document|read_file|web_search|parallel_web_search|screen_market|ticker|quote|candle|orderbook|funding|open_interest|filing|news|profile|screener|fred|iwencai|fund_flow|dragon|northbound|margin|block_trade|shareholder|lockup|sector|options_chain|financial|fundamentals|trading_|get_forex|fetch|search|bash)/,
+    pattern: /(market_data|read_url|read_document|read_file|web_search|parallel_web_search|concurrent_scraper|screen_market|ticker|quote|candle|orderbook|funding|open_interest|filing|news|profile|screener|fred|iwencai|fund_flow|dragon|northbound|margin|block_trade|shareholder|lockup|sector|options_chain|financial|fundamentals|trading_|get_forex|fetch|search|bash)/,
   },
   {
     id: "modeling",
@@ -79,8 +79,8 @@ export interface ExecutionPhaseGroup {
 
 /** Merge a phase's calls into a single status. */
 function phaseStatus(steps: ToolCallEntry[]): PhaseStatus {
-  if (steps.some((step) => step.status === "error")) return "error";
   if (steps.some((step) => step.status === "running")) return "running";
+  if (steps.some((step) => step.status === "error")) return "error";
   if (steps.length > 0) return "done";
   return "pending";
 }

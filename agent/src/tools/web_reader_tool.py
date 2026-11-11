@@ -19,6 +19,7 @@ import requests
 from src.agent.progress import emit_progress
 from src.agent.tool_context import current_grounding
 from src.tools.source_documents import document_result, persist_document
+from src.tools.scraper.url_resolver import is_unreadable_wrapper, resolve_url_sync
 from src.agent.tools import BaseTool
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,8 @@ def _url_allowed(url: str) -> tuple[bool, str]:
     return True, ""
 
 
-def _read_failure(code: str, error: str, url: str, *, status_code: int | None = None) -> str:
+def _read_failure(code: str, error: str, url: str, *, status_code: int | None = None,
+                  remedy: str | None = None) -> str:
     """Failure payload with a next step, not only a status line.
 
     The VIC run retried the same blocked URLs at iterations 12, 22 and 63-82
@@ -151,7 +153,7 @@ def _read_failure(code: str, error: str, url: str, *, status_code: int | None = 
         "error_code": code,
         "error": error,
         "url": url,
-        "remedy": (
+        "remedy": remedy or (
             "Không thử lại nguyên URL này. Dùng nguồn thay thế đã công bố: trang quan hệ "
             "nhà đầu tư của tổ chức phát hành, hồ sơ công bố trên Sở giao dịch (HOSE/HNX), "
             "hoặc tệp người dùng đã tải lên qua read_document. Ghi rõ nguồn thay thế và "
@@ -240,17 +242,46 @@ def read_url(url: str, no_cache: bool = False, offset: int = 0,
         if cached is not None:
             payload = json.loads(cached)
         else:
-            emit_progress("fetching", message=f"GET {target_url[:60]}")
-            fetched = _fetch_origin(target_url)
+            # A Google News link is a redirect wrapper: the publisher URL only
+            # exists behind the batchexecute handshake. Resolve it on a cache
+            # miss only -- paging a long article must not redo the handshake
+            # for every chunk -- but keep the requested URL as the citation key
+            # so the report can cite the link it saw in the news feed.
+            fetch_url = target_url
+            resolved_url = ""
+            if is_unreadable_wrapper(target_url):
+                resolved_url = resolve_url_sync(target_url)
+                if resolved_url == target_url:
+                    return _read_failure(
+                        "wrapper_unresolved",
+                        "Google News wrapper could not be resolved to its publisher URL",
+                        target_url,
+                        remedy=(
+                            "Link Google News này không phân giải được. Dùng link gốc của bài "
+                            "(trường 'publisher_url' nếu feed có) hoặc tìm lại tiêu đề trên trang "
+                            "nhà phát hành; không thử lại nguyên URL wrapper."
+                        ),
+                    )
+                # The publisher URL comes from a remote handshake response, so
+                # apply the same SSRF/scheme check as a user-supplied URL before
+                # either the pinned origin fetch or the third-party reader sees it.
+                allowed, error = _url_allowed(resolved_url)
+                if not allowed:
+                    return _read_failure("unsafe_url", error, target_url)
+                fetch_url = resolved_url
+            emit_progress("fetching", message=f"GET {fetch_url[:60]}")
+            fetched = _fetch_origin(fetch_url)
             if fetched.get("security_blocked"):
                 return _read_failure("unsafe_origin", "Origin connection was refused by the SSRF guard", target_url)
             data = fetched.get("data", b"")
             content_type = str(fetched.get("content_type", "")).split(";", 1)[0].lower()
             if content_type == "application/pdf" or data.lstrip().startswith(b"%PDF-"):
                 from src.tools.doc_reader_tool import read_pdf_bytes
-                payload = read_pdf_bytes(data, source=fetched.get("url", target_url), run_dir=run_dir, deliver=False, requested_url=target_url)
+                payload = read_pdf_bytes(data, source=fetched.get("url", fetch_url), run_dir=run_dir, deliver=False, requested_url=target_url)
                 payload.pop("text", None)
                 payload.update(url=target_url, title=payload.get("file", "PDF"))
+                if resolved_url:
+                    payload["resolved_url"] = resolved_url
             else:
                 original = None
                 text, title, cached_remote = "", "", False
@@ -260,7 +291,7 @@ def read_url(url: str, no_cache: bool = False, offset: int = 0,
                     if content_type in {"text/html", "application/xhtml+xml"}:
                         from src.tools.extractor import clean_html
                         html = fetched.get("text") or data.decode("utf-8", errors="replace")
-                        cleaned = clean_html(html, url=target_url)
+                        cleaned = clean_html(html, url=fetch_url)
                         text, title = cleaned.clean_markdown, cleaned.title
                         dynamic = len(text.strip()) < 1200 and bool(re.search(
                             r"__NEXT_DATA__|__next_f|id\s*=\s*['\"](?:root|app|__next)['\"]|enable javascript|loading\.\.\.", html, re.IGNORECASE))
@@ -268,7 +299,7 @@ def read_url(url: str, no_cache: bool = False, offset: int = 0,
                     elif content_type in {"text/plain", "text/markdown", "text/x-markdown"}:
                         text = data.decode("utf-8", errors="replace")
                         complete = bool(text.strip())
-                original = persist_document(source=fetched.get("url", target_url), content_type=content_type,
+                original = persist_document(source=fetched.get("url", fetch_url), content_type=content_type,
                                             content_bytes=data, full_text=text, run_dir=run_dir, requested_url=target_url,
                                             coverage={"extraction_complete": complete, "method": method,
                                                       "scope": "fetched_body_main_content"})
@@ -277,14 +308,17 @@ def read_url(url: str, no_cache: bool = False, offset: int = 0,
                     if data and content_type not in {"text/html", "application/xhtml+xml", "text/plain", "text/markdown", "text/x-markdown"}:
                         return json.dumps({"status": "error", "error": "Unsupported origin content type",
                                            "url": target_url, "source_document": original}, ensure_ascii=False)
-                    text, title, cached_remote = _read_rendered(target_url, no_cache)
+                    text, title, cached_remote = _read_rendered(fetch_url, no_cache)
                     method = "rendered_reader"
                 document = original if complete else persist_document(
-                    source=target_url, content_type="text/markdown", content_bytes=text.encode("utf-8"),
-                    full_text=text, run_dir=run_dir, coverage={"extraction_complete": True,
+                    source=fetched.get("url", fetch_url), content_type="text/markdown", content_bytes=text.encode("utf-8"),
+                    full_text=text, run_dir=run_dir, requested_url=target_url,
+                    coverage={"extraction_complete": True,
                     "method": method, "scope": "fetched_rendered_body"})
                 payload = {"status": "ok", "url": target_url, "title": title,
                            "length": len(text), "source_document": document}
+                if resolved_url:
+                    payload["resolved_url"] = resolved_url
                 if not complete:
                     payload["original_snapshot"] = original
                 if cached_remote:
@@ -307,7 +341,7 @@ class WebReaderTool(BaseTool):
     """Web reader tool."""
 
     name = "read_url"
-    description = "Read public HTML or PDF sources. Preserves raw/full extracted text. Follow next_offset through all chunks; a saved source is not proof all text was read. Dynamic pages may use third-party Jina."
+    description = "Read public HTML or PDF sources. Preserves raw/full extracted text. Follow next_offset through all chunks; a saved source is not proof all text was read. Google News redirect wrappers are resolved to the publisher automatically. Dynamic pages may use third-party Jina."
     parameters = {
         "type": "object",
         "properties": {

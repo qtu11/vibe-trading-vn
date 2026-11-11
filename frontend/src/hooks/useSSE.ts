@@ -205,11 +205,24 @@ export function useSSE(config?: SSEConfig) {
     setStatus("disconnected");
   }, [setStatus]);
 
+  const reconnect = useCallback(() => {
+    if (closedRef.current) return;
+    const generation = ++generationRef.current;
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
+    sourceRef.current?.close();
+    sourceRef.current = null;
+    setStatus("reconnecting");
+    doConnect(generation);
+  }, [doConnect, setStatus]);
+
   const getStatus = useCallback(() => statusRef.current, []);
 
   const onStatusChange = useCallback((cb: (s: SSEStatus) => void) => {
     onStatusChangeRef.current = cb;
   }, []);
 
-  return { connect, disconnect, getStatus, onStatusChange };
+  return { connect, reconnect, disconnect, getStatus, onStatusChange };
 }

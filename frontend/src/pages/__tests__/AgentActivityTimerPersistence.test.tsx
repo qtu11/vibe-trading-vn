@@ -23,6 +23,7 @@ const apiMock = vi.hoisted(() => ({
 
 const sseMock = vi.hoisted(() => ({
   connect: vi.fn(),
+  reconnect: vi.fn(),
   disconnect: vi.fn(),
   onStatusChange: vi.fn(),
 }));
@@ -381,7 +382,7 @@ describe("Agent completion trusts the backend's attempt start", () => {
       endedAt: endedSec * 1000,
     });
   });
-  it("keeps explicit provider waiting active but still times out on transport keepalives alone", async () => {
+  it("reconnects a stalled stream while preserving the live attempt and accepting late progress", async () => {
     const router = createMemoryRouter([{ path: "/", element: <Agent /> }], { initialEntries: ["/?session=session-one"] });
     render(<RouterProvider router={router} />);
     await waitFor(() => expect(sseMock.connect).toHaveBeenCalled());
@@ -392,18 +393,50 @@ describe("Agent completion trusts the backend's attempt start", () => {
         const store = useAgentStore.getState();
         store.startActivity("attempt-wait");
         store.setStatus("streaming");
+        store.appendDelta("Partial evidence");
+        store.addToolCall({ id: "source-67", tool: "read_url", arguments: {}, status: "ok", timestamp: Date.now() });
       });
       for (let i = 0; i < 4; i++) {
         act(() => { vi.advanceTimersByTime(40_000); });
         act(() => { latestHandlers().llm_waiting({ attempt_id: "attempt-wait", iter: 1 }); });
       }
       expect(useAgentStore.getState().status).toBe("streaming");
-      expect(useAgentStore.getState().streamingText).toBe("");
+      expect(useAgentStore.getState().streamingText).toBe("Partial evidence");
       for (let i = 0; i < 3; i++) {
         act(() => { vi.advanceTimersByTime(40_000); });
         act(() => { latestHandlers().heartbeat({}); });
       }
+      expect(sseMock.reconnect).toHaveBeenCalledOnce();
+      expect(useAgentStore.getState().status).toBe("streaming");
+      expect(useAgentStore.getState().activity?.steps).toHaveLength(1);
+      expect(useAgentStore.getState().streamingText).toBe("Partial evidence");
+      act(() => { latestHandlers().tool_call({ attempt_id: "attempt-wait", call_id: "source-68", tool: "read_url" }); });
+      expect(useAgentStore.getState().activity?.steps).toHaveLength(2);
+      expect(useAgentStore.getState().activity?.state).toBe("working");
+      act(() => { latestHandlers()["attempt.failed"]({ attempt_id: "attempt-wait", summary: "Provider deadline" }); });
       expect(useAgentStore.getState().status).toBe("idle");
+      expect(useAgentStore.getState().messages.some((message) => message.meta?.activity?.state === "timeout")).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it("recovers a committed reply when the terminal event was lost", async () => {
+    const router = createMemoryRouter([{ path: "/", element: <Agent /> }], { initialEntries: ["/?session=session-one"] });
+    render(<RouterProvider router={router} />);
+    await waitFor(() => expect(sseMock.connect).toHaveBeenCalled());
+    vi.useFakeTimers();
+    try {
+      apiMock.getSessionMessages.mockResolvedValue([{
+        message_id: "stored-final", role: "assistant", content: "Recovered final answer", linked_attempt_id: "attempt-lost",
+        created_at: new Date().toISOString(), metadata: { status: "completed" }, tool_trail: [],
+      }]);
+      act(() => {
+        useAgentStore.getState().startActivity("attempt-lost");
+        useAgentStore.getState().setStatus("streaming");
+      });
+      await act(async () => { await vi.advanceTimersByTimeAsync(100_000); });
+      expect(useAgentStore.getState().status).toBe("idle");
+      expect(useAgentStore.getState().messages.some((message) => message.content === "Recovered final answer")).toBe(true);
+      expect(useAgentStore.getState().messages.some((message) => message.meta?.activity?.state === "timeout")).toBe(false);
     } finally { vi.useRealTimers(); }
   });
 

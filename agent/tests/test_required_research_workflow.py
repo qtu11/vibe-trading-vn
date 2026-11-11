@@ -142,6 +142,14 @@ def test_requested_file_cannot_be_forgotten_before_any_export_attempt(tmp_path):
 
 
 @pytest.mark.parametrize("prompt, required", [
+    ("nghiên cứu phân tích TCB trên sàn HOSE, xuất file báo cáo dưới dạng docx", True),
+    ("nghiên cứu phân tích tcb trên sàn hose, xuất file báo cáo dưới dạng docx", True),
+    ("Phân tích TCB.VN và xuất báo cáo DOCX", True),
+    ("Research TCB on HOSE and export an analysis report as DOCX", True),
+    ("Research TCB stock and cite the filings", True),
+    ("Research the company culture and summarize it", False),
+    ("Giá TCB trên HOSE hôm nay?", False),
+    ("Tóm tắt PDF kết quả TCB trên HOSE", False),
     ("Phân tích và báo cáo cổ phiếu TCB trên HOSE", True),
     ("Analyze the valuation of the company", True),
     ("Deep research climate transition risk", True),

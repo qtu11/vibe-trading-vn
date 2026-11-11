@@ -1270,7 +1270,7 @@
       "failed": "Thất bại",
       "steps": "bước {{count}}",
       "continue": "Tiếp tục",
-      "reattach": "Đính kèm lại",
+      "reattach": "Kết nối lại",
       "checkingFigures": "Kiểm tra các số liệu trong câu trả lời này (làm tròn {{round}})…"
     },
     "resumeConnector": "Tiếp tục trình kết nối",

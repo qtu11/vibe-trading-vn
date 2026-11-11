@@ -72,7 +72,7 @@ export const ExecutionPanel = memo(function ExecutionPanel({
   const shown = filtered;
   const totalSteps = groups.reduce((sum, group) => sum + group.steps.length, 0);
   const totalElapsed = groups.reduce((sum, group) => sum + group.elapsedMs, 0);
-  const failedPhases = groups.filter((group) => group.status === "error").length;
+  const failedCalls = groups.reduce((sum, group) => sum + group.errors, 0);
 
   return (
     <div className="min-w-0 overflow-hidden rounded-xl border border-hairline-subtle bg-surface-panel/70 shadow-panel" data-execution-panel>
@@ -91,10 +91,10 @@ export const ExecutionPanel = memo(function ExecutionPanel({
           {totalElapsed > 0 && (
             <span className="vt-tabular">{formatPhaseElapsed(totalElapsed)}</span>
           )}
-          {failedPhases > 0 && (
+          {failedCalls > 0 && (
             <span className="inline-flex items-center gap-1 font-medium text-danger">
               <AlertTriangle aria-hidden="true" className="h-3 w-3" />
-              {failedPhases} {t("execution.failedPhases" as never)}
+              {failedCalls} {t("execution.failedPhases" as never)}
             </span>
           )}
         </span>
@@ -158,7 +158,7 @@ export const ExecutionPanel = memo(function ExecutionPanel({
               <span className="vt-tabular shrink-0 text-[10px] text-ink-faint">
                 {group.steps.length} {t("execution.toolCount" as never)}
               </span>
-              {group.status === "error" && (
+              {group.errors > 0 && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-medium text-danger">
                   <AlertTriangle aria-hidden="true" className="h-3 w-3" />
                   {group.errors}

@@ -324,6 +324,27 @@ describe("useSSE — exponential backoff", () => {
 });
 
 describe("useSSE — Last-Event-ID resume", () => {
+  it("manually reconnects a stale stream without replaying already delivered text", () => {
+    const textDelta = vi.fn();
+    const { result } = renderHook(() => useSSE());
+    act(() => result.current.connect("http://test/events", { text_delta: textDelta }));
+    act(() => MockEventSource.latest.emit("text_delta", { delta: "Observed evidence" }, "resume-67"));
+    const previous = MockEventSource.latest;
+    const close = vi.spyOn(previous, "close");
+    act(() => result.current.reconnect());
+    expect(close).toHaveBeenCalledOnce();
+    expect(MockEventSource.latest.url).toContain("Last-Event-ID=resume-67");
+    act(() => {
+      previous.onopen?.();
+      MockEventSource.latest.emit("text_delta", { delta: "Observed evidence" }, "resume-67");
+      MockEventSource.latest.emit("text_delta", { delta: " plus analysis" }, "resume-68");
+    });
+    expect(textDelta.mock.calls.map(([delta]) => delta.delta)).toEqual(["Observed evidence", " plus analysis"]);
+    act(() => result.current.disconnect());
+    act(() => result.current.reconnect());
+    expect(MockEventSource.instances).toHaveLength(2);
+  });
+
   it("appends Last-Event-ID to reconnect URL", () => {
     const { result } = renderHook(() => useSSE());
 

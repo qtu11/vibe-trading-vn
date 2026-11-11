@@ -169,6 +169,87 @@ def test_run_registry_uses_latest_snapshot_and_registered_redirect_alias(source_
     assert documents_for_run(source_run) == [doc]
 
 
+WRAPPER = "https://news.google.com/rss/articles/CBMi-example?oc=5"
+PUBLISHER = "https://cafef.vn/tcb-loi-nhuan-quy-iii.chn"
+
+
+def test_google_news_wrapper_is_resolved_before_fetch(monkeypatch):
+    calls: list[str] = []
+
+    def fetch(url):
+        calls.append(url)
+        return {"data": ("<html><title>TCB</title><article><p>"
+                         "Lợi nhuận quý III đạt 10.400 tỷ đồng, tăng 20% so với cùng kỳ.</p>"
+                         "</article></html>").encode(),
+                "content_type": "text/html", "url": PUBLISHER, "status_code": 200}
+
+    monkeypatch.setattr(wr, "is_unreadable_wrapper", lambda url: url == WRAPPER)
+    monkeypatch.setattr(wr, "resolve_url_sync", lambda url, **_: PUBLISHER)
+    monkeypatch.setattr(wr, "_fetch_origin", fetch, raising=False)
+
+    result = json.loads(wr.read_url(WRAPPER))
+
+    assert calls == [PUBLISHER], "the publisher must be fetched, never the wrapper"
+    assert result["status"] == "ok"
+    assert result["url"] == WRAPPER
+    assert result["resolved_url"] == PUBLISHER
+    assert "10.400" in result["content"]
+    assert result["source_document"]["source"] == PUBLISHER
+    assert result["source_document"]["requested_url"] == WRAPPER
+    assert result["source_document"]["coverage"]["complete"] is True
+
+
+def test_paging_a_wrapper_resolves_once_from_the_cache(monkeypatch):
+    """Chunk paging must not redo the Google handshake for every chunk."""
+    resolutions: list[str] = []
+
+    def resolve(url, **_):
+        resolutions.append(url)
+        return PUBLISHER
+
+    monkeypatch.setattr(wr, "is_unreadable_wrapper", lambda url: url == WRAPPER)
+    monkeypatch.setattr(wr, "resolve_url_sync", resolve)
+    monkeypatch.setattr(wr, "_fetch_origin", lambda url: {
+        "data": ("<html><title>TCB</title><article><p>"
+                 + "Lợi nhuận quý III tăng mạnh so với cùng kỳ. " * 40
+                 + "</p></article></html>").encode(),
+        "content_type": "text/html", "url": PUBLISHER, "status_code": 200})
+
+    first = json.loads(wr.read_url(WRAPPER, max_chars=200))
+    assert first["next_offset"] is not None
+    second = json.loads(wr.read_url(WRAPPER, offset=first["next_offset"], max_chars=200))
+
+    assert resolutions == [WRAPPER]
+    assert second["status"] == "ok"
+    assert second["resolved_url"] == PUBLISHER
+    assert second["offset"] == first["next_offset"]
+
+
+def test_unresolved_wrapper_fails_with_actionable_code(monkeypatch):
+    monkeypatch.setattr(wr, "is_unreadable_wrapper", lambda url: url == WRAPPER)
+    monkeypatch.setattr(wr, "resolve_url_sync", lambda url, **_: url)
+    monkeypatch.setattr(wr, "_fetch_origin", lambda *_: pytest.fail("unresolved wrapper must not be fetched"))
+
+    result = json.loads(wr.read_url(WRAPPER))
+
+    assert result["status"] == "error"
+    assert result["error_code"] == "wrapper_unresolved"
+    assert result["url"] == WRAPPER
+
+
+def test_resolved_publisher_is_rechecked_by_the_url_guard(monkeypatch):
+    """A remote handshake must not smuggle an unsafe origin past the guard."""
+    monkeypatch.setattr(wr, "is_unreadable_wrapper", lambda url: url == WRAPPER)
+    monkeypatch.setattr(wr, "resolve_url_sync", lambda url, **_: "http://127.0.0.1/private")
+    monkeypatch.setattr(wr, "_fetch_origin", lambda *_: pytest.fail("unsafe publisher must not be fetched"))
+
+    result = json.loads(wr.read_url(WRAPPER))
+
+    assert result["status"] == "error"
+    assert result["error_code"] == "unsafe_url"
+    assert result["url"] == WRAPPER
+
+
 def test_rendered_shell_is_not_a_complete_source(monkeypatch):
     monkeypatch.setattr(wr, "_fetch_origin", lambda url: {"data": b"<html><div id='__next'>Loading...</div></html>",
                         "content_type": "text/html", "url": url, "status_code": 200})

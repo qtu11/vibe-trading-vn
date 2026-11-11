@@ -24,8 +24,8 @@ number/source binding inside an `analysis_sections` chapter instead of deleting
 the chapter. Headings are plain text without "1."/"Chương 1" numbering because
 the renderer numbers chapters. A `read_url` failure (`source_blocked`,
 `source_not_found`, `source_rate_limited`, `source_unreadable`,
-`source_unreachable`) is terminal for that URL; use its `remedy` or mark the
-data unavailable. Never relabel evidence as verified or erase a missing-data
+`source_unreachable`, `wrapper_unresolved`) is terminal for that URL; use its
+`remedy` or mark the data unavailable. Never relabel evidence as verified or erase a missing-data
 marker to force publication. Deliver only returned artifacts and download URLs;
 if a format is unavailable, say so.
 

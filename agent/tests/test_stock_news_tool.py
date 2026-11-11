@@ -273,6 +273,21 @@ class TestVietnamNews:
         assert article["published"] == "2026-11-05T10:00:00+00:00"
         assert "doanh thu 1.234,5 tỷ đồng" in article["snippet"]
 
+    def test_google_news_articles_flag_redirect_wrappers(self) -> None:
+        """A wrapper is not directly readable but is still usable via read_url."""
+        articles = _parse_rss_articles(
+            self._google_rss(), 10, provider="google_news", code="FPT.VN"
+        )
+
+        assert articles[0]["readable"] is False
+        assert articles[0]["requires_resolution"] is True
+
+        cafef = _parse_rss_articles(
+            self._cafef_rss(), 10, provider="cafef", code="FPT.VN"
+        )
+        assert cafef[0]["readable"] is True
+        assert cafef[0]["requires_resolution"] is False
+
     def test_vn_stock_news_uses_google_news_first(self) -> None:
         calls: list[tuple[str, dict[str, Any]]] = []
 

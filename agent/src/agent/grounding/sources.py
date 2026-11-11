@@ -261,7 +261,9 @@ def canonical_url(url: str | None) -> str:
     """Normalise a URL for source deduplication.
 
     A fragment and trailing slash never identify a different document. The
-    query string is kept: many publishers route a story through it.
+    query string is kept: many publishers route a story through it. The one
+    exception is a Google News wrapper, whose query is tracking-only and whose
+    identity is the article id in the path.
     """
     if not url:
         return ""
@@ -279,7 +281,18 @@ def canonical_url(url: str | None) -> str:
     if parts.port and parts.port not in {80, 443}:
         netloc = f"{host}:{parts.port}"
     path = parts.path.rstrip("/") or "/"
-    return urlunsplit((parts.scheme.lower(), netloc, path, parts.query, ""))
+    query = parts.query
+    if host == "news.google.com":
+        # A Google News wrapper is identified by the opaque article id in the
+        # path. Its query is only routing/tracking (``?oc=5``); dropping it lets
+        # a citation written without the tracking suffix match the feed URL the
+        # reader stored, instead of failing as an unread source. The resolver
+        # owns the wrapper path list, so ask it rather than duplicating it.
+        from src.tools.scraper.url_resolver import is_unreadable_wrapper
+
+        if is_unreadable_wrapper(value):
+            query = ""
+    return urlunsplit((parts.scheme.lower(), netloc, path, query, ""))
 
 
 @dataclass(frozen=True)
@@ -748,6 +761,11 @@ class _SourceMixin:
             url=url or None,
             title=title or url,
             publisher="",
+            # A Google News link is a redirect wrapper on an aggregator host;
+            # ``read_url`` resolved it to the publisher before fetching. The
+            # publisher URL is what determines the source tier, so a wrapper
+            # citation does not get downgraded to the aggregator.
+            publisher_url=str(payload.get("resolved_url") or "") or None,
             published_at=str(
                 payload.get("published_at")
                 or payload.get("published")

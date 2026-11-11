@@ -187,21 +187,25 @@ async def parallel_web_search_async(
 
     elapsed_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
 
-    formatted_results = [
-        {
-            "title": r.title,
-            "url": r.url,
-            "snippet": r.snippet,
-            "source": r.source,
-            "score": round(r.score, 4),
-            "published_date": getattr(r, "published_at", None),
-            # True when the link is a redirect wrapper (Google News) that no
-            # plain fetch can read. The caller should prefer the readable
-            # links from the same result set.
-            "readable": not r.extra.get("is_wrapper", False),
-        }
-        for r in results
-    ]
+    formatted_results = []
+    for r in results:
+        requires_resolution = is_unreadable_wrapper(r.url)
+        formatted_results.append(
+            {
+                "title": r.title,
+                "url": r.url,
+                "snippet": r.snippet,
+                "source": r.source,
+                "score": round(r.score, 4),
+                "published_date": getattr(r, "published_at", None),
+                # ``readable`` is false for a redirect wrapper (Google News):
+                # no plain fetch can read it. ``requires_resolution`` says the
+                # link is still usable -- read_url resolves it to the publisher
+                # before fetching, and the citation keeps the feed URL.
+                "readable": not requires_resolution,
+                "requires_resolution": requires_resolution,
+            }
+        )
 
     payload = {
         "status": "ok",
@@ -252,10 +256,10 @@ async def concurrent_scrape_and_synthesize_async(
         }
 
     # Step 1: Async Concurrent Scraping
-    # Wrapper URLs (Google News) point at a publisher page that needs a
-    # browser handshake; fetching them burns a request and returns a shell.
-    # They are skipped here and reported, so the caller can pick the readable
-    # links from the same search result instead.
+    # Wrapper URLs (Google News) point at a publisher page that only resolves
+    # through a handshake; fetching one here burns a request and returns a
+    # shell. They are skipped and reported so the caller can read them with
+    # read_url -- which resolves the wrapper first -- instead of this tool.
     skipped_wrappers: list[str] = []
     fetchable_urls: list[str] = []
     for url in urls:
@@ -397,6 +401,16 @@ async def concurrent_scrape_and_synthesize_async(
         document["final_url"] = document.get("source") or requested_url
         document["url"] = requested_url
         document["full_text_path"] = document.get("full_text_path") or document.get("text_path")
+        if (document.get("coverage") or {}).get("complete") is not True:
+            # This tool delivers excerpts, not the full text. Citing the URL
+            # without a read_url pass leaves an incomplete source and the
+            # research release gate refuses the report; say what to do next
+            # instead of letting the model assume the excerpt was the read.
+            document["read_url_required"] = True
+            document["next_step"] = (
+                "Gọi read_url cho URL này và đọc hết các chunk (next_offset) "
+                "trước khi trích dẫn, hoặc bỏ nguồn và các số liệu dựa trên nó."
+            )
     extraction_count = sum((document.get("coverage") or {}).get("extraction_complete") is True for document in source_documents.values())
     complete_count = sum((document.get("coverage") or {}).get("complete") is True for document in source_documents.values())
     delivery_count = sum((document.get("coverage") or {}).get("text_delivery_complete") is True for document in source_documents.values())
@@ -512,8 +526,9 @@ async def concurrent_scrape_and_synthesize_async(
         ]
         if skipped_wrappers:
             parts.append(
-                f"{len(skipped_wrappers)} URLs were redirect wrappers that need a "
-                "browser to resolve and were skipped"
+                f"{len(skipped_wrappers)} URLs were redirect wrappers and were "
+                "skipped here; read them with read_url, which resolves the "
+                "wrapper to the publisher before fetching"
             )
         if reader_failures:
             parts.append(
@@ -532,7 +547,10 @@ class ParallelWebSearchTool(BaseTool):
     description: str = (
         "Tìm kiếm thông tin web song song trên nhiều công cụ (DuckDuckGo, Brave, Bing, QVeris, và các cổng thông tin tài chính Việt Nam: CafeF, Vietstock). "
         "Hỗ trợ phân tán nhiều truy vấn cùng một lúc, tự động loại bỏ liên kết trùng lặp trên cùng một domain (Domain Diversity Gate) "
-        "và xếp hạng theo chuẩn thuật toán Reciprocal Rank Fusion (RRF)."
+        "và xếp hạng theo chuẩn thuật toán Reciprocal Rank Fusion (RRF). "
+        "Mỗi kết quả có 'readable' (fetch trực tiếp được) và 'requires_resolution' "
+        "(link Google News cần phân giải); link requires_resolution vẫn đọc được "
+        "bằng read_url vì read_url tự phân giải wrapper sang trang gốc trước khi fetch."
     )
     repeatable: bool = True
     is_readonly: bool = True

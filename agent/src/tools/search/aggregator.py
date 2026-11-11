@@ -245,9 +245,8 @@ class MultiSearchAggregator:
             doc.extra["aggregated_sources"] = list(sources_per_doc[url])
             doc.extra["domain"] = domain
             # A Google News link points at a publisher page that no plain
-            # fetch can read. Marking it lets the caller prefer the readable
-            # links from the same result set instead of spending a request
-            # on a shell page.
+            # fetch can read. Marking it lets the caller know read_url resolves
+            # the wrapper first; it is not a reason to drop the link.
             doc.extra["is_wrapper"] = is_unreadable_wrapper(url)
 
             domain_counts[domain] += 1

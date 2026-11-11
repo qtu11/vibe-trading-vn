@@ -41,6 +41,11 @@ _MARKET_ALIASES = {
 
 _PARAGRAPH_TEXT_KEYS = ("text", "content", "body", "paragraph", "value")
 
+#: Matches a date followed by a time part in an ISO-ish timestamp. The schema
+#: declares these fields as ``date``; a timestamp with a time part is rejected
+#: with pydantic's "Datetimes provided to dates should have zero time".
+_DATE_WITH_TIME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:[T ].*)?$")
+
 #: Chapter prefixes the model types into a heading. The renderer already adds
 #: its own "06", so "1. Kết luận" renders as "06 1. Kết luận". Only strip a
 #: prefix that is clearly numbering: digits/roman numerals followed by
@@ -99,6 +104,28 @@ def _dedup(items: list[str]) -> list[str]:
     return list(dict.fromkeys(items))
 
 
+def _date_only(raw: Any, *, label: str, warnings: list[str]) -> Any:
+    """Trim an ISO timestamp to its date part; leave anything else untouched.
+
+    The schema declares ``data_as_of``, ``Metric.as_of``,
+    ``Source.published_at`` and ``PricePoint.date`` as ``date``. A model
+    sending ``2026-09-30T00:00:00+07:00`` fails the whole export with
+    pydantic's "Datetimes provided to dates should have zero time - e.g. be
+    exact dates", even though the date part is exactly what the field wants.
+    Only a well-formed ``YYYY-MM-DD`` prefix is trimmed, and the change is
+    recorded so the repair is visible in the export warnings.
+    """
+    if not isinstance(raw, str):
+        return raw
+    stripped = raw.strip()
+    match = _DATE_WITH_TIME_RE.match(stripped)
+    if match is None or match.group(1) == stripped:
+        return raw
+    date_part = match.group(1)
+    warnings.append(f"{label}: '{stripped}' -> '{date_part}' (chỉ giữ ngày)")
+    return date_part
+
+
 def _normalize_sources(payload: dict, warnings: list[str]) -> list[str]:
     sources = payload.get("sources")
     if not isinstance(sources, list):
@@ -113,6 +140,12 @@ def _normalize_sources(payload: dict, warnings: list[str]) -> list[str]:
             src["published_at"] = src.pop("as_of")
         if "published_at" not in src and isinstance(src.get("date"), str):
             src["published_at"] = src.pop("date")
+        if "published_at" in src:
+            src["published_at"] = _date_only(
+                src["published_at"],
+                label=f"sources[{index}].published_at",
+                warnings=warnings,
+            )
         if not src.get("provider"):
             domain = re.sub(r"^https?://(www\.)?", "", str(src.get("url", "")))
             domain = domain.split("/")[0] or "nguồn thu thập"
@@ -212,6 +245,7 @@ def _normalize_price_history(payload: dict, all_ids: list[str], warnings: list[s
         dict_unit = str(history.get("currency") or history.get("unit") or default_unit)
         points = []
         for i, (day, close) in enumerate(zip(dates, closes)):
+            day = _date_only(day, label=f"price_history[{i}].date", warnings=warnings)
             point: dict[str, Any] = {"date": day, "close": close, "unit": dict_unit,
                                      "price_basis": default_basis, "source_ids": list(dict_sources)}
             if i < len(volumes):
@@ -222,9 +256,15 @@ def _normalize_price_history(payload: dict, all_ids: list[str], warnings: list[s
         history = payload["price_history"]
 
     if isinstance(history, list):
-        for point in history:
+        for index, point in enumerate(history):
             if not isinstance(point, dict):
                 continue
+            if "date" in point:
+                point["date"] = _date_only(
+                    point["date"],
+                    label=f"price_history[{index}].date",
+                    warnings=warnings,
+                )
             if not point.get("unit"):
                 point["unit"] = default_unit
             if point.get("price_basis") is None:
@@ -391,6 +431,14 @@ def normalize_report_payload(data: dict) -> tuple[dict, list[str]]:
         return data, warnings
     payload = copy.deepcopy(data)
 
+    # ``data_as_of`` is a ``date``. A timestamp here fails the export before
+    # any other repair can run, so trim it first: the subtitle and the metric
+    # ``as_of`` fallback read this value.
+    if payload.get("data_as_of") is not None:
+        payload["data_as_of"] = _date_only(
+            payload["data_as_of"], label="data_as_of", warnings=warnings
+        )
+
     market = payload.get("market")
     if isinstance(market, str):
         mapped = _MARKET_ALIASES.get(market.strip().lower())
@@ -422,6 +470,17 @@ def normalize_report_payload(data: dict) -> tuple[dict, list[str]]:
             _ensure_metric_keys(items, prefix, warnings)
 
     _map_top_level_market_price(payload, warnings)
+
+    # Coerce after the top-level ``market_price`` has been folded in, so every
+    # metric -- including that inserted one -- gets a schema-valid date.
+    for field in ("financial_metrics", "valuation_metrics"):
+        for metric in payload.get(field) or []:
+            if isinstance(metric, dict) and "as_of" in metric:
+                metric["as_of"] = _date_only(
+                    metric["as_of"],
+                    label=f"{field} '{metric.get('key', '')}'.as_of",
+                    warnings=warnings,
+                )
 
     metric_keys = {m.get("key") for m in
                    ([*(payload.get("financial_metrics") or []), *(payload.get("valuation_metrics") or [])])
