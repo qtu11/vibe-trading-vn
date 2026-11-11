@@ -2,97 +2,363 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   Vibe-Trading — Design System
+   "Institutional Financial Intelligence × AI-Native Workspace"
+
+   The token model is an explicit elevation ladder:
+     sunken  <  base  <  sidebar  <  panel  <  raised  <  overlay
+   Each level is separated by at least ~4 lightness points so adjacent
+   surfaces stay distinguishable on 1080p panels and on 4K desktop apps.
+   Hairlines come in three strengths (subtle / default / strong) and ink
+   comes in four (primary / secondary / muted / faint).
+   ========================================================================== */
+
 @layer base {
   :root {
-    /* Light mode surfaces */
-    --background: 220 20% 98%;
-    --foreground: 220 20% 10%;
+    color-scheme: light;
+
+    /* --- Elevation ladder (light) ------------------------------------- */
+    --surface-sunken: 225 26% 93.5%;
+    --surface-base: 225 24% 97%;
+    --surface-sidebar: 225 26% 95.5%;
+    --surface-panel: 0 0% 100%;
+    --surface-raised: 0 0% 100%;
+    --surface-overlay: 0 0% 100%;
+    /* App chrome (top bar / command strip) sits above the sidebar in the
+       depth order but below floating overlays. */
+    --surface-chrome: 225 30% 98.5%;
+
+    /* --- Hairlines ---------------------------------------------------- */
+    --border-subtle: 225 18% 91%;
+    --border: 225 15% 86%;
+    --border-strong: 225 13% 76%;
+
+    /* --- Ink ---------------------------------------------------------- */
+    --ink: 226 34% 12%;
+    --ink-secondary: 226 14% 33%;
+    --ink-muted: 226 11% 44%;
+    --ink-faint: 226 9% 45%;
+    --ink-inverse: 0 0% 100%;
+
+    /* --- Brand accent (amber, matched to the mark) -------------------- */
+    --accent: 26 92% 44%;
+    --accent-strong: 20 88% 36%;
+    --accent-ink: 22 90% 33%;
+    --accent-soft: 32 96% 94%;
+    --accent-foreground: 30 70% 8%;
+
+    /* --- Market semantics --------------------------------------------- */
+    --bull: 154 56% 28%;
+    --bull-soft: 154 46% 94%;
+    --bear: 355 68% 42%;
+    --bear-soft: 355 76% 96%;
+    --info: 214 78% 40%;
+    --info-soft: 214 88% 96%;
+    --warning: 34 92% 30%;
+    --warning-soft: 40 92% 94%;
+    --success: 154 56% 28%;
+    --danger: 355 68% 42%;
+
+    /* --- Elevation shadows -------------------------------------------- */
+    --shadow-color: 226 34% 12%;
+    --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.06), 0 1px 1px hsl(var(--shadow-color) / 0.04);
+    --shadow-md: 0 6px 18px hsl(var(--shadow-color) / 0.07), 0 1px 3px hsl(var(--shadow-color) / 0.05);
+    --shadow-lg: 0 20px 52px hsl(var(--shadow-color) / 0.13), 0 2px 8px hsl(var(--shadow-color) / 0.06);
+    /* Layered "premium desktop" shadows: a tight contact shadow plus a wide
+       ambient one. Used on floating chrome, popovers and elevated cards. */
+    --shadow-float:
+      0 1px 1px hsl(var(--shadow-color) / 0.04),
+      0 4px 10px hsl(var(--shadow-color) / 0.06),
+      0 18px 44px hsl(var(--shadow-color) / 0.10);
+    --shadow-panel:
+      0 1px 2px hsl(var(--shadow-color) / 0.05),
+      0 0 0 1px hsl(var(--border-subtle));
+    /* Ambient brand bloom used behind the logo and hero mark. */
+    --shadow-brand: 0 0 0 1px hsl(var(--accent) / 0.22), 0 6px 22px hsl(var(--accent) / 0.28);
+
+    /* --- Motion -------------------------------------------------------- */
+    --dur-instant: 90ms;
+    --dur-fast: 150ms;
+    --dur-base: 220ms;
+    --dur-slow: 340ms;
+    --ease-standard: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+    --radius: 0.625rem;
+
+    /* --- Legacy aliases (kept so existing utilities keep working) ----- */
+    --background: 225 24% 97%;
+    --foreground: 226 34% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 220 20% 10%;
-
-    /* Popover: a slightly elevated surface used for floating menus,
-       tooltips, and the language switcher dropdown. Falls back to a
-       solid white (light) or surface-1 (dark) so dropdowns never
-       appear transparent and let underlying content bleed through. */
+    --card-foreground: 226 34% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 20% 10%;
-
-    /* Brand accent */
-    --primary: 27 90% 52%;
-    --primary-foreground: 0 0% 100%;
-
-    --muted: 220 14% 92%;
-    --muted-foreground: 220 14% 46%;
-    --destructive: 0 84% 60%;
+    --popover-foreground: 226 34% 12%;
+    --primary: 26 92% 44%;
+    --primary-foreground: 30 70% 8%;
+    --muted: 225 20% 93%;
+    --muted-foreground: 226 11% 50%;
+    --destructive: 355 68% 42%;
     --destructive-foreground: 0 0% 100%;
-    --border: 220 14% 87%;
-    --radius: 0.5rem;
 
-    /* Semantic colors */
-    --success: 142 71% 45%;
-    --danger: 0 84% 60%;
-    --warning: 38 92% 50%;
-    --info: 217 91% 60%;
-
-    /* Chart tokens */
-    --chart-grid: 220 14% 90%;
-    --chart-text: 220 14% 46%;
-    --chart-axis: 220 14% 80%;
+    /* --- Chart tokens -------------------------------------------------- */
+    --chart-grid: 225 16% 89%;
+    --chart-text: 226 11% 50%;
+    --chart-axis: 225 14% 82%;
     --chart-compare-a: #3b82f6;
     --chart-compare-b: #f59e0b;
+
+    /* --- Reasoning effort heat scale (teal → amber → red) ------------- */
+    --effort-1: 191 84% 34%;
+    --effort-2: 168 62% 32%;
+    --effort-3: 32 90% 42%;
+    --effort-4: 355 72% 46%;
+    --effort-5: 350 70% 34%;
+
+    /* --- Report brand (the crimson "shrimp" house identity used on
+           generated research documents) --------------------------------- */
+    --report-brand: 356 62% 26%;
+    --report-brand-ink: 355 70% 92%;
+    --report-brand-soft: 356 60% 96%;
+    --report-brand-ink-strong: 356 62% 30%;
+    --report-card-from: 356 55% 7%;
+    --report-card-via: 356 57% 12%;
+    --report-card-to: 355 52% 5%;
   }
 
   .dark {
-    /* Dark mode: 4-level surface system. Keep >=5 lightness points between
-       adjacent surfaces — smaller deltas are indistinguishable on most
-       panels (sidebar vs main blended at 5%/8%). */
-    --background: 220 20% 5%;       /* bg-base */
-    --foreground: 220 10% 93%;
-    --card: 220 18% 10%;            /* surface-1 */
-    --card-foreground: 220 10% 93%;
+    color-scheme: dark;
 
-    --popover: 220 18% 12%;         /* surface-1.5 (slightly lighter than card) */
-    --popover-foreground: 220 10% 93%;
+    /* --- Elevation ladder (dark) -------------------------------------- */
+    --surface-sunken: 226 26% 5.5%;
+    --surface-base: 226 24% 7.5%;
+    --surface-sidebar: 226 22% 9.5%;
+    --surface-panel: 226 20% 11.5%;
+    --surface-raised: 226 18% 14%;
+    --surface-overlay: 226 18% 16.5%;
+    --surface-chrome: 226 24% 10%;
 
-    --primary: 27 90% 52%;
-    --primary-foreground: 0 0% 100%;
+    /* --- Hairlines ---------------------------------------------------- */
+    --border-subtle: 226 16% 14%;
+    --border: 226 14% 19%;
+    --border-strong: 226 12% 27%;
 
-    --muted: 220 16% 16%;           /* surface-2 */
-    --muted-foreground: 220 10% 64%;
-    --destructive: 0 62% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 14% 24%;          /* surface-3 */
+    /* --- Ink ---------------------------------------------------------- */
+    --ink: 225 26% 95%;
+    --ink-secondary: 225 14% 74%;
+    --ink-muted: 225 10% 56%;
+    --ink-faint: 225 10% 60%;
+    --ink-inverse: 226 34% 10%;
 
-    /* Semantic colors */
-    --success: 142 71% 45%;
-    --danger: 0 62% 50%;
-    --warning: 38 92% 50%;
-    --info: 217 91% 60%;
+    /* --- Brand accent (dark) ------------------------------------------ */
+    --accent: 30 94% 58%;
+    --accent-strong: 34 96% 66%;
+    --accent-ink: 32 92% 66%;
+    --accent-soft: 30 40% 16%;
+    --accent-foreground: 226 40% 10%;
 
-    /* Chart tokens */
-    --chart-grid: 220 20% 14%;
-    --chart-text: 220 10% 55%;
-    --chart-axis: 220 20% 26%;
+    /* --- Market semantics --------------------------------------------- */
+    --bull: 154 52% 48%;
+    --bull-soft: 154 34% 15%;
+    --bear: 355 78% 66%;
+    --bear-soft: 355 40% 17%;
+    --info: 214 88% 66%;
+    --info-soft: 214 44% 16%;
+    --warning: 38 92% 60%;
+    --warning-soft: 38 44% 15%;
+    --success: 154 52% 48%;
+    --danger: 355 78% 66%;
+
+    --shadow-color: 226 60% 2%;
+    --shadow-sm: 0 1px 2px hsl(var(--shadow-color) / 0.5);
+    --shadow-md: 0 8px 22px hsl(var(--shadow-color) / 0.55), 0 1px 3px hsl(var(--shadow-color) / 0.4);
+    --shadow-lg: 0 24px 60px hsl(var(--shadow-color) / 0.7), 0 2px 10px hsl(var(--shadow-color) / 0.5);
+    --shadow-float:
+      0 1px 1px hsl(var(--shadow-color) / 0.5),
+      0 6px 16px hsl(var(--shadow-color) / 0.55),
+      0 24px 56px hsl(var(--shadow-color) / 0.62);
+    --shadow-panel:
+      0 1px 2px hsl(var(--shadow-color) / 0.55),
+      0 0 0 1px hsl(var(--border-subtle));
+    --shadow-brand: 0 0 0 1px hsl(var(--accent) / 0.32), 0 8px 28px hsl(var(--accent) / 0.34);
+
+    /* --- Legacy aliases ------------------------------------------------ */
+    --background: 226 24% 7.5%;
+    --foreground: 225 26% 95%;
+    --card: 226 20% 11.5%;
+    --card-foreground: 225 26% 95%;
+    --popover: 226 18% 16.5%;
+    --popover-foreground: 225 26% 95%;
+    --primary: 30 94% 58%;
+    --primary-foreground: 226 40% 10%;
+    --muted: 226 18% 15%;
+    --muted-foreground: 225 10% 58%;
+    --destructive: 355 78% 66%;
+    --destructive-foreground: 226 40% 10%;
+
+    --chart-grid: 226 18% 16%;
+    --chart-text: 225 10% 55%;
+    --chart-axis: 226 16% 25%;
     --chart-compare-a: #60a5fa;
     --chart-compare-b: #fbbf24;
+
+    /* --- Reasoning effort heat scale (teal → amber → red) ------------- */
+    --effort-1: 186 70% 56%;
+    --effort-2: 166 58% 48%;
+    --effort-3: 38 92% 60%;
+    --effort-4: 356 80% 66%;
+    --effort-5: 352 72% 55%;
+
+    /* --- Report brand (crimson research-document identity) --------------- */
+    --report-brand: 356 46% 26%;
+    --report-brand-ink: 354 62% 90%;
+    --report-brand-soft: 356 40% 16%;
+    --report-brand-ink-strong: 354 68% 72%;
+    --report-card-from: 356 44% 8%;
+    --report-card-via: 356 46% 13%;
+    --report-card-to: 355 42% 6%;
   }
 
   * { @apply border-border; }
   body { @apply bg-background text-foreground; }
 
-  /* Prose table enhancements */
+  /* Numeric columns must not reflow while values tick. */
+  .vt-num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv05" 1;
+  }
+
+  /* --- Scrollbars: thin, neutral, only visible on interaction --------- */
+  ::-webkit-scrollbar { width: 11px; height: 11px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong) / 0.75);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--ink-faint) / 0.7);
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-corner { background: transparent; }
+
+  /* --- Prose (financial answers) -------------------------------------- */
   .prose table { border-collapse: collapse; width: 100%; }
   .prose th, .prose td { border: 1px solid hsl(var(--border)); }
-  .prose tbody tr:nth-child(even) { background: hsl(var(--muted) / 0.3); }
+  .prose tbody tr:nth-child(even) { background: hsl(var(--muted) / 0.35); }
 
-  /* Smooth scrollbar for webkit */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(var(--border)); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground)); }
+  ::selection { background: hsl(var(--accent) / 0.22); }
 }
 
-/* Streaming pulse-slide animation for the "running" bar */
+@layer components {
+  /* Shared focus ring. Every interactive element in the app uses it so the
+     keyboard experience is uniform. */
+  .vt-focus {
+    outline: none;
+  }
+  .vt-focus-visible:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px hsl(var(--surface-base)),
+      0 0 0 4px hsl(var(--accent) / 0.55);
+  }
+
+  .vt-card {
+    background: hsl(var(--surface-panel));
+    border: 1px solid hsl(var(--border-subtle));
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .vt-divider { border-color: hsl(var(--border-subtle)); }
+
+  /* ---- Premium chrome ------------------------------------------------
+     Frosted application chrome (top bar, floating command surfaces).
+     The blur + saturation keeps the surface legible over scrolling
+     content while reading as a distinct material layer. */
+  .vt-chrome {
+    background: hsl(var(--surface-chrome) / 0.82);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+  }
+
+  /* A hairline that reads as a light-catching edge rather than a flat rule. */
+  .vt-edge-top {
+    box-shadow: inset 0 1px 0 hsl(var(--ink) / 0.045);
+  }
+  .vt-edge-bottom {
+    box-shadow: inset 0 -1px 0 hsl(var(--ink) / 0.045);
+  }
+
+  /* Elevated card used for answers, panels and popovers. */
+  .vt-elevated {
+    background: hsl(var(--surface-panel));
+    border: 1px solid hsl(var(--border-subtle));
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* Floating surface (menus, popovers, command palettes). */
+  .vt-floating {
+    background: hsl(var(--surface-overlay));
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-float);
+  }
+
+  /* Brand bloom behind the logo / hero mark. */
+  .vt-brand-glow {
+    box-shadow: var(--shadow-brand);
+  }
+
+  /* Subtle top-light gradient that gives large flat areas a sense of
+     depth. Applied to the workspace background. */
+  .vt-workspace {
+    background:
+      radial-gradient(
+        1200px 460px at 50% -8%,
+        hsl(var(--accent) / 0.055),
+        transparent 70%
+      ),
+      hsl(var(--surface-base));
+  }
+
+  /* Fine grid texture for empty / hero states. */
+  .vt-grid-texture {
+    background-image:
+      linear-gradient(hsl(var(--ink) / 0.028) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--ink) / 0.028) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 78%);
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 30%, transparent 78%);
+  }
+
+  /* Numeric data column: aligned digits, never reflows while ticking. */
+  .vt-tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+    letter-spacing: -0.01em;
+  }
+
+  /* Thin, self-hiding scroll region for dense panels. */
+  .vt-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong) / 0.6) transparent;
+  }
+  .vt-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+  .vt-scroll::-webkit-scrollbar-track { background: transparent; }
+  .vt-scroll::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-strong) / 0.55);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+  .vt-scroll::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--ink-faint) / 0.7);
+    background-clip: content-box;
+  }
+}
+
+/* ---------- Streaming pulse-slide animation for the "running" bar -------- */
 @keyframes pulse-slide {
   0%   { transform: translateX(-100%); }
   50%  { transform: translateX(200%); }
@@ -109,7 +375,58 @@
   overflow-y: hidden;
 }
 
-/* Lightweight office sprites used by the native Pixel Office management view. */
+/* ---------- Motion primitives ------------------------------------------ */
+@keyframes vt-fade-rise {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes vt-pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes vt-shimmer {
+  from { background-position: 180% 0; }
+  to   { background-position: -80% 0; }
+}
+@keyframes vt-indeterminate {
+  from { transform: translateX(-100%) scaleX(0.35); }
+  60%  { transform: translateX(60%) scaleX(0.6); }
+  to   { transform: translateX(160%) scaleX(0.35); }
+}
+@keyframes vt-spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+.vt-fade-rise { animation: vt-fade-rise var(--dur-base) var(--ease-standard) both; }
+.vt-fade-in { animation: vt-fade-in var(--dur-fast) var(--ease-standard) both; }
+.vt-pop-in { animation: vt-pop-in var(--dur-fast) var(--ease-standard) both; }
+
+.vt-skeleton {
+  background-image: linear-gradient(
+    100deg,
+    hsl(var(--muted) / 0.55) 20%,
+    hsl(var(--muted) / 0.95) 40%,
+    hsl(var(--muted) / 0.55) 60%
+  );
+  background-size: 220% 100%;
+  animation: vt-shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vt-fade-rise,
+  .vt-fade-in,
+  .vt-pop-in,
+  .vt-skeleton {
+    animation: none;
+  }
+  .vt-skeleton { background-image: none; }
+}
+
+/* ---------- Lightweight office sprites --------------------------------- */
 .pixel-office-floor {
   background-color: hsl(var(--card));
   background-image:
@@ -172,7 +489,7 @@
 .pixel-character__arm--right { right: 0; }
 .pixel-character__leg { top: 49px; height: 12px; background: #334155; }
 .pixel-character__leg--left { left: 7px; }
-.pixel-character__leg--right { right: 7px; }
+.pixel-character__leg--right { right: 0; }
 .pixel-character__typing {
   position: absolute;
   right: 0;
@@ -187,7 +504,7 @@
   50% { opacity: 1; transform: translateY(0); }
 }
 
-/* Message/hero entrance — one subtle rise per mount; removed under reduced motion */
+/* ---------- Message / hero entrance ------------------------------------- */
 @keyframes msg-enter {
   from { opacity: 0; transform: translateY(10px); }
 }
@@ -196,7 +513,7 @@
   .msg-enter { animation: none; }
 }
 
-/* RTL: mirror directional icons (chevrons, arrows) automatically */
+/* ---------- RTL: mirror directional icons automatically ------------------ */
 [dir="rtl"] .rtl\:flip-x { transform: scaleX(-1); }
 
 /* ===== Bidi/RTL support for chat content =====

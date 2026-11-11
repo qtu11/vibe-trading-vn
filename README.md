@@ -111,7 +111,7 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 
 2. **Hội đồng AI Đa tác nhân (Swarm Autonomous Trading Council):**
    - Thay thế việc ra quyết định đơn lẻ bằng mạng lưới chuyên viên AI đa nhiệm: Chuyên viên Phân tích Vĩ mô (Macro), Chuyên viên BCTC (Fundamental), Chuyên viên Phân tích Kỹ thuật & SMC (Technical), Giám đốc Quản trị Rủi ro (Risk Manager), Nhà Quản lý Danh mục (Portfolio Manager) và Chuyên viên Thực thi (Execution Agent).
-   - Công cụ `run_swarm` cung cấp luồng chuyên gia và tranh biện khi được gọi; một yêu cầu chat thông thường chạy qua `AgentLoop`, không mặc nhiên đi qua toàn bộ hội đồng.
+   - `AgentLoop` tự chạy `deep_research_review` cho yêu cầu nghiên cứu chuyên sâu hoặc phân tích/báo cáo doanh nghiệp, cổ phiếu: đọc nguồn → phân tích chuyên môn → phản biện → biên tập. Tra giá, giải thích thuật ngữ và chuyển định dạng đơn giản đi theo công cụ trực tiếp. Các preset hội đồng khác vẫn được gọi riêng theo yêu cầu.
 
 3. **Engine xuất dự thảo nghiên cứu vốn cổ phần:**
    - Tool/API xuất báo cáo mặc định `minimum_pages=1`; chỉ tăng khi người dùng yêu cầu độ dài cụ thể. Nếu chưa đạt số trang đã yêu cầu hoặc thiếu định dạng, receipt ghi rõ phần thiếu và giữ liên kết các file có thật; không thêm nội dung lặp để đủ trang.
@@ -140,12 +140,17 @@ Inventory hiện tại của hệ thống: **121 agent tools** / **87 main MCP t
 flowchart TD
     U[Yêu cầu và lịch sử phiên] --> S[SessionService: giữ quyền chạy phiên, lưu attempt]
     S --> C[ContextBuilder: hướng dẫn, lịch sử, catalog công cụ]
-    C --> L[AgentLoop: gọi model, chọn bước tiếp theo]
+    C --> Q{Yêu cầu nghiên cứu chuyên sâu hoặc báo cáo doanh nghiệp?}
+    Q -->|Có| V[Đọc nguồn → Phân tích → Phản biện → Biên tập]
+    V --> H[Receipt thực thi: đủ vai và lượt đọc bằng chứng]
+    H --> L[AgentLoop: tổng hợp và chọn bước tiếp theo]
+    Q -->|Không| L
     L --> T[Resolve mã/sàn rồi tìm web, đọc tài liệu, lấy dữ liệu]
-    T --> E[GroundingLedger: lưu bằng chứng và mã nguồn]
+    T --> A[Lưu bytes gốc và toàn văn trước rút gọn; đọc tiếp bằng offset]
+    A --> E[GroundingLedger: bằng chứng và mã nguồn dùng chung giữa worker]
     E --> K[Kết quả cùng _sources; compact giữ đường dẫn và nguồn]
     K --> L
-    L --> R[ResearchReport: schema, nguồn, ngày, đơn vị, phép tính]
+    L --> R[Kiểm review và coverage nguồn được trích; schema, ngày, đơn vị, phép tính]
     R -->|Lỗi cần sửa| F[field_errors, accepted_report, collected_sources]
     F --> L
     R -->|Qua kiểm tra| X[Render và đăng ký file tải]
@@ -157,15 +162,15 @@ flowchart TD
 ```
 
 1. [API state](agent/src/api/state.py) khởi tạo một dịch vụ phiên dùng chung. [SessionService](agent/src/session/service.py) nhận yêu cầu, giữ quyền chạy phiên bằng khóa hệ điều hành và lưu `pending → running`. Dịch vụ thứ hai không được đánh dấu tác vụ còn chủ sở hữu là bị khởi động lại.
-2. [ContextBuilder](agent/src/agent/context.py) và [AgentLoop](agent/src/agent/loop.py) dựng ngữ cảnh từ yêu cầu, lịch sử đã đóng gói, hướng dẫn và catalog công cụ. Model chọn bước tiếp theo; tìm kiếm chỉ cung cấp đầu mối, cần đọc nội dung nguồn để làm bằng chứng. Mã/sàn phải được resolve trước các công cụ phụ thuộc danh tính.
-3. [Tool lifecycle](agent/src/agent/tool_lifecycle.py) thực thi công cụ, lưu bằng chứng và trả `_sources` cho model. Cache/replay giữ mã nguồn gốc sau compact. Kết quả tìm kiếm ở khung phải dùng cùng `source_id` với ledger trong chat, loại URL trùng và cập nhật khi mở lại truy vấn có kết quả mới. Tìm được một link chưa đồng nghĩa đã đọc/kiểm chứng nội dung. Bằng chứng mới hoặc tập lỗi thực sự giảm cho phép sửa tiếp; lặp cùng lỗi vẫn bị giới hạn. Thiếu nguồn BCTC, lỗi cutoff, lỗi cấu hình và lỗi tính toán được phân biệt.
+2. [ContextBuilder](agent/src/agent/context.py) và [AgentLoop](agent/src/agent/loop.py) dựng ngữ cảnh từ yêu cầu, lịch sử, hướng dẫn và catalog. [Research workflow](agent/src/agent/research_workflow.py) nhận diện yêu cầu nghiên cứu chuyên sâu và báo cáo phân tích doanh nghiệp/cổ phiếu, chạy bốn vai trước lượt model tổng hợp. Mỗi vai phải có lượt thực thi model và đọc bằng chứng thật; viết báo cáo, tìm link hoặc tính toán đơn thuần không đủ. Các vai có thể dùng cùng model đã cấu hình; đây không phải bảo đảm nhiều mô hình độc lập.
+3. [Reader](agent/src/tools/web_reader_tool.py) lấy HTML/PDF qua transport kiểm tra DNS và redirect. PDF dùng bộ đọc native/OCR; HTML thiếu nội dung có thể dùng dịch vụ render Jina. [Source snapshots](agent/src/tools/source_documents.py) giữ bytes gốc và toàn văn trong run trước khi chia đoạn/rút gọn. `next_offset` cho phép đọc tiếp; `extraction_complete` tách biệt với `text_delivery_complete`. [Swarm observations](agent/src/swarm/observations.py) đưa các lượt đọc thật vào ledger cha, giữ chung `[S#]` và sao chép bằng chứng bất biến vào sandbox từng worker. Nội dung model tự viết không được nâng thành nguồn. Cache/compact giữ đường dẫn tới dữ liệu; không khôi phục được dữ liệu chưa từng lấy.
 4. [Report tool](agent/src/reporting/tool.py) nhận nội dung có cấu trúc do AI tạo. [Schema](agent/src/reporting/schema.py) và [evidence gate](agent/src/reporting/evidence.py) kiểm nguồn đã thu thập, ngày, đơn vị và công thức khai báo; lỗi thiếu nguồn/phương pháp ở nhiều mục được trả cùng lượt, kèm payload cần sửa. Alias `financial_table.rows[].cells` được chuyển thành `values` và `cell_evidence` để giữ số và nguồn từng ô. `as_of` là ngày dữ liệu đã biết tại cutoff; kỳ kế hoạch/dự báo cần ghi riêng trong nhãn/ghi chú. `split_dividend` tương ứng `total_return`, không phải giá chỉ điều chỉnh chia tách.
-5. [Report service](agent/src/reporting/service.py) render và đăng ký artifact. Agent đối chiếu receipt với file thực tế; thiếu định dạng đã thử xuất được sửa trong giới hạn, sau đó trả `report_delivery_incomplete` cùng các link hợp lệ. Câu “đã xong” của model không tự chứng minh đã giao đủ file.
+5. Chat và [report tool](agent/src/reporting/tool.py) cùng kiểm tra receipt review và coverage nguồn được trích. Nguồn chưa đọc đủ hoặc OCR thất bại phải được đọc tiếp, thay nguồn hoặc bỏ luận điểm phụ thuộc; không được tự sửa cờ `complete`. [Report service](agent/src/reporting/service.py) render và đăng ký artifact sau kiểm tra bằng chứng. Agent ghi nhận định dạng xuất được yêu cầu ngay từ đầu, đối chiếu receipt với file thực tế; thiếu định dạng trả `report_delivery_incomplete` cùng các link hợp lệ. Câu “đã xong” không tự chứng minh đã giao đủ file.
 6. [Checkpoint](agent/src/session/checkpoint.py) lưu văn bản đang stream và lịch sử công cụ; `run_dir` được lưu ngay khi run xuất hiện. Reply/trạng thái cuối được ghi trước sự kiện kết thúc. Khi khởi động lại, phục hồi giữ phần đã lưu và trạng thái gián đoạn, không coi việc có công cụ thành công là đã hoàn thành toàn bộ yêu cầu.
 
 Khung nguồn desktop dùng phiên trình duyệt tạm thời riêng. Electron được ghim **43.4.1** để nhận [bản sửa PDF trong in-memory session](https://releases.electronjs.org/pr/52810); bộ lọc tài nguyên cho phép viewer PDF tích hợp và tài nguyên UI nội bộ của chính viewer đó. Link người dùng vẫn qua kiểm tra URL công khai; nguồn không dùng bridge/cookie của chat. Lời gọi model có deadline theo cấu hình và nhận cancel kể cả khi adapter không trả chunk; hủy task vẫn giữ quyền chạy phiên đến khi worker thực sự kết thúc.
 
-**Giới hạn hiện tại:** gate giao file theo dõi định dạng mà model **đã thử export**, chưa là hợp đồng công việc bảo đảm model luôn bắt đầu export. Khớp số với nguồn chưa chứng minh ý nghĩa kế toán; phương pháp định giá chỉ mô tả bằng văn xuôi vẫn có thể ở dạng draft kèm cảnh báo. Các kiểm thử hồi quy dùng model giả lập, không phải nghiệm thu nhà cung cấp trực tiếp hay chứng nhận CFA. Xem [audit luồng AI và ca VIC/FPT](docs/AI_RESEARCH_WORKFLOW_AUDIT_2026-11-10.md).
+**Giới hạn hiện tại:** coverage mô tả tài liệu đã lấy và các đoạn văn bản đã được công cụ chuyển vào ngữ cảnh, không chứng minh AI hiểu đúng hay đã duyệt mọi trang, tab và liên kết của website. Trang cần đăng nhập/tương tác, OCR kém, giới hạn dung lượng và thời gian có thể làm nguồn chưa đầy đủ. Nhận diện yêu cầu dùng quy tắc ngôn ngữ có phạm vi giới hạn. Khớp số với nguồn chưa chứng minh ý nghĩa kế toán; phương pháp định giá chỉ bằng văn xuôi vẫn có thể ở dạng draft kèm cảnh báo. Chưa nghiệm thu provider trực tiếp hay chứng nhận CFA. Xem [luồng đọc nguồn và review mới](docs/AI_SOURCE_RESEARCH_PIPELINE_2026-11-11.md) và [audit VIC/FPT trước thay đổi](docs/AI_RESEARCH_WORKFLOW_AUDIT_2026-11-10.md).
 
 ### Kiến trúc mục tiêu
 
@@ -422,12 +427,13 @@ Phân định paper và live là cơ chế bảo vệ thời gian chạy độc 
 </details>
 
 <details>
-<summary><b>Preset Trading Teams</b> <sub>31 swarm presets</sub></summary>
+<summary><b>Preset Trading Teams</b> <sub>32 swarm presets</sub></summary>
 
-31 nhóm tác nhân cấu hình sẵn cho các nghiệp vụ đầu tư, giao dịch và quản trị rủi ro:
+32 nhóm tác nhân cấu hình sẵn cho nghiên cứu, đầu tư và quản trị rủi ro:
 
 | Nhóm Preset | Luồng điều phối công việc |
 | --- | --- |
+| `deep_research_review` | Đọc nguồn → Phân tích chuyên môn → Phản biện → Biên tập; kiểm lượt đọc thực tế trước xuất |
 | `investment_committee` | Tranh biện Bull/Bear → Rà soát rủi ro → Giám đốc đầu tư ra quyết định phân bổ |
 | `global_equities_desk` | Chuyên viên A-share + HK/Mỹ + Crypto → Chiến lược gia toàn cầu tổng hợp |
 | `crypto_trading_desk` | Chuyên viên Funding/Basis + Thanh lý + Dòng tiền On-chain → Giám đốc rủi ro |
@@ -703,7 +709,7 @@ Vibe-Trading/
 │   │   │
 │   │   ├── skills/                 # 91 finance skills in 9 categories (SKILL.md each)
 │   │   ├── swarm/                  # Swarm DAG execution engine
-│   │   │   └── presets/            #   31 swarm preset YAML definitions
+│   │   │   └── presets/            #   32 swarm preset YAML definitions
 │   │   ├── session/                # Multi-turn chat + FTS5 session search
 │   │   └── providers/              # LLM provider abstraction
 │   │

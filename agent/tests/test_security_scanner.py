@@ -66,6 +66,7 @@ def test_read_url_adds_security_warning_to_external_content(
         def close(self):
             pass
 
+    monkeypatch.setattr(web_reader_tool, "_fetch_origin", lambda url: {"data": b"", "content_type": "text/html", "url": url, "status_code": 200})
     monkeypatch.setattr(web_reader_tool.requests, "get", lambda *args, **kwargs: Response())
 
     result = json.loads(web_reader_tool.read_url("https://example.com/report"))

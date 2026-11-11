@@ -25,7 +25,9 @@ class Response:
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
+def clear_cache(monkeypatch):
+    # These tests exercise only the rendered-reader boundary, after a safe empty origin response.
+    monkeypatch.setattr(web_reader_tool, "_fetch_origin", lambda url: {"data": b"", "content_type": "text/html", "url": url, "status_code": 200})
     with web_reader_tool._CACHE_LOCK:
         web_reader_tool._URL_MEMORY_CACHE.clear()
     yield
@@ -100,25 +102,11 @@ def test_read_url_allows_public_http_targets(monkeypatch: pytest.MonkeyPatch) ->
     ]
 
 
-@pytest.mark.parametrize("url", ["https://public-name.example/page", "https://2130706433/page", "https://0x7f000001/page"])
-def test_proxy_failure_never_connects_to_origin_or_resolves_its_dns(monkeypatch, url):
-    calls = []
-
-    def fake_get(target, **kwargs):
-        calls.append(target)
-        raise web_reader_tool.requests.Timeout("fixture timeout")
-
-    def forbid_dns(*args, **kwargs):
-        raise AssertionError("Origin DNS must not be resolved locally")
-
-    monkeypatch.setattr(web_reader_tool.requests, "get", fake_get)
-    monkeypatch.setattr("socket.getaddrinfo", forbid_dns)
-    result = json.loads(web_reader_tool.read_url(url))
-    assert result["status"] == "error"
-    assert "fallback is disabled" in result["error"]
-    assert calls == ["https://r.jina.ai/" + url]
-    assert web_reader_tool._direct_fetch(url) is None
-    assert calls == ["https://r.jina.ai/" + url]
+def test_guarded_origin_refusal_is_never_forwarded_to_remote_reader(monkeypatch):
+    monkeypatch.setattr(web_reader_tool, "_fetch_origin", lambda url: {"security_blocked": True})
+    monkeypatch.setattr(web_reader_tool.requests, "get", lambda *args, **kwargs: pytest.fail("Blocked origin must not be forwarded"))
+    result = json.loads(web_reader_tool.read_url("https://public-name.example/page"))
+    assert result["status"] == "error" and result["error_code"] == "unsafe_origin"
 
 
 def test_reader_redirect_is_not_followed_even_to_private_target(monkeypatch):
@@ -172,7 +160,9 @@ def test_response_body_is_bounded_before_character_truncation(monkeypatch):
     monkeypatch.setattr(web_reader_tool.requests, "get", lambda *args, **kwargs: response)
     result = json.loads(web_reader_tool.read_url("https://example.com/long"))
     assert result["status"] == "ok"
-    assert result["length"] == 9010 and "truncated" in result["content"]
+    assert result["length"] == 9010 and result["truncated"] is True
+    assert result["next_offset"] is not None
+    assert result["source_document"]["coverage"]["text_delivery_complete"] is False
     assert len(result["content"]) < 8100 and response.closed
 
 

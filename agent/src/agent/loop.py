@@ -82,6 +82,10 @@ from src.agent.context_compact import (  # noqa: F401  (re-exported so loop impo
 )
 from src.agent.tool_progress import ToolProgress
 from src.agent.write_targets import append_report_artifacts, missing_report_formats
+from src.agent.research_workflow import (
+    REVIEW_PRESET, completed_review, requested_export_formats,
+    requires_research_review, research_release_error,
+)
 from src.agent.tools import ToolRegistry
 from src.agent.trace import TraceWriter
 from src.core.state import RunStateStore
@@ -91,7 +95,7 @@ from src.goal.context import (
     goal_needs_continuation,
     goal_progress_tuple,
 )
-from src.providers.chat import ChatLLM, LLMResponse, LLMRuntimeSnapshot, ProviderStreamError
+from src.providers.chat import ChatLLM, LLMResponse, LLMRuntimeSnapshot, ProviderStreamError, ToolCallRequest
 from src.providers.session_context import bind_llm_session_id, reset_llm_session_id
 from src.providers.content_filter import (
     CONTENT_FILTER_SKIP_MESSAGE,
@@ -391,7 +395,7 @@ class AgentLoop(ToolCallLifecycle):
         self._released_fallback = False
         self._released_fallback_reason = None
         self._written_files = set()
-        self._requested_report_formats = set()
+        self._requested_report_formats = requested_export_formats(user_message)
         self._report_artifacts = {}
         self._stall_reason = None
         self._budget_stop_reason = None
@@ -576,7 +580,65 @@ class AgentLoop(ToolCallLifecycle):
             watchdog.start()
 
         stream_failure_streak = 0
+        research_workflow = {"required": requires_research_review(user_message)}
         try:
+            if research_workflow["required"] and not self._cancel_event.is_set() and self._budget_stop_reason is None:
+                from src.tools.swarm_tool import SwarmTool
+
+                review_tool = self.registry.get("run_swarm")
+                if not isinstance(review_tool, SwarmTool):
+                    raise RuntimeError("research_workflow_incomplete: run_swarm is unavailable")
+                review_tool.cancel_event = self._cancel_event
+                def review_progress(*_):
+                    if not self._run_done.is_set() and self._usage_run_token is usage_run_token:
+                        self._last_activity_wall = _time.time()
+                review_tool.progress_callback = review_progress
+
+                def review_usage(role, usage):
+                    if self._run_done.is_set() or self._usage_run_token is not usage_run_token:
+                        return
+                    self._account_llm_usage(run_dir, usage, self._run_iteration,
+                                            purpose=f"research_review.{role}")
+                    if self._budget_stop_reason is not None:
+                        self._cancel_event.set()
+
+                review_tool.usage_callback = review_usage
+                call = ToolCallRequest(id=f"required-review-{self._run_iteration + 1}", name="run_swarm",
+                                       arguments={"prompt": user_message, "preset_name": REVIEW_PRESET,
+                                                  "variables": {"request": user_message}})
+                messages.append(context.format_assistant_tool_calls([call]))
+                self._process_tool_calls([call], context, messages, trace, react_trace, self._run_iteration)
+                receipt = completed_review(self._grounding)
+                # The preset has four bounded tasks; resume the same run across
+                # up to three tool wait windows instead of starting another team.
+                for wait_index in range(2):
+                    if receipt is not None or self._cancel_event.is_set():
+                        break
+                    observed_runs = [row for row in self._grounding.swarm_run_receipts()
+                                     if row.get("preset") == REVIEW_PRESET]
+                    pending = observed_runs[-1] if observed_runs else None
+                    if pending is None or pending.get("status") not in {"pending", "running"}:
+                        break
+                    research_workflow["review_run_id"] = pending["run_id"]
+                    call = ToolCallRequest(id=f"required-review-wait-{wait_index + 1}", name="run_swarm",
+                                           arguments={"run_id": pending["run_id"]})
+                    messages.append(context.format_assistant_tool_calls([call]))
+                    self._process_tool_calls([call], context, messages, trace, react_trace, self._run_iteration)
+                    receipt = completed_review(self._grounding)
+                if receipt is None and not self._cancel_event.is_set():
+                    for observed in self._grounding.swarm_run_receipts():
+                        if observed.get("preset") == REVIEW_PRESET:
+                            research_workflow["review_run_id"] = observed["run_id"]
+                            if observed.get("status") in {"pending", "running"}:
+                                from src.agent.tool_context import current_grounding
+                                token = current_grounding.set(self._grounding)
+                                try:
+                                    review_tool.cancel_owned_run(observed["run_id"])
+                                finally:
+                                    current_grounding.reset(token)
+                    raise RuntimeError("research_workflow_incomplete: required reviewers did not complete evidence-backed analysis; inspect the swarm run before resuming")
+                if receipt is not None:
+                    research_workflow["review_run_id"] = receipt["run_id"]
             while iteration < self.max_iterations:
                 self._tool_schema_tokens = (
                     0 if iteration + 1 >= self.max_iterations or grounding_correction_text_only
@@ -1025,6 +1087,18 @@ class AgentLoop(ToolCallLifecycle):
                             {"delta": final_content, "iter": current_iter},
                         )
                         syntax_fallback_emitted = True
+                    release_error = research_release_error(self._grounding, content=final_content)
+                    if release_error:
+                        if iteration < self.max_iterations and report_delivery_revisions < 2:
+                            report_delivery_revisions += 1
+                            messages.append({"role": "assistant", "content": final_content})
+                            messages.append({"role": "user", "content": json.dumps(release_error, ensure_ascii=False)})
+                            if stream.streamed_chars:
+                                self._emit("stream_reset", {"iter": current_iter, "reason": "research_read_pending"})
+                            grounding_correction_text_only = False
+                            final_content = ""
+                            continue
+                        raise RuntimeError("research_workflow_incomplete: " + json.dumps(release_error, ensure_ascii=False))
                     missing_formats = missing_report_formats(self._requested_report_formats, self._report_artifacts)
                     if missing_formats:
                         if iteration < self.max_iterations and report_delivery_revisions < 2:
@@ -1237,6 +1311,7 @@ class AgentLoop(ToolCallLifecycle):
             error_code = (
                 "provider_stream_error"
                 if isinstance(exc, ProviderStreamError)
+                else "research_workflow_incomplete" if str(exc).startswith("research_workflow_incomplete:")
                 else "context_budget_exceeded" if str(exc).startswith("context_budget_exceeded:")
                 else "agent_loop_error"
             )
@@ -1255,6 +1330,8 @@ class AgentLoop(ToolCallLifecycle):
                 "react_trace": react_trace,
                 "iterations": iteration,
                 "max_iterations": self.max_iterations,
+                "research_workflow": research_workflow,
+                "sources": self._grounding.source_citations() if self._grounding is not None else [],
             }
 
         final_messages = messages
@@ -1316,6 +1393,7 @@ class AgentLoop(ToolCallLifecycle):
             last_response_model,
             content_filter_count,
         )
+        result["research_workflow"] = research_workflow
         if outcome.mark == "success" and self._forex_trade_plan is not None:
             result["forex_trade_plan"] = self._forex_trade_plan
         if self._grounding is not None:

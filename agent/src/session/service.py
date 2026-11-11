@@ -465,6 +465,8 @@ class SessionService:
                 # on the reply so [S#] markers resolve after a page reload, not
                 # only while the live tool result is on screen.
                 reply_metadata["sources"] = result["sources"]
+            if isinstance(result.get("research_workflow"), dict):
+                reply_metadata["research_workflow"] = result["research_workflow"]
 
             partial = (self.store.get_partial_response(session.session_id, attempt.attempt_id)
                        if attempt.status != AttemptStatus.COMPLETED else None)

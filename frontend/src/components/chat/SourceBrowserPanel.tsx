@@ -3,12 +3,14 @@ import { ArrowLeft, ArrowRight, ExternalLink, Globe, Loader2, RotateCw, X } from
 import type { SourceBrowserState } from "@/desktop";
 import { useReportPreviewStore } from "@/stores/reportPreview";
 import { evidenceUrl } from "@/lib/research";
+import { cn } from "@/lib/utils";
 
 /**
- * The source browser for one tab.
+ * The web-browser mode of the research pane.
  *
- * The panel stays mounted while other tabs are shown, so the page the user
- * was reading is still open when they switch back.
+ * On the desktop build the page is rendered by the native bridge, so this
+ * component owns the *chrome* only: navigation, address bar, load/error
+ * state. In the web build it falls back to a sandboxed iframe.
  */
 export function SourceBrowserPanel({ tabId, resizing = false }: { tabId?: string; resizing?: boolean }) {
   const tab = useReportPreviewStore((state) => state.tabs.find((item) => item.id === (tabId ?? state.activeId)) ?? null);
@@ -75,25 +77,34 @@ export function SourceBrowserPanel({ tabId, resizing = false }: { tabId?: string
 
   if (!selection) return null;
   const url = state?.url || selection.sourceUrl;
-  const buttonClass = "rounded-md p-2 hover:bg-muted disabled:opacity-35 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary";
-  return <aside aria-labelledby={titleId} className="flex h-full min-h-0 w-full flex-col bg-background">
-    <header className="flex items-center gap-2 border-b border-border px-3 py-2">
-      <Globe aria-hidden="true" className="h-4 w-4 shrink-0 text-primary" />
-      <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold">{state?.title || selection.title}</h2>
-      <button ref={closeRef} type="button" aria-label="Đóng trình duyệt nguồn" className={buttonClass} onClick={() => closeTab(tab!.id)}><X aria-hidden="true" className="h-4 w-4" /></button>
+  const buttonClass = cn(
+    "vt-focus-visible inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-muted transition-colors duration-fast",
+    "hover:bg-muted hover:text-ink disabled:pointer-events-none disabled:opacity-35",
+  );
+  return <aside aria-labelledby={titleId} className="flex h-full min-h-0 w-full flex-col bg-surface-base">
+    <header className="flex items-center gap-2 border-b border-hairline px-3 py-2">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent-ink">
+        <Globe aria-hidden="true" className="h-3.5 w-3.5" />
+      </span>
+      <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight text-ink">
+        {state?.title || selection.title}
+      </h2>
+      <button ref={closeRef} type="button" aria-label="Đóng trình duyệt nguồn" className={buttonClass} onClick={() => closeTab(tab!.id)}>
+        <X aria-hidden="true" className="h-4 w-4" />
+      </button>
     </header>
-    <nav aria-label="Trình duyệt nguồn" className="flex items-center gap-1 border-b border-border p-2">
+    <nav aria-label="Trình duyệt nguồn" className="flex items-center gap-1 border-b border-hairline px-2 py-1.5">
       {browser && <>
         <button type="button" aria-label="Quay lại" disabled={!state?.canGoBack} className={buttonClass} onClick={() => browser.navigate("back")}><ArrowLeft aria-hidden="true" className="h-4 w-4" /></button>
         <button type="button" aria-label="Tiến tới" disabled={!state?.canGoForward} className={buttonClass} onClick={() => browser.navigate("forward")}><ArrowRight aria-hidden="true" className="h-4 w-4" /></button>
       </>}
       <button type="button" aria-label="Tải lại nguồn" className={buttonClass} onClick={() => { if (browser) browser.navigate("reload"); else setReloadKey((key) => key + 1); }}><RotateCw aria-hidden="true" className="h-4 w-4" /></button>
-      <span className="min-w-0 flex-1 truncate rounded border border-border bg-muted/40 px-2 py-1.5 text-xs text-muted-foreground" title={url}>{url}</span>
+      <span className="vt-num mx-1 min-w-0 flex-1 truncate rounded-md border border-hairline-subtle bg-surface-sunken px-2 py-1 text-[11px] text-ink-muted" title={url}>{url}</span>
       <a href={url} target="_blank" rel="noopener noreferrer" aria-label="Mở nguồn bằng trình duyệt ngoài" className={buttonClass} onClick={browser ? (event) => { event.preventDefault(); browser.openExternal(url); } : undefined}><ExternalLink aria-hidden="true" className="h-4 w-4" /></a>
     </nav>
-    {!browser && <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">Một số website chặn xem nhúng trên bản web. Dùng ứng dụng desktop để đọc trong khung này, hoặc chọn mở bằng trình duyệt ngoài.</p>}
-    {state?.loading && <p role="status" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />Đang tải nguồn…</p>}
-    {state?.error && <p role="alert" className="px-3 py-2 text-sm text-danger">{state.error}</p>}
+    {!browser && <p className="border-b border-hairline bg-surface-sidebar px-3 py-2 text-[11px] leading-relaxed text-ink-muted">Một số website chặn xem nhúng trên bản web. Dùng ứng dụng desktop để đọc trong khung này, hoặc chọn mở bằng trình duyệt ngoài.</p>}
+    {state?.loading && <p role="status" className="flex items-center gap-2 border-b border-hairline bg-surface-sidebar px-3 py-2 text-[11px] text-ink-muted"><Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />Đang tải nguồn…</p>}
+    {state?.error && <p role="alert" className="border-b border-hairline bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{state.error}</p>}
     <div ref={viewport} className="min-h-0 flex-1 bg-white">
       {!browser && <iframe key={`${selection.sourceUrl}:${reloadKey}`} title={`Nguồn: ${selection.title}`} src={selection.sourceUrl} sandbox="allow-scripts allow-forms" referrerPolicy="no-referrer" className="h-full w-full border-0" />}
     </div>

@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Yürütme aşamaları",
+    "phaseCount": "aşama",
+    "toolCount": "araç",
+    "failedPhases": "başarısız",
+    "filterLogs": "Araçları filtrele",
+    "noMatchingTools": "Bu filtreyle eşleşen araç yok.",
+    "phases": {
+      "planning": "Araştırma planlaması",
+      "planningHint": "Becerileri yükleme, alt ajanları başlatma ve araştırma sorusunu çerçeveleme.",
+      "collection": "Veri toplama",
+      "collectionHint": "Piyasa verisi, finansal raporlar, haberler ve web kaynakları toplama.",
+      "modeling": "Finansal analiz",
+      "modelingHint": "Faktör kurma, geriye dönük test çalıştırma ve sinyal üretme.",
+      "verification": "Çapraz doğrulama",
+      "verificationHint": "Sonuçları dayanıklılık ve tutarlılık testleriyle doğrulama.",
+      "reporting": "Rapor üretimi",
+      "reportingHint": "Sentezi, alıntıları ve indirilebilir çıktıları yazma."
+    }
+  },
   "charts": {
     "noCompleteBars": "Grafik kullanılamıyor: eksiksiz OHLC mumları alınamadı. Hiçbir mum tahmin edilmedi.",
     "legacyUnavailable": "Bu kayıtlı grafik yeniden oluşturulamıyor çünkü mum verilerinin bir kısmı düzenlenmişti. Gözlemlenen piyasa verilerinden yeni bir grafik oluşturmak için yeniden sorun.",
@@ -47,7 +67,12 @@
     "sessionsLoadFailed": "Konuşmalar yüklenemiyor.",
     "pixelOffice": "Piksel Ofis",
     "paperTrading": "Sanal işlem",
-    "marketResearch": "Piyasa araştırması"
+    "marketResearch": "Piyasa araştırması",
+    "commandSearch": "Çalışma alanında ara",
+    "commandEmpty": "Eşleşen panel yok.",
+    "systemStatus": "Çalışma alanı hizmetleri",
+    "systemOnline": "Çevrimiçi",
+    "workspace": "Çalışma alanı"
   },
   "runtime": {
     "monitorBadge": "Çalışma durumu izleyicisi",

@@ -244,29 +244,34 @@ export function WelcomeScreen({ onExample }: Props) {
   const examplesTriggerRef = useRef<HTMLButtonElement>(null);
 
   return (
-    <div className="flex w-full flex-col items-center px-4 pb-14 text-center">
-      <div className="w-full max-w-3xl">
+    <div className="relative flex w-full flex-col items-center overflow-hidden px-4 pb-14 text-center">
+      {/* Fine grid texture + brand bloom: the hero reads as a designed
+          surface rather than an empty panel. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-[420px] vt-grid-texture" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 -top-24 h-[420px] bg-[radial-gradient(60%_60%_at_50%_0%,hsl(var(--accent)/0.16),transparent_70%)]" />
+
+      <div className="relative w-full max-w-3xl">
         <div className="mx-auto max-w-2xl">
           {/* Hero Mascot & Brand Emblem */}
           <div className="mb-6 flex flex-col items-center">
-            <div className="relative mb-3 flex items-center justify-center">
-              <BrandMark className="h-20 w-20 sm:h-24 sm:w-24 transition-transform hover:scale-105" priority />
+            <div className="mb-4 flex items-center justify-center">
+              <BrandMark className="h-20 w-20 transition-transform duration-slow ease-standard hover:scale-105 sm:h-24 sm:w-24" priority />
             </div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/[0.06] px-3 py-1 text-xs font-semibold text-primary tracking-wide">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/25 bg-accent/[0.07] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-accent-ink backdrop-blur-sm">
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
               </span>
               VIBE-TRADING AI AGENT
             </div>
           </div>
 
-          <h1 className="text-[30px] sm:text-[38px] font-semibold tracking-tight leading-tight text-foreground">
+          <h1 className="text-[30px] font-semibold leading-tight tracking-tight text-ink sm:text-[42px]">
             {t(greetingKey as any)}
           </h1>
-          <p className="mt-3 text-sm text-muted-foreground">
+          <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ink-muted">
             {t("welcome.taskSubtitle" as any)}
-            <span className="mt-2 block text-xs">{t("welcome.tasks.hint")}</span>
+            <span className="mt-2 block text-xs text-ink-faint">{t("welcome.tasks.hint")}</span>
           </p>
         </div>
 
@@ -288,8 +293,8 @@ export function WelcomeScreen({ onExample }: Props) {
                 }}
                 className={
                   isActive
-                    ? "inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/[0.08] px-4 py-2 text-sm text-primary transition-colors hover:border-primary/50 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                    : "inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-4 py-2 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    ? "inline-flex items-center gap-2 rounded-xl border border-primary/30 bg-primary/[0.08] px-4 py-2.5 text-sm text-primary transition-colors duration-fast hover:border-primary/50 hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    : "inline-flex items-center gap-2 rounded-xl border border-hairline bg-surface-panel px-4 py-2.5 text-sm text-ink-secondary shadow-panel transition-all duration-fast hover:-translate-y-px hover:border-primary/40 hover:bg-surface-raised hover:text-ink hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 }
               >
                 {action.icon}
@@ -305,11 +310,11 @@ export function WelcomeScreen({ onExample }: Props) {
           aria-expanded={isExamplesOpen}
           aria-controls="welcome-example-library"
           onClick={() => setIsExamplesOpen((open) => !open)}
-          className="mt-10 inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="vt-focus-visible mt-10 inline-flex items-center gap-1.5 text-sm text-ink-muted transition-colors duration-fast hover:text-ink"
         >
           <span>{t("welcome.browseAllExamples" as any)}</span>
           <ChevronDown
-            className={`h-4 w-4 transition-transform duration-300 ${isExamplesOpen ? "rotate-180" : ""}`}
+            className={`h-4 w-4 transition-transform duration-slow ease-standard ${isExamplesOpen ? "rotate-180" : ""}`}
             aria-hidden="true"
           />
         </button>
@@ -324,7 +329,7 @@ export function WelcomeScreen({ onExample }: Props) {
             setIsExamplesOpen(false);
             examplesTriggerRef.current?.focus();
           }}
-          className={`grid text-left transition-[grid-template-rows,opacity] duration-300 ease-out ${
+          className={`grid text-left transition-[grid-template-rows,opacity] duration-slow ease-standard ${
             isExamplesOpen
               ? "grid-rows-[1fr] opacity-100"
               : "grid-rows-[0fr] opacity-0"
@@ -350,8 +355,8 @@ export function WelcomeScreen({ onExample }: Props) {
                     onClick={() => setActiveCategory(index)}
                     className={
                       index === activeCategory
-                        ? "inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"
-                        : "inline-flex items-center gap-1.5 rounded-full border border-transparent px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-border/60 hover:text-foreground"
+                        ? "inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary"
+                        : "inline-flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs text-ink-muted transition-colors duration-fast hover:bg-muted hover:text-ink"
                     }
                   >
                     {cat.icon}
@@ -366,12 +371,12 @@ export function WelcomeScreen({ onExample }: Props) {
                     type="button"
                     tabIndex={isExamplesOpen ? 0 : -1}
                     onClick={() => onExample(t(ex.promptKey as any))}
-                    className="block w-full rounded-xl border border-border/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                    className="group block w-full rounded-xl border border-hairline-subtle bg-surface-panel px-3.5 py-3 text-left shadow-panel transition-all duration-fast hover:-translate-y-px hover:border-primary/40 hover:bg-surface-raised hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                   >
-                    <span className="text-sm font-medium leading-snug text-foreground">
+                    <span className="text-sm font-medium leading-snug text-ink">
                       {t(ex.titleKey as any)}
                     </span>
-                    <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                    <span className="mt-1 block text-xs leading-snug text-ink-muted">
                       {t(ex.descKey as any)}
                     </span>
                   </button>

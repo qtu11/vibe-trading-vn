@@ -204,3 +204,84 @@ def test_posix_oserror_is_not_treated_transient():
     assert _is_transient_windows_error(OSError("posix")) is False
     assert _is_transient_windows_error(_winerr(13)) is False
     assert _is_transient_windows_error(_winerr(5)) is True
+
+
+@pytest.mark.parametrize("entry", ["load_task", "load_all", "resolve_dependencies"])
+def test_task_reads_retry_transient_windows_replace_race(tmp_path, monkeypatch, entry):
+    from src.swarm.models import SwarmTask
+    from src.swarm.task_store import TaskStore, resolve_dependencies
+
+    tasks = TaskStore(tmp_path)
+    tasks.save_task(SwarmTask(id="facts", agent_id="reader", prompt_template="Read"))
+    original_read = type(tmp_path).read_text
+    calls = []
+
+    def read(path, *args, **kwargs):
+        calls.append(path)
+        if len(calls) < 3:
+            raise _winerr(32)
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(tmp_path), "read_text", read)
+    if entry == "load_task":
+        assert tasks.load_task("facts").id == "facts"
+    elif entry == "load_all":
+        assert tasks.load_all()[0].id == "facts"
+    else:
+        assert resolve_dependencies(tmp_path / "tasks", "other") == []
+    assert len(calls) == 3
+
+
+def test_task_read_retry_is_bounded_and_preserves_nontransient_errors(tmp_path, monkeypatch):
+    from src.swarm.models import SwarmTask
+    from src.swarm.task_store import TaskStore
+
+    tasks = TaskStore(tmp_path)
+    tasks.save_task(SwarmTask(id="facts", agent_id="reader", prompt_template="Read"))
+    calls = []
+
+    def read(path, *args, **kwargs):
+        calls.append(path)
+        raise _winerr(32)
+
+    monkeypatch.setattr(type(tmp_path), "read_text", read)
+    with pytest.raises(PermissionError):
+        tasks.load_task("facts")
+    assert len(calls) == store_mod._REPLACE_ATTEMPTS
+    calls.clear()
+
+    def missing(path, *args, **kwargs):
+        calls.append(path)
+        raise _winerr(2)
+
+    monkeypatch.setattr(type(tmp_path), "read_text", missing)
+    with pytest.raises(PermissionError):
+        tasks.load_all()
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("platform", ["nt", "posix"])
+def test_plain_task_permission_error_retries_only_on_windows(tmp_path, monkeypatch, platform):
+    import src.swarm.task_store as task_module
+    from src.swarm.models import SwarmTask
+
+    tasks = task_module.TaskStore(tmp_path)
+    tasks.save_task(SwarmTask(id="facts", agent_id="reader", prompt_template="Read"))
+    patch_module_os(monkeypatch, task_module, name=platform)
+    original_read = type(tmp_path).read_text
+    calls = []
+
+    def read(path, *args, **kwargs):
+        calls.append(path)
+        if len(calls) < 3:
+            raise PermissionError(13, "Permission denied", str(path))
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(type(tmp_path), "read_text", read)
+    if platform == "nt":
+        assert tasks.load_task("facts").id == "facts"
+        assert len(calls) == 3
+    else:
+        with pytest.raises(PermissionError):
+            tasks.load_task("facts")
+        assert len(calls) == 1

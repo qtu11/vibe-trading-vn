@@ -36,6 +36,7 @@ from src.swarm.models import (
 )
 from src.swarm.context import WorkerContext
 from src.swarm.budget import SwarmBudgetExceeded, SwarmCallBudget
+from src.swarm.observations import current_observations, NON_EVIDENCE_TOOLS
 from src.tools import build_swarm_registry
 from src.tools.mcp import MCPRemoteTool
 from src.tools.redaction import redact_payload, redact_tool_result
@@ -688,6 +689,7 @@ def _run_worker_impl(
     total_cache_read_tokens = 0
     total_cache_creation_tokens = 0
     token_source: str | None = None
+    data_tool_calls = 0
 
     # 4. Resolve prompt template with user vars (missing vars → LLM infers)
     class _FallbackDict(dict):
@@ -708,6 +710,7 @@ def _run_worker_impl(
             cache_read_tokens=total_cache_read_tokens,
             cache_creation_tokens=total_cache_creation_tokens,
             token_source=token_source,
+            data_tool_calls=data_tool_calls,
         )
 
     # 5. Build initial messages
@@ -719,6 +722,9 @@ def _run_worker_impl(
     # 6. ReAct loop
     artifact_dir = agent_artifact_dir(run_dir, agent_id, task_id)
     artifact_dir.mkdir(parents=True, exist_ok=True)
+    observations = current_observations.get()
+    if observations is not None:
+        messages[0]["content"] += observations.prepare(artifact_dir)
     get_tool = getattr(registry, "get", None)
     worker_context = WorkerContext(
         model=agent_spec.model_name or getattr(llm, "model_name", "") or "",
@@ -740,6 +746,14 @@ def _run_worker_impl(
             if token_source == "estimated" or measured.token_source == "estimated"
             else "provider"
         )
+        _emit(event_callback, "worker_llm_usage", agent_id, task_id, {
+            "usage": {"input_tokens": measured.input_tokens,
+                      "output_tokens": measured.output_tokens,
+                      "total_tokens": measured.input_tokens + measured.output_tokens,
+                      "input_token_details": {"cache_read": measured.cache_read_tokens,
+                                              "cache_creation": measured.cache_creation_tokens},
+                      "token_source": measured.token_source},
+        })
 
     t0 = time.monotonic()
     iteration = 0
@@ -748,8 +762,8 @@ def _run_worker_impl(
     # Threshold for injecting a "wrap up" nudge (80% of budget)
     wrap_up_at = max(1, int(max_iterations * 0.8))
     last_assistant_content = ""
+    pending_data_review = False
 
-    data_tool_calls = 0
     content_filter_count = 0
     consecutive_content_filter_count = 0
     stream_failure_streak = 0
@@ -772,6 +786,7 @@ def _run_worker_impl(
                 cache_read_tokens=total_cache_read_tokens,
                 cache_creation_tokens=total_cache_creation_tokens,
                 token_source=token_source,
+                data_tool_calls=data_tool_calls,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -794,6 +809,7 @@ def _run_worker_impl(
                 cache_read_tokens=total_cache_read_tokens,
                 cache_creation_tokens=total_cache_creation_tokens,
                 token_source=token_source,
+                data_tool_calls=data_tool_calls,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -847,6 +863,7 @@ def _run_worker_impl(
                 cache_read_tokens=total_cache_read_tokens,
                 cache_creation_tokens=total_cache_creation_tokens,
                 token_source=token_source,
+                data_tool_calls=data_tool_calls,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -990,6 +1007,7 @@ def _run_worker_impl(
                     cache_read_tokens=total_cache_read_tokens,
                     cache_creation_tokens=total_cache_creation_tokens,
                     token_source=token_source,
+                    data_tool_calls=data_tool_calls,
                     content_filter_warnings=compute_content_filter_warnings(
                         content_filter_count, iteration + 1,
                     ),
@@ -1009,6 +1027,7 @@ def _run_worker_impl(
                 cache_read_tokens=total_cache_read_tokens,
                 cache_creation_tokens=total_cache_creation_tokens,
                 token_source=token_source,
+                data_tool_calls=data_tool_calls,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -1054,6 +1073,7 @@ def _run_worker_impl(
                     cache_read_tokens=total_cache_read_tokens,
                     cache_creation_tokens=total_cache_creation_tokens,
                     token_source=token_source,
+                    data_tool_calls=data_tool_calls,
                     content_filter_warnings=compute_content_filter_warnings(
                         content_filter_count, iteration + 1,
                     ),
@@ -1072,6 +1092,8 @@ def _run_worker_impl(
             continue
 
         consecutive_content_filter_count = 0
+        if response.has_tool_calls or (response.content and response.content.strip()):
+            pending_data_review = False
 
         # If no tool calls, this is the final response
         if not response.has_tool_calls:
@@ -1084,6 +1106,8 @@ def _run_worker_impl(
                 report_written=_report_written(artifact_dir),
                 data_tool_calls=data_tool_calls,
             )
+            if pending_data_review:
+                reason = reason or "new evidence has not received a following model analysis"
             if reason:
                 _emit(event_callback, "worker_incomplete", agent_id, task_id,
                       {"iterations": iteration + 1, "reason": reason})
@@ -1098,6 +1122,7 @@ def _run_worker_impl(
                     cache_read_tokens=total_cache_read_tokens,
                     cache_creation_tokens=total_cache_creation_tokens,
                     token_source=token_source,
+                    data_tool_calls=data_tool_calls,
                     content_filter_warnings=compute_content_filter_warnings(
                         content_filter_count, iteration + 1,
                     ),
@@ -1113,6 +1138,7 @@ def _run_worker_impl(
                 cache_read_tokens=total_cache_read_tokens,
                 cache_creation_tokens=total_cache_creation_tokens,
                 token_source=token_source,
+                data_tool_calls=data_tool_calls,
                 content_filter_warnings=compute_content_filter_warnings(
                     content_filter_count, iteration + 1,
                 ),
@@ -1171,8 +1197,21 @@ def _run_worker_impl(
             # event previews, before truncation can cut a credential envelope.
             result = redact_tool_result(result)
             result_is_error = _is_error_result(result)
-            if tc.name != "load_skill" and not result_is_error:
+            observed_read = not result_is_error and (
+                _has_data_observation(registry.get(tc.name), result)
+                or (tc.name == "read_file" and observations is not None
+                    and observations.trusted_read(args, result, call_id=tc.id))
+            )
+            if observed_read:
                 data_tool_calls += 1
+                pending_data_review = True
+            tool = registry.get(tc.name)
+            if (observations is not None and not result_is_error and tool is not None
+                    and tool.is_readonly and tc.name not in _GENERIC_TOOLS):
+                result = observations.record(
+                    tool_name=tc.name, arguments=args, result=result, call_id=tc.id,
+                    agent_id=agent_id, task_id=task_id, artifact_dir=artifact_dir,
+                )
             tc_elapsed = time.monotonic() - tc_start
             _emit(
                 event_callback,
@@ -1211,6 +1250,8 @@ def _run_worker_impl(
         report_written=_report_written(artifact_dir),
         data_tool_calls=data_tool_calls,
     )
+    if pending_data_review:
+        reason = reason or "new evidence has not received a following model analysis"
     if reason:
         _emit(event_callback, "worker_incomplete", agent_id, task_id,
               {"iterations": max_iterations, "reason": f"iteration limit; {reason}"})
@@ -1225,6 +1266,7 @@ def _run_worker_impl(
             cache_read_tokens=total_cache_read_tokens,
             cache_creation_tokens=total_cache_creation_tokens,
             token_source=token_source,
+            data_tool_calls=data_tool_calls,
             content_filter_warnings=content_filter_warnings,
         )
     _emit(event_callback, "worker_iteration_limit", agent_id, task_id)
@@ -1238,6 +1280,7 @@ def _run_worker_impl(
         cache_read_tokens=total_cache_read_tokens,
         cache_creation_tokens=total_cache_creation_tokens,
         token_source=token_source,
+        data_tool_calls=data_tool_calls,
         content_filter_warnings=content_filter_warnings,
     )
 
@@ -1359,6 +1402,25 @@ def _truncate_preview(value: Any, *, limit: int = 200) -> str:
 # evidence" (that would regress correct runs; see #115 framing).
 _GENERIC_TOOLS = {"bash", "read_file", "write_file", "load_skill", "edit_file"}
 
+
+def _has_data_observation(tool: BaseTool | None, result: str) -> bool:
+    """Generic commands, empty success envelopes and writes prove no research read."""
+    if tool is None or not tool.is_readonly or tool.name in NON_EVIDENCE_TOOLS:
+        return False
+    try:
+        payload = json.loads(result)
+    except (ValueError, TypeError):
+        return bool(result.strip())
+    if isinstance(payload, dict):
+        if tool.name in {"read_url", "read_document", "doc_reader"}:
+            return bool(str(payload.get("content") or payload.get("text") or "").strip())
+        if tool.name == "concurrent_scraper":
+            return any(isinstance(row, dict) and str(row.get("text") or row.get("content") or row.get("excerpt") or "").strip()
+                       for row in payload.get("sources", []))
+        return any(value not in (None, "", [], {}) for key, value in payload.items()
+                   if key not in {"status", "ok", "success", "error", "message"})
+    return bool(payload)
+
 _UNPARSED_TOOL_MARKERS = (
     "<\uff5ctool\u2581calls\u2581begin\uff5c>",
     "<tool_calls_begin>",
@@ -1458,8 +1520,8 @@ def _classify_deliverable(
             "phase 2" in low and len(tail) < 80
         ):
             return "plan-only stub (no executed analysis / conclusion)"
-    if is_data_agent and not report_written and data_tool_calls == 0:
-        return "data agent produced no tool calls and no report.md"
+    if is_data_agent and data_tool_calls == 0:
+        return "data agent produced no tool calls proving an observed data read"
     return None
 
 

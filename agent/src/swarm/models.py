@@ -236,6 +236,7 @@ class SwarmTask(BaseModel):
     started_at: str | None = None
     completed_at: str | None = None
     worker_iterations: int = 0
+    data_tool_calls: int = 0
 
 
 class SwarmEvent(BaseModel):
@@ -370,3 +371,4 @@ class WorkerResult(BaseModel):
     cache_creation_tokens: int = 0
     token_source: str | None = None
     content_filter_warnings: list[str] = Field(default_factory=list)
+    data_tool_calls: int = 0

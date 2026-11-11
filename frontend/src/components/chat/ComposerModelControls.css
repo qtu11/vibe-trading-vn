@@ -26,8 +26,8 @@
 
 /* Flowing particles for the effort track */
 .effort-flow {
-  --effort-fill: #2563eb;
-  --effort-glow: rgba(37, 99, 235, 0.45);
+  --effort-fill: hsl(var(--effort-3));
+  --effort-glow: hsl(var(--effort-3) / 0.42);
 }
 
 .effort-flow-fill {

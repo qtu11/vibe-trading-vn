@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Các giai đoạn thực thi",
+    "phaseCount": "giai đoạn",
+    "toolCount": "công cụ",
+    "failedPhases": "lỗi",
+    "filterLogs": "Lọc công cụ",
+    "noMatchingTools": "Không có công cụ nào khớp bộ lọc.",
+    "phases": {
+      "planning": "Lập kế hoạch nghiên cứu",
+      "planningHint": "Nạp kỹ năng, phân công subagent và xác định câu hỏi nghiên cứu.",
+      "collection": "Thu thập dữ liệu",
+      "collectionHint": "Lấy dữ liệu thị trường, báo cáo, tin tức và nguồn web.",
+      "modeling": "Phân tích tài chính",
+      "modelingHint": "Xây dựng yếu tố, chạy backtest và tạo tín hiệu.",
+      "verification": "Kiểm chứng chéo",
+      "verificationHint": "Kiểm tra độ bền và tính nhất quán của kết quả.",
+      "reporting": "Tạo báo cáo",
+      "reportingHint": "Viết phần tổng hợp, trích dẫn và tạo tệp tải về."
+    }
+  },
   "charts": {
     "noCompleteBars": "Chưa thể vẽ biểu đồ: chưa lấy được nến OHLC đầy đủ. Không tự ước lượng dữ liệu nến.",
     "legacyUnavailable": "Không thể dựng lại biểu đồ đã lưu vì dữ liệu nến đã bị lược một phần. Hãy hỏi lại để tạo biểu đồ mới từ dữ liệu thị trường đã quan sát.",
@@ -87,7 +107,12 @@
     "sessionsLoadFailed": "Không thể tải cuộc trò chuyện.",
     "pixelOffice": "Văn phòng Pixel",
     "paperTrading": "Kinh doanh giấy",
-    "marketResearch": "Nghiên cứu thị trường"
+    "marketResearch": "Nghiên cứu thị trường",
+    "commandSearch": "Tìm trong không gian làm việc",
+    "commandEmpty": "Không có bảng điều khiển phù hợp.",
+    "systemStatus": "Dịch vụ không gian làm việc",
+    "systemOnline": "Trực tuyến",
+    "workspace": "Không gian làm việc"
   },
   "runtime": {
     "monitorBadge": "Giám sát thời gian chạy",

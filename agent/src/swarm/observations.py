@@ -10,9 +10,16 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from src.agent.result_artifacts import save_result_parts
+from src.agent.result_artifacts import save_result_parts, TOOL_RESULT_LIMIT
 
 current_observations: ContextVar[SwarmObservations | None] = ContextVar("swarm_observations", default=None)
+NON_EVIDENCE_TOOLS = frozenset({
+    "bash", "read_file", "write_file", "load_skill", "edit_file",
+    "web_search", "parallel_web_search", "search_symbol", "search_broker_reports",
+    "get_stock_news", "get_research_reports",
+    "session_search", "search_hypotheses", "qveris_search", "load_tools",
+    "technical_indicators", "financial_rigor",
+})
 
 
 def _write_bytes(path: Path, data: bytes, root: Path) -> None:
@@ -37,7 +44,7 @@ class SwarmObservations:
         self.root = Path(ledger.run_dir).resolve()
         self._lock = threading.RLock()
         self._receipts: list[dict[str, Any]] = []
-        self._readable: dict[str, tuple[bytes, dict[str, Any]]] = {}
+        self._readable: dict[str, tuple[bytes, dict[str, Any] | None, str]] = {}
 
     def record(self, *, tool_name: str, arguments: dict, result: str, call_id: str,
                agent_id: str, task_id: str, artifact_dir: Path) -> str:
@@ -107,7 +114,7 @@ class SwarmObservations:
                         data = original.read_bytes()
                         local = folder / original.name
                         _write_bytes(local, data, artifact_dir)
-                        self._readable[str(local.resolve())] = (data, receipt)
+                        self._readable[str(local.resolve())] = (data, None, receipt["tool"])
                         local_paths.append(str(local))
                     receipt[key] = local_paths
                 for document in receipt["source_documents"]:
@@ -118,16 +125,17 @@ class SwarmObservations:
                         data = original.read_bytes()
                         local = folder / "documents" / original.name
                         _write_bytes(local, data, artifact_dir)
-                        self._readable[str(local.resolve())] = (data, receipt)
+                        self._readable[str(local.resolve())] = (data, document, receipt["tool"])
                         document[key] = str(local)
             if not receipts:
                 return ""
             return ("\n\n## Collected tool observations\nThese are observed reads, not independent truth. "
                     "Use only the assigned source IDs. Read the listed parts with read_file before relying "
                     "on details omitted by upstream prose. Model reports and their invented refs are not sources.\n"
+                    "For long text use read_file(offset=0,max_chars=7000), follow next_offset until null.\n"
                     + json.dumps(receipts, ensure_ascii=False))
 
-    def trusted_read(self, arguments: dict, result: str) -> bool:
+    def trusted_read(self, arguments: dict, result: str, *, call_id: str = "shared-read") -> bool:
         """Credit only a real read of the unmodified server-copied evidence."""
         try:
             payload = json.loads(result)
@@ -136,9 +144,31 @@ class SwarmObservations:
                 saved = self._readable.get(path)
             if saved is None:
                 return False
-            data, _receipt = saved
+            data, document, origin_tool = saved
+            if origin_tool in NON_EVIDENCE_TOOLS:
+                return False
             content = payload.get("content")
-            return isinstance(content, str) and bool(content) and content.encode("utf-8") == data
+            offset = payload.get("offset", 0)
+            if not isinstance(content, str) or not content or type(offset) is not int or offset < 0:
+                return False
+            saved_text = data.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+            if len(result) > TOOL_RESULT_LIMIT or content != saved_text[offset:offset + len(content)]:
+                return False
+            if document is not None and path in {document.get("text_path"), document.get("full_text_path")}:
+                from src.tools.source_documents import record_source_delivery
+                record_source_delivery(document, offset=offset, returned_chars=len(content))
+                source = document.get("source") or document.get("url") or ""
+                remote = source.startswith(("http://", "https://"))
+                observed = {"status": "ok", "content" if remote else "text": content,
+                            "url" if remote else "file": source if remote else Path(source).name}
+                if not remote:
+                    observed["source_url"] = "doc://" + Path(source).as_posix()
+                self.ledger.ingest_observation(
+                    tool_name="read_url" if remote else "read_document", arguments=arguments,
+                    result=json.dumps(observed, ensure_ascii=False), success=True,
+                    call_id=f"swarm:{self.run_id}:read_file:{call_id}:{hashlib.sha256(path.encode()).hexdigest()[:12]}:{offset}",
+                )
+            return True
         except (ValueError, TypeError, OSError):
             return False
 

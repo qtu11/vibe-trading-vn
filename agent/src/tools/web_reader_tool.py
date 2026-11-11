@@ -1,8 +1,12 @@
-"""Web reader tool: fetch a URL as Markdown text via the Jina Reader API."""
+"""Read public HTML/PDF sources with immutable snapshots and bounded paging."""
 
 from __future__ import annotations
 
 from collections import OrderedDict
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+import re
 import ipaddress
 import json
 import logging
@@ -13,8 +17,9 @@ from urllib.parse import urlsplit
 import requests
 
 from src.agent.progress import emit_progress
+from src.agent.tool_context import current_grounding
+from src.tools.source_documents import document_result, persist_document
 from src.agent.tools import BaseTool
-from src.security.scanner import with_security_warnings
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +70,6 @@ def _cache_put(url: str, result: str) -> None:
         while (len(_URL_MEMORY_CACHE) > _CACHE_MAX_ENTRIES or
                sum(entry[2] for entry in _URL_MEMORY_CACHE.values()) > _CACHE_MAX_BYTES):
             _URL_MEMORY_CACHE.popitem(last=False)
-
-
-def _direct_fetch(target_url: str) -> str | None:
-    """Disabled: no local DNS/origin connection after a proxy failure.
-
-    Hostname screening followed by requests.get would still allow DNS rebinding
-    and redirects into private services. The reader deliberately fails closed
-    until a separately pinned, redirect-safe origin transport is implemented.
-    """
-    return None
 
 
 def _response_text(response, started: float) -> str:
@@ -168,121 +163,157 @@ def _read_failure(code: str, error: str, url: str, *, status_code: int | None = 
     return json.dumps(payload, ensure_ascii=False)
 
 
-def read_url(url: str, no_cache: bool = False) -> str:
-    """Fetch web page content via the Jina Reader API.
+def _fetch_origin(url: str) -> dict:
+    """Use the existing transport's DNS pinning on every origin redirect."""
+    from src.tools.scraper import AsyncScrapingEngine
 
-    The full URL (including query string) is sent to the third-party Jina
-    Reader service (r.jina.ai); never pass credentials/tokens or private
-    addresses. Results may be a cached snapshot.
+    async def fetch():
+        engine = AsyncScrapingEngine()
+        try:
+            result = await engine.scrape_url(url, timeout=15.0)
+            return {"data": result.content_bytes, "content_type": result.content_type,
+                    "text": result.html_content,
+                    "url": result.final_url or url, "status_code": result.status_code,
+                    "error": result.error, "truncated": result.truncated,
+                    "security_blocked": bool(result.error and result.error.startswith("SSRF violation:"))}
+        finally:
+            await engine.close()
 
-    Args:
-        url: Target URL.
-        no_cache: Bypass the local cache and ask the remote reader for a fresh
-            fetch. A successful response replaces the local snapshot.
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(fetch())
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(asyncio.run, fetch()).result()
 
-    Returns:
-        JSON result with title, content, url; ``cached: true`` is added
-        when the remote reader reports a cached snapshot. Local hits add
-        ``memory_cached`` and an age; neither flag verifies source accuracy.
-        Origin fallback is disabled; failures make no local origin request.
+
+def _read_rendered(url: str, no_cache: bool) -> tuple[str, str, bool]:
+    headers = {"Accept": "text/markdown"}
+    if no_cache:
+        headers["x-no-cache"] = "true"
+    response = None
+    try:
+        started = time.monotonic()
+        response = requests.get(f"{_JINA_PREFIX}{url}", headers=headers, timeout=_TIMEOUT,
+                                allow_redirects=False, stream=True)
+        if response.status_code != 200:
+            raise ValueError(f"remote reader returned HTTP {response.status_code}")
+        text = _response_text(response, started)
+        if not text.strip():
+            raise ValueError("remote reader returned empty content")
+        from src.tools.scraper.reader_fallback import _strip_reader_header
+        _, body = _strip_reader_header(text)
+        if re.fullmatch(r"\s*(?:loading[.\s…]*|(?:please\s+)?enable javascript.*|access denied[.\s]*|verify you are human[.\s]*)", body, flags=re.IGNORECASE):
+            raise ValueError("remote reader returned an unreadable shell")
+        title = next((line[6:].strip()[:350] for line in text.splitlines() if line.startswith("Title:")), "")
+        return text, title, _CACHED_MARKER in text
+    finally:
+        if response is not None:
+            response.close()
+
+
+def _cache_key(url: str, run_dir: str | Path | None = None) -> str:
+    ledger = current_grounding.get()
+    return f"{getattr(ledger, 'run_dir', None) or run_dir or ''}|{url}"
+
+
+def read_url(url: str, no_cache: bool = False, offset: int = 0,
+             max_chars: int = _MAX_LENGTH, run_dir: str | Path | None = None) -> str:
+    """Read one fetched document; follow next_offset until delivery is complete.
+
+    Static HTML and PDFs use the pinned origin transport. Dynamic HTML may
+    send the full public URL to the third-party Jina reader. Extraction refers
+    to the fetched document body, not every hidden tab/link on a website.
     """
     if not isinstance(url, str):
-        return json.dumps({"status": "error", "error": "target URL is not allowed"})
+        return _read_failure("unsafe_url", "target URL is not allowed", "")
     target_url = url.strip()
     allowed, error = _url_allowed(target_url)
     if not allowed:
-        return json.dumps({"status": "error", "error": error}, ensure_ascii=False)
-
-    # Check in-memory URL cache first to avoid repeating network requests
-    if not no_cache:
-        cached_result = _cache_get(target_url)
-        if cached_result is not None:
-            return cached_result
-
+        return _read_failure("unsafe_url", error, target_url)
+    if type(offset) is not int or offset < 0 or type(max_chars) is not int or not 1 <= max_chars <= 50000:
+        return _read_failure("invalid_chunk", "offset must be nonnegative and max_chars must be between 1 and 50000", target_url)
+    key = _cache_key(target_url, run_dir)
+    original = None
     try:
-        headers = {"Accept": "text/markdown"}
-        if no_cache:
-            headers["x-no-cache"] = "true"
-        emit_progress(
-            "fetching",
-            message=f"GET {target_url[:60]}{'…' if len(target_url) > 60 else ''}",
-        )
-        resp = None
-        try:
-            started = time.monotonic()
-            resp = requests.get(
-                f"{_JINA_PREFIX}{target_url}",
-                headers=headers,
-                timeout=_TIMEOUT,
-                allow_redirects=False,
-                stream=True,
-            )
-            if resp.status_code == 200:
-                original_text = _response_text(resp, started)
-                if not original_text.strip():
-                    raise ValueError("remote reader returned empty content")
-                emit_progress("parsing", message="extracting markdown")
-                text = original_text
-                title = ""
-                for line in text.split("\n"):
-                    if line.startswith("Title:"):
-                        title = line[6:].strip()[:350]
-                        break
-
-                if len(text) > _MAX_LENGTH:
-                    text = text[:_MAX_LENGTH] + f"\n\n... (truncated, total {len(original_text)} chars)"
-
-                result = {
-                    "status": "ok",
-                    "title": title,
-                    "url": target_url,
-                    "content": text,
-                    "length": len(original_text),
-                }
-                if _CACHED_MARKER in original_text:
-                    result["cached"] = True
-                result_str = json.dumps(with_security_warnings(result, fields=("content",)), ensure_ascii=False)
-                _cache_put(target_url, result_str)
-                return result_str
-            status = resp.status_code
-            if status in (401, 403):
-                code = "source_blocked"
-            elif status == 404:
-                code = "source_not_found"
-            elif status == 429:
-                code = "source_rate_limited"
-            elif status in (400, 422):
-                code = "source_unreadable"
+        cached = _cache_get(key) if not no_cache else None
+        if cached is not None:
+            payload = json.loads(cached)
+        else:
+            emit_progress("fetching", message=f"GET {target_url[:60]}")
+            fetched = _fetch_origin(target_url)
+            if fetched.get("security_blocked"):
+                return _read_failure("unsafe_origin", "Origin connection was refused by the SSRF guard", target_url)
+            data = fetched.get("data", b"")
+            content_type = str(fetched.get("content_type", "")).split(";", 1)[0].lower()
+            if content_type == "application/pdf" or data.lstrip().startswith(b"%PDF-"):
+                from src.tools.doc_reader_tool import read_pdf_bytes
+                payload = read_pdf_bytes(data, source=fetched.get("url", target_url), run_dir=run_dir, deliver=False, requested_url=target_url)
+                payload.pop("text", None)
+                payload.update(url=target_url, title=payload.get("file", "PDF"))
             else:
-                code = "source_unavailable"
-            return _read_failure(
-                code,
-                f"remote reader returned HTTP {status}; origin fallback is disabled",
-                target_url,
-                status_code=status,
-            )
-        finally:
-            if resp is not None:
-                resp.close()
-
+                original = None
+                text, title, cached_remote = "", "", False
+                complete = False
+                method = "direct_html"
+                if fetched.get("status_code") == 200 and not fetched.get("truncated"):
+                    if content_type in {"text/html", "application/xhtml+xml"}:
+                        from src.tools.extractor import clean_html
+                        html = fetched.get("text") or data.decode("utf-8", errors="replace")
+                        cleaned = clean_html(html, url=target_url)
+                        text, title = cleaned.clean_markdown, cleaned.title
+                        dynamic = len(text.strip()) < 1200 and bool(re.search(
+                            r"__NEXT_DATA__|__next_f|id\s*=\s*['\"](?:root|app|__next)['\"]|enable javascript|loading\.\.\.", html, re.IGNORECASE))
+                        complete = bool(text.strip()) and not dynamic
+                    elif content_type in {"text/plain", "text/markdown", "text/x-markdown"}:
+                        text = data.decode("utf-8", errors="replace")
+                        complete = bool(text.strip())
+                original = persist_document(source=fetched.get("url", target_url), content_type=content_type,
+                                            content_bytes=data, full_text=text, run_dir=run_dir, requested_url=target_url,
+                                            coverage={"extraction_complete": complete, "method": method,
+                                                      "scope": "fetched_body_main_content"})
+                if not complete:
+                    # Do not send a binary document to a rendered HTML reader.
+                    if data and content_type not in {"text/html", "application/xhtml+xml", "text/plain", "text/markdown", "text/x-markdown"}:
+                        return json.dumps({"status": "error", "error": "Unsupported origin content type",
+                                           "url": target_url, "source_document": original}, ensure_ascii=False)
+                    text, title, cached_remote = _read_rendered(target_url, no_cache)
+                    method = "rendered_reader"
+                document = original if complete else persist_document(
+                    source=target_url, content_type="text/markdown", content_bytes=text.encode("utf-8"),
+                    full_text=text, run_dir=run_dir, coverage={"extraction_complete": True,
+                    "method": method, "scope": "fetched_rendered_body"})
+                payload = {"status": "ok", "url": target_url, "title": title,
+                           "length": len(text), "source_document": document}
+                if not complete:
+                    payload["original_snapshot"] = original
+                if cached_remote:
+                    payload["cached"] = True
+            if payload.get("status") == "ok":
+                _cache_put(key, json.dumps(payload, ensure_ascii=False))
+        result = document_result(payload, offset=offset, max_chars=max_chars, text_field="content")
+        result["length"] = result["source_document"]["coverage"]["total_chars"]
+        return json.dumps(result, ensure_ascii=False)
     except Exception as exc:
         logger.warning("read_url request failed (%s)", type(exc).__name__)
-        return _read_failure(
-            "source_unreachable",
-            f"remote reader request failed ({type(exc).__name__}); origin fallback is disabled",
-            target_url,
-        )
+        error = str(exc) if isinstance(exc, ValueError) and str(exc).startswith("remote reader returned HTTP ") else f"Source could not be read ({type(exc).__name__})"
+        failure = json.loads(_read_failure("source_unreachable", error, target_url))
+        if original is not None:
+            failure["source_document"] = original
+        return json.dumps(failure, ensure_ascii=False)
 
 
 class WebReaderTool(BaseTool):
     """Web reader tool."""
 
     name = "read_url"
-    description = "Fetch web page content: provide a URL and receive the page as Markdown text. Useful for reading docs, articles, API references, etc."
+    description = "Read public HTML or PDF sources. Preserves raw/full extracted text. Follow next_offset through all chunks; a saved source is not proof all text was read. Dynamic pages may use third-party Jina."
     parameters = {
         "type": "object",
         "properties": {
             "url": {"type": "string", "description": "URL of the web page to read"},
+            "offset": {"type": "integer", "minimum": 0, "default": 0, "description": "Character offset supplied by next_offset; continue until null."},
+            "max_chars": {"type": "integer", "minimum": 1, "maximum": 50000, "default": 8000, "description": "Upper bound per chunk; actual JSON delivery budget may return fewer characters."},
             "no_cache": {
                 "type": "boolean",
                 "description": (
@@ -305,4 +336,5 @@ class WebReaderTool(BaseTool):
 
     def execute(self, **kwargs) -> str:
         """Fetch web page."""
-        return read_url(kwargs["url"], no_cache=bool(kwargs.get("no_cache", False)))
+        return read_url(kwargs["url"], no_cache=bool(kwargs.get("no_cache", False)),
+                        offset=kwargs.get("offset", 0), max_chars=kwargs.get("max_chars", _MAX_LENGTH), run_dir=kwargs.get("run_dir"))

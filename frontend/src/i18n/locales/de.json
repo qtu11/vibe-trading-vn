@@ -2,9 +2,29 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Ausführungsphasen",
+    "phaseCount": "Phasen",
+    "toolCount": "Tools",
+    "failedPhases": "fehlgeschlagen",
+    "filterLogs": "Tools filtern",
+    "noMatchingTools": "Keine Tool entspricht diesem Filter.",
+    "phases": {
+      "planning": "Research-Planung",
+      "planningHint": "Skills laden, Subagenten starten und die Forschungsfrage eingrenzen.",
+      "collection": "Datenerhebung",
+      "collectionHint": "Marktdaten, Filings, Nachrichten und Webquellen abrufen.",
+      "modeling": "Finanzanalyse",
+      "modelingHint": "Faktoren aufbauen, Backtests fahren und Signale erzeugen.",
+      "verification": "Kreuzvalidierung",
+      "verificationHint": "Ergebnisse über Robustheits- und Konsistenzprüfungen validieren.",
+      "reporting": "Berichtserstellung",
+      "reportingHint": "Zusammenfassung, Quellen und herunterladbare Artefakte schreiben."
+    }
+  },
   "charts": {
     "noCompleteBars": "Diagramm nicht verfügbar: Es wurden keine vollständigen OHLC-Kerzen abgerufen. Es wurden keine Kerzen geschätzt.",
-  "legacyUnavailable": "Dieses gespeicherte Diagramm konnte nicht rekonstruiert werden, weil ein Teil der Kerzendaten geschwärzt wurde. Stelle die Frage erneut, um ein neues Diagramm aus beobachteten Marktdaten zu erzeugen.",
+    "legacyUnavailable": "Dieses gespeicherte Diagramm konnte nicht rekonstruiert werden, weil ein Teil der Kerzendaten geschwärzt wurde. Stelle die Frage erneut, um ein neues Diagramm aus beobachteten Marktdaten zu erzeugen.",
     "historicalNote": "Historische Kerzen auf der oben genannten Bereinigungsbasis; keine Echtzeitkurse des letzten Handels.",
     "sourceLink": "Datenquelle ↗",
     "sourceUrlUnavailable": "Der Datenanbieter hat keine Quell-URL bereitgestellt",
@@ -87,7 +107,12 @@
     "sessionsLoadFailed": "Gespräche können nicht geladen werden.",
     "pixelOffice": "Pixelbüro",
     "paperTrading": "Simulierter Handel",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "Arbeitsbereich durchsuchen",
+    "commandEmpty": "Keine passenden Ansichten.",
+    "systemStatus": "Arbeitsbereich-Dienste",
+    "systemOnline": "Online",
+    "workspace": "Arbeitsbereich"
   },
   "runtime": {
     "monitorBadge": "Runtime-Monitor",

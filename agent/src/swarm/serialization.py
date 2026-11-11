@@ -30,6 +30,7 @@ def serialize_task(task: Any) -> dict:
         "status": status,
         "summary": task.summary,
         "iterations": getattr(task, "worker_iterations", 0),
+        "data_tool_calls": getattr(task, "data_tool_calls", 0),
         "error": redact_internal_paths(getattr(task, "error", None)) or None,
         "started_at": getattr(task, "started_at", None),
         "completed_at": getattr(task, "completed_at", None),

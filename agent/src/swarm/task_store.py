@@ -7,11 +7,29 @@ Provides DAG algorithms: dependency resolution, cycle detection, and topological
 from __future__ import annotations
 
 import threading
+import os
+import time
 import uuid
 from collections import Counter, defaultdict, deque
 from pathlib import Path
 
 from src.swarm.models import SwarmAgentSpec, SwarmTask, TaskStatus
+
+
+def _read_task(path: Path) -> SwarmTask:
+    from src.swarm.store import _REPLACE_ATTEMPTS, _REPLACE_BACKOFF, _is_transient_windows_error
+
+    for attempt in range(_REPLACE_ATTEMPTS):
+        try:
+            return SwarmTask.model_validate_json(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            # Python's open() can report errno 13 without winerror during a Windows rename.
+            transient = _is_transient_windows_error(exc) or (
+                os.name == "nt" and isinstance(exc, PermissionError) and getattr(exc, "winerror", None) is None
+            )
+            if not transient or attempt == _REPLACE_ATTEMPTS - 1:
+                raise
+            time.sleep(_REPLACE_BACKOFF[attempt])
 
 
 class TaskStore:
@@ -77,7 +95,7 @@ class TaskStore:
         path = self._task_path(task_id)
         if not path.exists():
             raise FileNotFoundError(f"Task not found: {path.name}")
-        return SwarmTask.model_validate_json(path.read_text(encoding="utf-8"))
+        return _read_task(path)
 
     def load_all(self) -> list[SwarmTask]:
         """Load all tasks for the current run.
@@ -88,7 +106,7 @@ class TaskStore:
         tasks: list[SwarmTask] = []
         for path in sorted(self._tasks_dir.glob("task-*.json")):
             tasks.append(
-                SwarmTask.model_validate_json(path.read_text(encoding="utf-8"))
+                _read_task(path)
             )
         return tasks
 
@@ -135,7 +153,7 @@ def resolve_dependencies(tasks_dir: Path, completed_task_id: str) -> list[str]:
     newly_unblocked: list[str] = []
 
     for path in tasks_dir.glob("task-*.json"):
-        task = SwarmTask.model_validate_json(path.read_text(encoding="utf-8"))
+        task = _read_task(path)
         if completed_task_id not in task.blocked_by:
             continue
 

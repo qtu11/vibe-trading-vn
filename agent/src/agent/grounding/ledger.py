@@ -309,10 +309,10 @@ class GroundingLedger(
             return {"sources": deepcopy(self.sources_index(call_id)),
                     "evidence_count": sum(row.call_id == call_id for row in self._evidence)}
 
-    def record_swarm_run(self, run_id: str, preset: str, **receipt: Any) -> None:
+    def record_swarm_run(self, run_id: str, receipt: Mapping[str, Any]) -> None:
         """Record server-observed swarm state; never consume a model's verdict."""
         with self._lock:
-            self._swarm_runs[run_id] = deepcopy({**receipt, "run_id": run_id, "preset": preset})
+            self._swarm_runs[run_id] = deepcopy({**receipt, "run_id": run_id})
             self.persist()
 
     def swarm_run_receipt(self, run_id: str) -> dict[str, Any] | None:

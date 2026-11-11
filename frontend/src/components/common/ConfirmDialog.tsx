@@ -1,5 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/Button";
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -18,9 +20,11 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Minimal dependency-free confirmation modal. Used for actions that need a
- * second, explicit step before firing (e.g. committing a real trading mandate)
- * without pulling in a dialog library for a single use case.
+ * Dependency-free confirmation modal.
+ *
+ * Used for actions that need a second, explicit step before firing (e.g.
+ * committing a real trading mandate) without pulling in a dialog library for
+ * a single use case.
  */
 export function ConfirmDialog({
   open,
@@ -85,7 +89,7 @@ export function ConfirmDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[hsl(var(--shadow-color)/0.55)] p-4 backdrop-blur-[2px]"
       onClick={onCancel}
     >
       <div
@@ -93,36 +97,31 @@ export function ConfirmDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-sm rounded-2xl border bg-background p-4 shadow-lg"
+        className={cn(
+          "vt-pop-in w-full max-w-sm rounded-2xl border border-hairline bg-surface-overlay p-5 shadow-lg",
+        )}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="confirm-dialog-title" className="text-sm font-semibold text-foreground">
+        <h2 id="confirm-dialog-title" className="text-sm font-semibold tracking-tight text-ink">
           {title}
         </h2>
-        {description && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p>}
-        {children && <div className="mt-3">{children}</div>}
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
+        {description && (
+          <p className="mt-1.5 text-xs leading-relaxed text-ink-muted">{description}</p>
+        )}
+        {children && <div className="mt-3.5">{children}</div>}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="outline" size="sm" onClick={onCancel}>
             {cancelLabel}
-          </button>
-          <button
+          </Button>
+          <Button
             ref={confirmRef}
-            type="button"
+            variant={tone === "destructive" ? "danger" : "primary"}
+            size="sm"
             onClick={onConfirm}
             disabled={confirmDisabled}
-            className={[
-              "rounded-lg px-3 py-1.5 text-xs font-medium transition-opacity hover:opacity-90 disabled:opacity-40",
-              tone === "destructive"
-                ? "bg-destructive text-destructive-foreground"
-                : "bg-primary text-primary-foreground",
-            ].join(" ")}
           >
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,

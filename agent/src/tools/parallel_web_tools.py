@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
+import contextvars
 import json
 import logging
 from pathlib import Path
 import re
 import time
-from typing import Any, List, Optional, Sequence, Union
+from typing import Any, Optional, Sequence
 from urllib.parse import urlparse
 
 from src.agent.tools import BaseTool
@@ -55,7 +56,7 @@ def _run_async_safely(coro: Any) -> Any:
 
     if loop and loop.is_running():
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-            return pool.submit(asyncio.run, coro).result()
+            return pool.submit(contextvars.copy_context().run, asyncio.run, coro).result()
     else:
         return asyncio.run(coro)
 
@@ -236,22 +237,8 @@ async def concurrent_scrape_and_synthesize_async(
         Structured response dictionary.
     """
     start_time = time.perf_counter()
-    try:
-        from src.tools.source_documents import persist_document
-    except ImportError:
-        def persist_document(**kwargs: Any) -> dict[str, Any]:
-            cov = kwargs.get("coverage") or {"status": "complete", "complete": True}
-            return {
-                "coverage": cov,
-                "artifact_path": kwargs.get("artifact_path", ""),
-                "full_text_path": kwargs.get("full_text_path", ""),
-                "text_path": kwargs.get("text_path", ""),
-            }
-    try:
-        from src.tools.doc_reader_tool import read_pdf_bytes
-    except ImportError:
-        def read_pdf_bytes(*args: Any, **kwargs: Any) -> dict[str, Any]:
-            return {}
+    from src.tools.source_documents import persist_document
+    from src.tools.doc_reader_tool import read_pdf_bytes
 
     if not urls:
         return {
@@ -304,29 +291,30 @@ async def concurrent_scrape_and_synthesize_async(
         html = getattr(res, "html_content", "") or getattr(res, "html", "")
         content_type = (getattr(res, "content_type", "") or res.headers.get("content-type", "text/html")).split(";", 1)[0].lower()
         content = getattr(res, "content_bytes", b"") or html.encode("utf-8")
-        coverage = {"status": "blocked", "complete": False, "method": "direct_html",
+        coverage = {"status": "blocked", "extraction_complete": False, "complete": False, "method": "direct_html",
                     "reason": res.error or "no_usable_text", "truncated": getattr(res, "truncated", False)}
         if not res.success:
             source_documents[res.url] = {"url": res.url, **persist_document(
                 source=res.final_url or res.url, content_type=content_type, content_bytes=content,
-                coverage=coverage, run_dir=run_dir,
+                coverage=coverage, run_dir=run_dir, requested_url=res.url,
             )}
             continue
         if content_type == "application/pdf" or content.lstrip().startswith(b"%PDF-"):
             try:
-                parsed = await asyncio.to_thread(read_pdf_bytes, content, source=res.final_url or res.url, run_dir=run_dir)
+                parsed = await asyncio.to_thread(
+                    read_pdf_bytes, content, source=res.final_url or res.url, run_dir=run_dir,
+                    requested_url=res.url, deliver=False,
+                )
             except Exception as exc:
                 parsed = {"status": "error", "error": type(exc).__name__}
             document = parsed.get("source_document") or persist_document(
                 source=res.final_url or res.url, content_type="application/pdf", content_bytes=content,
-                coverage={**coverage, "method": "pdf", "reason": parsed.get("error", "pdf_unreadable")}, run_dir=run_dir,
+                coverage={**coverage, "method": "pdf", "reason": parsed.get("error", "pdf_unreadable")},
+                run_dir=run_dir, requested_url=res.url,
             )
             document = {"url": res.url, **document}
-            pdf_coverage = dict(document.get("coverage") or parsed.get("coverage") or coverage)
-            pdf_coverage.update(method="pdf", status="complete" if pdf_coverage.get("complete") else "partial")
-            document["coverage"] = pdf_coverage
             source_documents[res.url] = document
-            text_path = document.get("text_path") or parsed.get("full_text_path")
+            text_path = document.get("full_text_path") or document.get("text_path") or parsed.get("full_text_path")
             full_text = Path(text_path).read_text(encoding="utf-8") if text_path else parsed.get("text", "")
             if full_text.strip():
                 raw_total_tokens += count_tokens(full_text)
@@ -336,27 +324,36 @@ async def concurrent_scrape_and_synthesize_async(
             coverage["reason"] = "unsupported_content_type"
             source_documents[res.url] = {"url": res.url, **persist_document(
                 source=res.final_url or res.url, content_type=content_type, content_bytes=content,
-                coverage=coverage, run_dir=run_dir,
+                coverage=coverage, run_dir=run_dir, requested_url=res.url,
             )}
             continue
-        clean_res = clean_html(html, url=res.url)
+        try:
+            clean_res = (CleanDocument(url=res.url, title=res.url, clean_markdown=html)
+                         if content_type in {"text/plain", "text/markdown"} else clean_html(html, url=res.url))
+        except Exception as exc:
+            source_documents[res.url] = {"url": res.url, **persist_document(
+                source=res.final_url or res.url, content_type=content_type, content_bytes=content,
+                coverage={**coverage, "reason": f"extraction_failed:{type(exc).__name__}"},
+                run_dir=run_dir, requested_url=res.url,
+            )}
+            continue
         text = clean_res.clean_markdown
         # shortcut: short hydration shells need the rendered reader; site-specific extractors are needed when that reader still returns a shell.
         dynamic_shell = len(text.strip()) < 1200 and bool(re.search(
             r"__NEXT_DATA__|__next_f|id\s*=\s*['\"](?:root|app|__next)['\"]|enable javascript|loading\.\.\.", html, re.IGNORECASE,
         ))
         needs_rendering = not text.strip() or dynamic_shell
-        coverage = {"status": "partial" if needs_rendering else "complete", "complete": not needs_rendering,
+        coverage = {"extraction_complete": not needs_rendering,
                     "method": "direct_html", "reason": "dynamic_or_empty_shell" if needs_rendering else "",
                     "truncated": False, "scope": "fetched_body_main_content"}
         source_documents[res.url] = {"url": res.url, **persist_document(
             source=res.final_url or res.url, content_type=content_type, content_bytes=content,
-            full_text=text, coverage=coverage, run_dir=run_dir,
+            full_text=text, coverage=coverage, run_dir=run_dir, requested_url=res.url,
         )}
         if needs_rendering:
             needs_reader.append(res.url)
         else:
-            raw_total_tokens += count_tokens(html)
+            raw_total_tokens += count_tokens(text)
             cleaned_docs.append(clean_res)
 
     # Step 2b: Reader-service fallback for client-rendered pages.
@@ -367,16 +364,18 @@ async def concurrent_scrape_and_synthesize_async(
     reader_failures: list[dict[str, str]] = []
     if needs_reader:
         rendered = await fetch_rendered_markdown_batch_detailed(needs_reader)
-        for url, (markdown, reason) in rendered.items():
+        for url in needs_reader:
+            markdown, reason = rendered.get(url, ("", "rendered_reader_failed"))
             if not markdown.strip():
                 reader_failures.append({"url": url, "reason": reason or "unknown"})
-                source_documents[url]["coverage"].update(status="partial", complete=False, reason=reason or "rendered_reader_failed")
                 continue
             original = source_documents[url]
             document = persist_document(
-                source=url, content_type="text/markdown", content_bytes=markdown.encode("utf-8"),
-                full_text=markdown, coverage={"status": "partial" if reason else "complete", "complete": not bool(reason),
-                                              "method": "rendered_reader", "reason": reason, "truncated": bool(reason)}, run_dir=run_dir,
+                source=original.get("source") or url, requested_url=url,
+                content_type="text/markdown", content_bytes=markdown.encode("utf-8"),
+                full_text=markdown, coverage={"extraction_complete": not bool(reason),
+                    "method": "rendered_reader", "reason": reason,
+                    "truncated": reason == "response_size_limit_exceeded", "scope": "rendered_body_main_content"}, run_dir=run_dir,
             )
             source_documents[url] = {"url": url, **document, "original_snapshot": original}
             raw_total_tokens += count_tokens(markdown)
@@ -392,12 +391,19 @@ async def concurrent_scrape_and_synthesize_async(
     for url in urls:
         if url not in source_documents:
             source_documents[url] = {"url": url, "coverage": {"status": "blocked", "complete": False,
+                "extraction_complete": False, "text_delivery_complete": False,
                 "reason": "redirect_wrapper" if url in skipped_wrappers else "no_fetch_result"}}
-    for document in source_documents.values():
+    for requested_url, document in source_documents.items():
+        document["final_url"] = document.get("source") or requested_url
+        document["url"] = requested_url
         document["full_text_path"] = document.get("full_text_path") or document.get("text_path")
+    extraction_count = sum((document.get("coverage") or {}).get("extraction_complete") is True for document in source_documents.values())
     complete_count = sum((document.get("coverage") or {}).get("complete") is True for document in source_documents.values())
+    delivery_count = sum((document.get("coverage") or {}).get("text_delivery_complete") is True for document in source_documents.values())
     coverage = {"status": "complete" if complete_count == len(source_documents) else ("partial" if cleaned_docs else "blocked"),
-                "complete": complete_count == len(source_documents), "documents_requested": len(source_documents),
+                "extraction_complete": extraction_count == len(source_documents),
+                "text_delivery_complete": delivery_count == len(source_documents), "complete": complete_count == len(source_documents),
+                "documents_requested": len(source_documents), "documents_extracted": extraction_count,
                 "documents_complete": complete_count, "documents_incomplete": len(source_documents) - complete_count}
 
     # Step 3: 3-Tier Deduplication
@@ -467,7 +473,7 @@ async def concurrent_scrape_and_synthesize_async(
     token_stats["latency_ms"] = elapsed_ms
 
     payload = {
-        "status": "ok" if coverage["complete"] else "partial",
+        "status": "ok" if coverage["extraction_complete"] else "partial",
         "query": active_query,
         "coverage": coverage,
         "source_documents": list(source_documents.values()),

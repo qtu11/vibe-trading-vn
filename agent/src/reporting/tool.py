@@ -123,6 +123,14 @@ class ExportResearchReportTool(BaseTool):
             from src.reporting.evidence import from_grounding_ledger
 
             ledger = current_grounding.get()
+            from src.agent.research_workflow import research_release_error
+
+            release_error = research_release_error(ledger, report=report_dict)
+            if release_error:
+                return json.dumps({"ok": False, "status": "error", "error": release_error,
+                                   "error_code": release_error["code"], "message": release_error["message"],
+                                   "accepted_report": report_dict,
+                                   "collected_sources": ledger.source_citations()}, ensure_ascii=False)
             evidence_context = from_grounding_ledger(ledger) if ledger is not None else None
             job = service.create_job(report_data=report_dict, formats=requested_formats, evidence_context=evidence_context, minimum_pages=minimum_pages)
             download_links = [

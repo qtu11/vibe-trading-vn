@@ -17,8 +17,8 @@ This module closes that gap without weakening the gate:
   ``S1``/``S2`` ids, deduplicates by canonical URL, and renders the compact
   index the model sees on the tool result.
 
-Only a bounded excerpt and a hash are retained: the full text stays with the
-publisher. A source is always ``unverified`` -- presence in a document is not
+The ledger retains bounded excerpts and hashes; reader tools preserve complete
+source snapshots separately. A source is always ``unverified`` -- presence in a document is not
 independent confirmation of the number.
 """
 
@@ -28,7 +28,7 @@ import hashlib
 import json
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
@@ -775,7 +775,7 @@ class _SourceMixin:
         self._add_source(
             call_id=call_id,
             tool="read_document",
-            url=f"doc://{name}" if name else None,
+            url=str(payload.get("source_url") or (f"doc://{name}" if name else "")) or None,
             title=name or "user document",
             publisher="User document",
             published_at=str(
@@ -894,9 +894,12 @@ class _SourceMixin:
 
         if existing_id is not None:
             previous = self._source_by_id[existing_id]
-            # A later ``read_url`` carries the full page; keep the larger text.
+            # Later chunks may be shorter but still contain new observed figures.
             if len(text or excerpt) <= previous.content_chars:
-                return previous
+                record = replace(previous, call_id=call_id,
+                                 numbers=_merge_numbers(previous.numbers, numbers))
+                self._replace_source(record)
+                return record
             if explicit_effective:
                 effective, effective_basis = explicit_effective, "explicit"
             elif previous.data_effective_at:

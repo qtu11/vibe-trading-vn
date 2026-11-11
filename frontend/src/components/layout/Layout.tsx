@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useSearchParams } from "react-router";
-import { Check, ChevronDown, Languages, Moon, Sun, Plus, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Loader2, X } from "lucide-react";
+import { Check, ChevronDown, Languages, Moon, Plus, Search, Sun, Trash2, Pencil, MessageSquare, ChevronsLeft, ChevronsRight, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDarkMode } from "@/hooks/useDarkMode";
 import { api, type SessionItem } from "@/lib/api";
@@ -14,6 +14,7 @@ import i18n from "@/i18n";
 import { toast } from "sonner";
 import { SidebarNavigation } from "./SidebarNavigation";
 import { PageHelp } from "./PageHelp";
+import { NAVIGATION_GROUPS } from "./navigation";
 
 // APP_VERSION is sourced from i18n locale files (app.version key) to keep a
 // single source of truth across the footer and every localised README.
@@ -142,10 +143,10 @@ export function Layout() {
   };
 
   return (
-    <div className="flex h-screen bg-background rtl:flex-row-reverse">
+    <div className="flex h-screen bg-surface text-ink rtl:flex-row-reverse">
       <a
         href="#main"
-        className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[70] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary/40"
+        className="sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-[70] focus:rounded-md focus:bg-surface-overlay focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-ink focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-accent/40"
       >
         {t('layout.skipToMain', { defaultValue: 'Skip to main content' })}
       </a>
@@ -153,22 +154,32 @@ export function Layout() {
       <aside
         aria-label={t('layout.sidebar', { defaultValue: 'Vibe-Trading sidebar' })}
         className={cn(
-          "w-12 border-e border-border/60 bg-card flex flex-col shrink-0 transition-all duration-200 overflow-visible",
+          "w-12 border-e border-hairline bg-surface-sidebar flex flex-col shrink-0 transition-[width] duration-[--dur-base] ease-standard overflow-visible z-30",
           !collapsed && "md:w-64"
         )}
       >
         {/* Brand */}
-        <div className={cn("border-b border-border/60", collapsed ? "p-2 flex justify-center" : "px-3.5 py-3 max-md:p-2 max-md:flex max-md:justify-center")}>
+        <div className={cn(
+          "border-b border-hairline-subtle vt-edge-bottom",
+          collapsed ? "p-2 flex justify-center" : "px-3 py-3 max-md:p-2 max-md:flex max-md:justify-center",
+        )}>
           <Link
             to="/"
             aria-label="Vibe-Trading"
-            className={cn("flex items-center group", collapsed ? "justify-center" : "gap-2.5 max-md:justify-center")}
+            className={cn(
+              "vt-focus-visible flex items-center group",
+              collapsed ? "justify-center" : "gap-2.5 max-md:justify-center",
+            )}
           >
-            <BrandMark className="h-8 w-8 shrink-0 group-hover:scale-105 transition-transform" priority />
+            <BrandMark className="h-8 w-8 shrink-0 transition-transform duration-[--dur-fast] group-hover:scale-105" priority />
             {!collapsed && (
               <div className="flex flex-col min-w-0 max-md:hidden">
-                <span className="text-[15px] font-bold tracking-tight text-foreground leading-tight">Vibe-Trading</span>
-                <span className="text-[10px] font-semibold text-primary/80 tracking-wider uppercase">AI Trading Lab</span>
+                <span className="text-[15px] font-semibold tracking-tight text-ink leading-tight">
+                  Vibe-Trading
+                </span>
+                <span className="text-[10px] font-semibold text-accent-ink/85 tracking-[0.14em] uppercase">
+                  AI Trading Lab
+                </span>
               </div>
             )}
           </Link>
@@ -185,7 +196,11 @@ export function Layout() {
           aria-controls="sidebar-sessions"
           title={t("layout.sessions")}
           onClick={() => setSessionsOpen((open) => !open)}
-          className={cn("mx-1 mt-2 flex items-center justify-center rounded-md border-t p-2 text-muted-foreground hover:bg-muted", !collapsed && "md:hidden")}
+          className={cn(
+            "vt-focus-visible mx-1 mt-2 flex items-center justify-center rounded-md border-t p-2",
+            "text-ink-muted transition-colors hover:bg-muted hover:text-ink",
+            !collapsed && "md:hidden",
+          )}
         >
           <MessageSquare className="h-4 w-4" />
         </button>
@@ -196,12 +211,15 @@ export function Layout() {
             ref={sessionsPanelRef}
             id="sidebar-sessions"
             aria-label={t("layout.sessions")}
-            className={cn("overflow-auto flex flex-col border-border/60", sessionsOpen
-              ? "fixed inset-y-0 start-12 z-40 w-[min(18rem,calc(100vw-3rem))] border-e bg-card shadow-xl"
-              : "flex-1 border-t mt-2 max-md:hidden")}
+            className={cn(
+              "overflow-auto flex flex-col border-hairline",
+              sessionsOpen
+                ? "fixed inset-y-0 start-12 z-40 w-[min(18rem,calc(100vw-3rem))] border-e bg-surface-sidebar shadow-lg"
+                : "flex-1 border-t mt-2 max-md:hidden",
+            )}
           >
-            <div className="flex items-center justify-between px-4 py-2">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <div className="flex items-center justify-between px-3.5 py-2">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
                 <MessageSquare className="h-3.5 w-3.5" />
                 {t('layout.sessions')}
               </span>
@@ -209,18 +227,34 @@ export function Layout() {
                 to="/agent"
                 onClick={() => setSessionsOpen(false)}
                 aria-label={t('layout.newChat')}
-                className="flex items-center gap-1 p-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                className="vt-focus-visible flex items-center gap-1 rounded p-1.5 text-ink-muted transition-colors hover:bg-muted hover:text-ink"
                 title={t('layout.newChat')}
               >
                 <Plus className="h-3.5 w-3.5" aria-hidden="true" />
               </Link>
-              {sessionsOpen && <button type="button" aria-label={t("layout.collapse")} onClick={() => { setSessionsOpen(false); sessionsTriggerRef.current?.focus(); }} className="rounded p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>}
+              {sessionsOpen && (
+                <button
+                  type="button"
+                  aria-label={t("layout.collapse")}
+                  onClick={() => { setSessionsOpen(false); sessionsTriggerRef.current?.focus(); }}
+                  className="vt-focus-visible rounded p-1.5 text-ink-muted transition-colors hover:bg-muted hover:text-ink"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             {sessionsOpen && sessionsError && (
-              <div className="mx-3 mb-3 rounded-md border border-warning/30 bg-warning/10 p-3 text-xs">
+              <div className="mx-3 mb-3 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs">
                 <p>{t("layout.sessionsLoadFailed")} {sessionsError}</p>
-                <button type="button" onClick={loadSessions} disabled={sessionsLoading} className="mt-2 rounded border px-2 py-1 disabled:opacity-50">{t("connection.retry")}</button>
+                <button
+                  type="button"
+                  onClick={loadSessions}
+                  disabled={sessionsLoading}
+                  className="mt-2 rounded border border-hairline px-2 py-1 disabled:opacity-50"
+                >
+                  {t("connection.retry")}
+                </button>
               </div>
             )}
 
@@ -228,11 +262,11 @@ export function Layout() {
               {sessionsLoading ? (
                 <div className="space-y-1.5 px-2 py-1">
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="h-7 rounded-md bg-muted/50 animate-pulse" />
+                    <div key={i} className="h-7 rounded-md bg-muted/60 animate-pulse" />
                   ))}
                 </div>
               ) : !sessionsError && sessions.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-muted-foreground/60">{t('layout.noSessions')}</p>
+                <p className="px-3 py-2 text-xs text-ink-faint">{t('layout.noSessions')}</p>
               ) : null}
               {sessions.map((s) => {
                 const isActive = s.session_id === activeSessionId;
@@ -248,7 +282,7 @@ export function Layout() {
                         onKeyDown={(e) => { if (e.key === "Enter") renameSession(s.session_id); if (e.key === "Escape") setRenameTarget(null); }}
                         onBlur={() => renameSession(s.session_id)}
                         aria-label={`${t('layout.rename')}: ${s.title || s.session_id}`}
-                        className="flex-1 min-w-0 ps-3 pe-2 py-1.5 rounded-md text-xs border border-primary bg-background outline-none focus:ring-2 focus:ring-primary/40"
+                        className="flex-1 min-w-0 ps-3 pe-2 py-1.5 rounded-md text-xs border border-accent bg-surface-panel outline-none focus:ring-2 focus:ring-primary/40"
                       />
                     ) : (
                       <Link
@@ -257,21 +291,22 @@ export function Layout() {
                         className={cn(
                           "flex-1 min-w-0 ps-3 pe-14 py-1.5 rounded-md text-xs transition-colors truncate block border-s-2",
                           isActive
-                            ? "border-s-primary bg-primary/10 text-primary font-medium"
-                            : "border-s-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
+                            ? "border-s-accent bg-accent/10 text-accent-ink font-medium"
+                            : "border-s-transparent text-ink-secondary hover:bg-muted hover:text-ink",
                         )}
                         title={s.title || s.session_id}
                       >
                         <span className="flex min-w-0 items-center gap-1.5">
                           {streamingSessionId === s.session_id ? (
-                            <Loader2 className="h-3 w-3 shrink-0 animate-spin text-primary" />
+                            <Loader2 className="h-3 w-3 shrink-0 animate-spin text-accent" />
                           ) : (
                             // Transparent placeholder keeps titles aligned with
                             // spinner rows without a meaningless gray dot.
                             <span className={cn(
                               "h-1.5 w-1.5 rounded-full shrink-0",
-                              isActive ? "bg-primary/70" : "bg-transparent"
-                            )} />
+                              isActive ? "bg-accent" : "bg-transparent",
+                            )}
+                            />
                           )}
                           <span className="min-w-0 truncate">{s.title || s.session_id.slice(0, 16)}</span>
                         </span>
@@ -280,20 +315,20 @@ export function Layout() {
                     {!isRenaming && isDeleting ? (
                       <div className="absolute right-0.5 flex items-center gap-0.5">
                         <button onClick={() => deleteSession(s.session_id)} className="p-1.5 text-danger hover:bg-danger/10 rounded text-[10px] font-medium">{t('layout.confirm')}</button>
-                        <button onClick={() => setDeleteTarget(null)} className="p-1.5 text-muted-foreground hover:bg-muted rounded text-[10px]">{t('layout.cancel')}</button>
+                        <button onClick={() => setDeleteTarget(null)} className="p-1.5 text-ink-muted hover:bg-muted rounded text-[10px]">{t('layout.cancel')}</button>
                       </div>
                     ) : !isRenaming ? (
                       <div className="absolute right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 flex items-center gap-0.5 transition-opacity">
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setRenameTarget(s.session_id); setRenameValue(s.title || ""); }}
-                          className="p-1.5 text-muted-foreground hover:text-foreground rounded"
+                          className="p-1.5 text-ink-muted hover:text-ink rounded"
                           title={t('layout.rename')}
                         >
                           <Pencil className="h-3 w-3" />
                         </button>
                         <button
                           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setDeleteTarget(s.session_id); }}
-                          className="p-1.5 text-muted-foreground hover:text-danger rounded"
+                          className="p-1.5 text-ink-muted hover:text-danger rounded"
                           title={t('layout.delete')}
                         >
                           <Trash2 className="h-3 w-3" />
@@ -311,13 +346,18 @@ export function Layout() {
         {collapsed && <div className="flex-1" />}
 
         {/* Footer */}
-        <div className={cn("mt-auto border-t border-border/60", collapsed ? "p-1 flex flex-col items-center gap-1" : "p-3 space-y-2 max-md:p-1 max-md:flex max-md:flex-col max-md:items-center max-md:gap-1 max-md:space-y-0")}>
+        <div className={cn(
+          "mt-auto border-t border-hairline-subtle",
+          collapsed
+            ? "p-1 flex flex-col items-center gap-1"
+            : "p-3 space-y-2 max-md:p-1 max-md:flex max-md:flex-col max-md:items-center max-md:gap-1 max-md:space-y-0",
+        )}>
           {collapsed ? (
             <>
-              <button onClick={toggle} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={dark ? t('layout.light') : t('layout.dark')}>
+              <button onClick={toggle} className="vt-focus-visible p-1.5 text-ink-muted hover:text-ink rounded transition-colors" title={dark ? t('layout.light') : t('layout.dark')}>
                 {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
               </button>
-              <button onClick={() => setCollapsed(false)} className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors" title={t('layout.expand')}>
+              <button onClick={() => setCollapsed(false)} className="vt-focus-visible p-1.5 text-ink-muted hover:text-ink rounded transition-colors" title={t('layout.expand')}>
                 <ChevronsRight className="h-3.5 w-3.5" />
               </button>
               <LanguageSwitcher compact />
@@ -327,7 +367,7 @@ export function Layout() {
               <div className="flex items-center justify-between max-md:flex-col">
                 <button
                   onClick={toggle}
-                  className="flex items-center gap-1.5 p-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  className="vt-focus-visible flex items-center gap-1.5 p-1.5 text-xs text-ink-muted hover:text-ink transition-colors"
                 >
                   {dark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
                   <span className="max-md:hidden">{dark ? t('layout.light') : t('layout.dark')}</span>
@@ -335,7 +375,7 @@ export function Layout() {
                 <div className="flex items-center gap-1 max-md:hidden">
                   <button
                     onClick={() => setCollapsed(true)}
-                    className="p-1.5 text-muted-foreground hover:text-foreground rounded transition-colors"
+                    className="vt-focus-visible p-1.5 text-ink-muted hover:text-ink rounded transition-colors"
                     title={t('layout.collapse')}
                   >
                     <ChevronsLeft className="h-3.5 w-3.5" />
@@ -346,10 +386,10 @@ export function Layout() {
                 <LanguageSwitcher />
                 {/* About is marketing, not a work surface — it lives here by
                     the version stamp instead of in the primary nav. */}
-                <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60 max-md:hidden">
+                <div className="flex items-center gap-1.5 text-[10px] text-ink-faint max-md:hidden">
                   <span>{t('app.version')}</span>
                   <span aria-hidden="true">·</span>
-                  <Link to="/about" className="transition-colors hover:text-foreground">
+                  <Link to="/about" className="transition-colors hover:text-ink">
                     {t('layout.about')}
                   </Link>
                 </div>
@@ -360,15 +400,16 @@ export function Layout() {
       </aside>
 
       {/* Main */}
-      <div className="relative flex-1 flex flex-col overflow-hidden">
+      <div className="relative flex-1 flex flex-col overflow-hidden vt-workspace">
+        <CommandBar pathname={pathname} collapsed={collapsed} onToggleSidebar={() => setCollapsed((value) => !value)} />
         {sessionsError ? (
           <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs">
             <span className="font-medium">{t("layout.sessionsLoadFailed")}</span>
-            <span className="text-muted-foreground">{sessionsError}</span>
-            <button type="button" onClick={loadSessions} disabled={sessionsLoading} className="ms-auto rounded-md border px-2 py-1 disabled:opacity-50">
+            <span className="text-ink-muted">{sessionsError}</span>
+            <button type="button" onClick={loadSessions} disabled={sessionsLoading} className="ms-auto rounded-md border border-hairline px-2 py-1 disabled:opacity-50">
               {sessionsLoading ? t("settings.loading") : t("connection.retry")}
             </button>
-            <Link to="/settings" className="text-primary underline">{t("layout.settings")}</Link>
+            <Link to="/settings" className="text-accent-ink underline">{t("layout.settings")}</Link>
           </div>
         ) : <ConnectionBanner status={sseStatus} retryAttempt={sseRetryAttempt} />}
         <main id="main" className="flex-1 min-h-0 overflow-auto">
@@ -377,6 +418,179 @@ export function Layout() {
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * The application command bar.
+ *
+ * A desktop-native shell needs one persistent strip that answers three
+ * questions at a glance: where am I, what can I jump to, and is the system
+ * healthy. The bar is intentionally thin and frosted so it frames the
+ * workspace instead of competing with it.
+ */
+function CommandBar({
+  pathname,
+  collapsed,
+  onToggleSidebar,
+}: {
+  pathname: string;
+  collapsed: boolean;
+  onToggleSidebar: () => void;
+}) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const activeItem = useMemo(() => {
+    for (const group of NAVIGATION_GROUPS) {
+      const match = group.items.find((item) =>
+        item.to === "/"
+          ? pathname === "/" || pathname.startsWith("/agent")
+          : pathname === item.to || pathname.startsWith(`${item.to}/`),
+      );
+      if (match) return match;
+    }
+    return undefined;
+  }, [pathname]);
+
+  const results = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const all = NAVIGATION_GROUPS.flatMap((group) =>
+      group.items.map((item) => ({ group, item })),
+    );
+    if (!needle) return all.slice(0, 8);
+    return all
+      .filter(({ item }) => {
+        const label = t(`layout.${item.id}`);
+        return label.toLowerCase().includes(needle)
+          || item.to.toLowerCase().includes(needle);
+      })
+      .slice(0, 8);
+  }, [query, t]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    const onClick = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onClick);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onClick);
+    };
+  }, [open]);
+
+  return (
+    <header className="vt-chrome vt-edge-bottom relative z-30 flex h-12 shrink-0 items-center gap-2 border-b border-hairline-subtle px-3 md:px-4">
+      <button
+        type="button"
+        onClick={onToggleSidebar}
+        aria-label={collapsed ? t("layout.expand") : t("layout.collapse")}
+        title={collapsed ? t("layout.expand") : t("layout.collapse")}
+        className="vt-focus-visible flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-muted hover:text-ink"
+      >
+        {collapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+      </button>
+
+      {/* Breadcrumb — the current location in the product. */}
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-xs">
+        <span className="hidden shrink-0 font-medium uppercase tracking-[0.12em] text-ink-faint sm:inline">
+          {t("app.name", { defaultValue: "Workspace" })}
+        </span>
+        <span aria-hidden="true" className="hidden shrink-0 text-ink-faint/60 sm:inline">/</span>
+        <span className="truncate font-medium text-ink">
+          {activeItem ? t(`layout.${activeItem.id}`) : t("layout.home")}
+        </span>
+      </nav>
+
+      <div className="ms-auto flex items-center gap-2">
+        {/* Command palette trigger — searches the product's surfaces. */}
+        <div ref={rootRef} className="relative hidden md:block">
+          <div className="relative flex h-8 w-56 items-center">
+            <Search
+              aria-hidden="true"
+              className="pointer-events-none absolute start-2.5 h-3.5 w-3.5 text-ink-faint"
+            />
+            <input
+              type="search"
+              value={query}
+              onFocus={() => setOpen(true)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setOpen(true);
+              }}
+              placeholder={t("layout.commandSearch", { defaultValue: "Search…" })}
+              aria-label={t("layout.commandSearch", { defaultValue: "Search" })}
+              className={cn(
+                "vt-focus-visible h-8 w-full rounded-lg border border-hairline bg-surface-sunken/60 ps-8 pe-12",
+                "text-xs text-ink placeholder:text-ink-faint",
+                "transition-colors duration-fast hover:border-hairline-strong focus:bg-surface-panel",
+              )}
+            />
+            <kbd className="pointer-events-none absolute end-2 rounded border border-hairline bg-surface-panel px-1.5 py-0.5 font-mono text-[10px] text-ink-faint">
+              /
+            </kbd>
+          </div>
+          {open && (
+            <div
+              className="vt-floating vt-pop-in absolute end-0 top-full mt-2 w-72 overflow-hidden rounded-xl"
+              role="listbox"
+              aria-label={t("layout.commandSearch", { defaultValue: "Search" })}
+            >
+              <ul className="max-h-80 overflow-y-auto p-1.5">
+                {results.map(({ group, item }) => (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      role="option"
+                      aria-selected={false}
+                      onClick={() => {
+                        setOpen(false);
+                        setQuery("");
+                      }}
+                      className="vt-focus-visible flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs text-ink-secondary transition-colors hover:bg-muted hover:text-ink"
+                    >
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent/10 text-accent-ink">
+                        <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate">
+                        {t(`layout.${item.id}`)}
+                      </span>
+                      <span className="shrink-0 text-[10px] text-ink-faint">
+                        {t(`navigation.groups.${group.id}`)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+                {results.length === 0 && (
+                  <li className="px-2.5 py-3 text-xs text-ink-faint">
+                    {t("layout.commandEmpty", { defaultValue: "No matching surfaces." })}
+                  </li>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Live system status — a calm, always-present health signal. */}
+        <span
+          className="hidden items-center gap-1.5 rounded-full border border-hairline bg-surface-sunken/60 px-2.5 py-1 text-[10.5px] font-medium text-ink-muted lg:inline-flex"
+          title={t("layout.systemStatus", { defaultValue: "Workspace services" })}
+        >
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
+          </span>
+          {t("layout.systemOnline", { defaultValue: "Online" })}
+        </span>
+      </div>
+    </header>
   );
 }
 
@@ -475,7 +689,7 @@ function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-label={t("layout.language")}
-        className="flex items-center gap-1 p-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors max-md:justify-center"
+        className="vt-focus-visible flex items-center gap-1 p-1.5 text-xs text-ink-muted hover:text-ink transition-colors max-md:justify-center"
       >
         <Languages className="h-3.5 w-3.5 shrink-0" />
         {!compact && <span className="whitespace-nowrap max-md:hidden">{current.label}</span>}
@@ -492,7 +706,7 @@ function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
             minWidth: menuStyle.minWidth,
             zIndex: 60,
           }}
-          className="rounded-md border border-border/60 bg-popover shadow-lg ring-1 ring-black/5"
+          className="vt-pop-in rounded-xl border border-hairline bg-surface-overlay shadow-lg"
         >
           {SUPPORTED_LANGUAGES.map((lang) => {
             const active = lang.code === current.code;
@@ -506,12 +720,12 @@ function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
                   }}
                   aria-current={active || undefined}
                   className={cn(
-                    "w-full flex items-center gap-2 px-2.5 py-1.5 text-xs hover:bg-muted hover:text-foreground transition-colors",
-                    active && "text-foreground",
+                    "vt-focus-visible w-full flex items-center gap-2 px-2.5 py-1.5 text-xs hover:bg-muted hover:text-ink transition-colors",
+                    active && "text-ink font-medium",
                   )}
                 >
                   <span className="flex-1 text-start whitespace-nowrap">{lang.label}</span>
-                  {active && <Check className="h-3 w-3 shrink-0" />}
+                  {active && <Check className="h-3 w-3 shrink-0 text-accent" />}
                 </button>
               </li>
             );

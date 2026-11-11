@@ -94,7 +94,7 @@ def test_agent_run_messages_never_end_with_assistant(tmp_path: Path) -> None:
         max_iter=5,
         tmp_run_dir=tmp_path / "run",
     )
-    result = agent.run("Analyze AAPL stock for 2024")
+    result = agent.run("Explain AAPL stock terminology")
     assert result["status"] == "success"
     assert llm.call_count >= 1
 

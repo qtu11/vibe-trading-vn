@@ -34,7 +34,9 @@ class _Resp:
 
 
 @pytest.fixture(autouse=True)
-def clear_cache():
+def clear_cache(monkeypatch):
+    # These tests exercise only the rendered-reader boundary, after a safe empty origin response.
+    monkeypatch.setattr(wr, "_fetch_origin", lambda url: {"data": b"", "content_type": "text/html", "url": url, "status_code": 200})
     with wr._CACHE_LOCK:
         wr._URL_MEMORY_CACHE.clear()
     yield

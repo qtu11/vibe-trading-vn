@@ -129,6 +129,17 @@ class DOMCleaner:
                     link_density=0.0,
                 )
 
+        # Recover body content lxml leaves in an implicit head in malformed HTML.
+        head = tree.find("head")
+        if head is not None:
+            for node in list(head):
+                if isinstance(node.tag, str) and node.tag.lower() not in {"title", "meta", "link", "base", "style", "script", "noscript", "template"}:
+                    body = tree.find("body")
+                    if body is None:
+                        body = lxml.html.Element("body")
+                        tree.append(body)
+                    body.append(node)
+
         # Early step: Extract document metadata before dropping head/scripts
         metadata = self._extract_metadata(tree, base_url)
         title = metadata.get("title", "")

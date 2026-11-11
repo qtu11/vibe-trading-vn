@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "执行阶段",
+    "phaseCount": "个阶段",
+    "toolCount": "个工具",
+    "failedPhases": "个失败",
+    "filterLogs": "筛选工具",
+    "noMatchingTools": "没有符合筛选条件的工具。",
+    "phases": {
+      "planning": "研究规划",
+      "planningHint": "加载技能、派生子代理并界定研究问题。",
+      "collection": "数据采集",
+      "collectionHint": "获取行情、财报、新闻与网页来源。",
+      "modeling": "金融分析",
+      "modelingHint": "构建因子、运行回测并生成信号。",
+      "verification": "交叉验证",
+      "verificationHint": "通过稳健性与一致性检验验证结果。",
+      "reporting": "报告生成",
+      "reportingHint": "撰写综述、引用与可下载成果。"
+    }
+  },
   "navigation": {
     "menu": "浏览功能",
     "close": "关闭功能菜单",
@@ -73,7 +93,12 @@
     "sessionsLoadFailed": "无法加载会话。",
     "pixelOffice": "像素办公室",
     "paperTrading": "模拟交易",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "搜索工作区",
+    "commandEmpty": "没有匹配的面板。",
+    "systemStatus": "工作区服务",
+    "systemOnline": "在线",
+    "workspace": "工作区"
   },
   "runtime": {
     "monitorBadge": "交易监控",
@@ -1952,7 +1977,7 @@
   },
   "charts": {
     "noCompleteBars": "图表暂不可用：未获取完整的 OHLC 蜡烛数据。未估算任何蜡烛。",
-  "legacyUnavailable": "无法重建此已保存图表，因为其蜡烛数据已被部分删减。请重新提问，以便根据已观测的市场数据生成新图表。",
+    "legacyUnavailable": "无法重建此已保存图表，因为其蜡烛数据已被部分删减。请重新提问，以便根据已观测的市场数据生成新图表。",
     "historicalNote": "历史蜡烛采用上述复权口径，并非实时最新成交报价。",
     "sourceLink": "数据来源 ↗",
     "sourceUrlUnavailable": "数据提供方未提供来源网址",

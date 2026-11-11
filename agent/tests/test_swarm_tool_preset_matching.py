@@ -45,6 +45,12 @@ def test_ambiguous_continuation_does_not_fallback_to_equity_team() -> None:
 
     assert preset is None
     assert error is not None
+
+
+def test_vietnamese_continuation_does_not_start_a_new_equity_team() -> None:
+    for prompt in ("tiếp tục", "tiep tuc", "làm tiếp báo cáo", "hoàn thành báo cáo"):
+        preset, error = swarm_tool._resolve_preset(prompt)
+        assert preset is None and error is not None
     assert "equity_research_team" in error
 
 

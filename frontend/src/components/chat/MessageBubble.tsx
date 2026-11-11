@@ -102,7 +102,7 @@ const markdownComponents: ReactMarkdownOptions["components"] = {
     return <SourceLink {...props} />;
   },
 };
-const proseClassName = "prose prose-sm dark:prose-invert max-w-none text-[15px] leading-relaxed prose-p:font-serif prose-p:text-[15.5px] prose-p:leading-[1.75] prose-li:font-serif prose-li:text-[15.5px] prose-li:leading-[1.75] prose-headings:font-sans prose-table:font-sans prose-code:font-mono prose-blockquote:font-sans [&_blockquote_p]:font-sans prose-table:border prose-table:border-border/50 prose-th:bg-muted/30 prose-th:px-3 prose-th:py-1.5 prose-td:px-3 prose-td:py-1.5 prose-th:text-left prose-th:text-xs prose-th:font-medium prose-td:text-xs prose-hr:hidden";
+const proseClassName = "prose prose-sm dark:prose-invert max-w-none text-[15px] leading-relaxed prose-p:font-serif prose-p:text-[15.5px] prose-p:leading-[1.75] prose-li:font-serif prose-li:text-[15.5px] prose-li:leading-[1.75] prose-headings:font-sans prose-table:font-sans prose-code:font-mono prose-blockquote:font-sans [&_blockquote_p]:font-sans prose-table:border prose-table:border-hairline prose-th:bg-muted/40 prose-th:px-3 prose-th:py-1.5 prose-td:px-3 prose-td:py-1.5 prose-th:text-left prose-th:text-xs prose-th:font-medium prose-td:text-xs prose-hr:hidden";
 
 interface MarkdownErrorBoundaryProps {
   content: string;
@@ -174,7 +174,7 @@ export const MarkdownContent = memo(function MarkdownContent({
         )}
       </MarkdownErrorBoundary>
       {showCursor && (
-        <span className="inline-block w-0.5 h-4 bg-primary ml-0.5 animate-pulse align-middle" />
+        <span className="inline-block w-0.5 h-4 bg-accent ml-0.5 animate-pulse align-middle" />
       )}
     </div>
   );
@@ -223,7 +223,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={handleCopy}
-      className={`absolute top-2 end-2 p-1.5 rounded-md bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity`}
+      className="vt-focus-visible absolute top-2 end-2 rounded-md border border-hairline-subtle bg-surface-overlay/90 p-1.5 text-ink-muted opacity-0 backdrop-blur transition-opacity duration-fast hover:bg-muted hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
       aria-label={label}
       title={label}
     >
@@ -268,7 +268,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
       ?? (meta?.attachment ? [meta.attachment] : []);
     return (
       <div className="flex justify-end group">
-        <div dir="auto" className="max-w-[72%] max-h-[40vh] overflow-y-auto break-words rounded-[18px] bg-muted px-4 py-3 text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">
+        <div dir="auto" className="max-w-[72%] max-h-[40vh] overflow-y-auto break-words rounded-[18px] bg-muted px-4 py-3 text-[15px] text-foreground leading-relaxed whitespace-pre-wrap shadow-panel ring-1 ring-inset ring-hairline-subtle">
           {meta && (attachments.length > 0 || meta.swarmMode || meta.goalMode) && (
             <div className="mb-1.5 flex flex-wrap justify-end gap-1.5 text-[10px] leading-none text-muted-foreground">
               {attachments.map((attachment, index) => (
@@ -297,8 +297,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
             </div>
           )}
           {msg.content}
-        </div>
-      </div>
+        </div>      </div>
     );
   }
 
@@ -326,7 +325,6 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
       </div>
     );
   }
-
   if (msg.type === "run_complete" && msg.runId) {
     return <RunCompleteCard msg={msg} />;
   }
@@ -337,7 +335,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
       <div className="flex gap-3">
         <AgentAvatar />
         <div className="space-y-2">
-          <div className="flex items-start gap-2 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
+          <div className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/[0.06] px-4 py-3">
             <XCircle className="h-4 w-4 text-danger shrink-0 mt-0.5" />
             <p dir="auto" className="whitespace-pre-wrap text-sm text-danger leading-relaxed">{msg.content}</p>
           </div>
@@ -346,7 +344,7 @@ export const MessageBubble = memo(function MessageBubble({ msg, onRetry }: Props
               <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>
               <button
                 onClick={() => onRetry(msg)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/80 border border-transparent hover:border-border transition-all"
+                className="vt-focus-visible flex items-center gap-1.5 rounded-lg border border-hairline bg-surface-panel px-3 py-1.5 text-xs text-ink-secondary transition-colors duration-fast hover:border-hairline-strong hover:bg-muted hover:text-ink"
                 title={i18n.t("messageBubble.retry" as never)}
               >
                 <RefreshCw className="h-3 w-3" />

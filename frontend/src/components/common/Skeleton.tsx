@@ -1,7 +1,19 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * A shimmering placeholder block.
+ *
+ * Used instead of a spinner wherever the final shape of the content is
+ * already known, so the layout never jumps when real data arrives.
+ */
 export function Skeleton({ className, style }: { className?: string; style?: React.CSSProperties }) {
-  return <div className={cn("animate-pulse rounded-md bg-muted/50", className)} style={style} />;
+  return (
+    <div
+      aria-hidden="true"
+      className={cn("animate-pulse rounded-md bg-muted/60", className)}
+      style={style}
+    />
+  );
 }
 
 export function SkeletonMetrics() {

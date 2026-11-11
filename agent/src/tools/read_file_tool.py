@@ -99,6 +99,10 @@ class ReadFileTool(BaseTool):
                 "type": "integer",
                 "description": "Max number of lines to return (default: all)",
             },
+            "offset": {"type": "integer", "minimum": 0,
+                       "description": "Character offset for reading the next chunk (default 0)."},
+            "max_chars": {"type": "integer", "minimum": 1, "maximum": _OUTPUT_LIMIT,
+                          "description": "Character budget; use 7000 for source document chunks."},
         },
         "required": ["path"],
     }
@@ -115,6 +119,11 @@ class ReadFileTool(BaseTool):
         """
         file_path = kwargs["path"]
         limit = kwargs.get("limit")
+        offset = kwargs.get("offset", 0)
+        max_chars = kwargs.get("max_chars", _OUTPUT_LIMIT)
+        if (type(offset) is not int or offset < 0 or type(max_chars) is not int
+                or not 1 <= max_chars <= _OUTPUT_LIMIT):
+            return json.dumps({"status": "error", "error": "Invalid offset or max_chars"})
         run_dir = kwargs.get("run_dir")
 
         allowed_roots = []
@@ -239,13 +248,17 @@ class ReadFileTool(BaseTool):
             if limit and limit > 0:
                 lines = text.splitlines(keepends=True)
                 text = "".join(lines[:limit])
-            if len(text) > _OUTPUT_LIMIT:
-                text = text[:_OUTPUT_LIMIT] + "\n... (truncated)"
+            total_chars = len(text)
+            text = text[offset:offset + max_chars]
             return json.dumps(
                 {
                     "status": "ok",
                     "path": str(resolved),
                     "content": text,
+                    **({"offset": offset,
+                        "next_offset": offset + len(text) if offset + len(text) < total_chars else None,
+                        "total_chars": total_chars}
+                       if "offset" in kwargs or "max_chars" in kwargs or offset + len(text) < total_chars else {}),
                 },
                 ensure_ascii=False,
             )

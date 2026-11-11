@@ -6,9 +6,8 @@ newsroom dashboards) returns HTTP 200 with a script-only shell: no ``<p>``, no
 successful fetch with zero usable text, which silently empties the whole
 research pipeline.
 
-This module re-fetches such a page through a reader service that executes the
-page and returns rendered text. It is only used when the direct fetch yields
-no prose, so the common case (server-rendered HTML) still costs one request.
+This module re-fetches empty or short hydration shells through a reader
+service. The common server-rendered page still costs one request.
 
 The target URL is sent to the third-party reader service, so the same rules as
 ``src.tools.web_reader_tool`` apply: never pass credentials, tokens, or
@@ -19,10 +18,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import re
 from typing import Optional
 
 import httpx
+
+from .ssrf_guard import SSRFGuard, SSRFSafeTransport
 
 logger = logging.getLogger(__name__)
 
@@ -30,24 +30,6 @@ logger = logging.getLogger(__name__)
 _READER_PREFIX = "https://r.jina.ai/"
 _READER_TIMEOUT = 15.0
 _MAX_READER_BYTES = 2 * 1024 * 1024
-
-#: Hostnames that are never forwarded to a third-party reader service.
-_BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal"}
-
-
-def _is_safe_public_host(hostname: str) -> bool:
-    """Return whether a hostname may be forwarded to the reader service.
-
-    Only literal IP addresses can be judged here without a DNS round-trip; the
-    reader service performs the fetch on its own side, so a hostname that
-    resolves to a private address is screened by the reader's own network
-    policy, not by this check.
-    """
-    host = hostname.strip().lower().rstrip(".")
-    if not host or host in _BLOCKED_HOSTNAMES or host.endswith(".local"):
-        return False
-    return True
-
 
 #: Header lines the reader service prepends to the payload.
 _HEADER_PREFIXES = (
@@ -105,41 +87,8 @@ async def fetch_rendered_markdown(
         The rendered Markdown body, or ``None`` when the reader service is
         unavailable, times out, or returns nothing usable.
     """
-    import urllib.parse
-
-    try:
-        parsed = urllib.parse.urlsplit(url)
-    except ValueError:
-        return None
-    if parsed.scheme.lower() not in {"http", "https"}:
-        return None
-    hostname = parsed.hostname or ""
-    if not _is_safe_public_host(hostname):
-        logger.warning("Reader fallback refused for unsafe host %r", hostname)
-        return None
-
-    owns_client = client is None
-    if owns_client:
-        client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(timeout, connect=8.0))
-    try:
-        resp = await client.get(
-            f"{_READER_PREFIX}{url}",
-            headers={"Accept": "text/markdown"},
-        )
-        if resp.status_code != 200:
-            logger.warning("Reader fallback returned HTTP %s for %s", resp.status_code, url)
-            return None
-        raw = resp.content[:_MAX_READER_BYTES].decode("utf-8", errors="replace")
-        _, body = _strip_reader_header(raw)
-        if not body.strip():
-            return None
-        return body
-    except Exception as exc:  # noqa: BLE001 - fallback must never break the pipeline
-        logger.warning("Reader fallback failed for %s: %s", url, exc)
-        return None
-    finally:
-        if owns_client and client is not None:
-            await client.aclose()
+    body, reason = await _fetch_rendered_markdown_detailed(url, timeout=timeout, client=client)
+    return body if body and not reason else None
 
 
 async def fetch_rendered_markdown_batch(
@@ -157,7 +106,7 @@ async def fetch_rendered_markdown_batch(
     results = await fetch_rendered_markdown_batch_detailed(
         urls, timeout=timeout, concurrency=concurrency
     )
-    return {url: body for url, (body, _reason) in results.items() if body}
+    return {url: body for url, (body, reason) in results.items() if body and not reason}
 
 
 async def fetch_rendered_markdown_batch_detailed(
@@ -193,7 +142,7 @@ async def fetch_rendered_markdown_batch_detailed(
 
 
 async def _fetch_rendered_markdown_detailed(
-    url: str, *, timeout: float = _READER_TIMEOUT
+    url: str, *, timeout: float = _READER_TIMEOUT, client: Optional[httpx.AsyncClient] = None,
 ) -> tuple[str, str]:
     """Fetch one rendered page, returning ``(body, reason)``.
 
@@ -202,40 +151,57 @@ async def _fetch_rendered_markdown_detailed(
     import urllib.parse
 
     try:
+        if len(url) > 4096 or any(ord(char) < 32 or ord(char) == 127 for char in url) or "\\" in url:
+            return "", "unsafe_url"
         parsed = urllib.parse.urlsplit(url)
+        parsed.port
     except ValueError:
         return "", "malformed_url"
     if parsed.scheme.lower() not in {"http", "https"}:
         return "", "unsupported_scheme"
+    if parsed.username or parsed.password:
+        return "", "unsafe_url"
     hostname = parsed.hostname or ""
-    if not _is_safe_public_host(hostname):
-        logger.warning("Reader fallback refused for unsafe host %r", hostname)
+    if not hostname or hostname.rstrip(".").lower().endswith((".local", ".localhost")):
+        return "", "unsafe_host"
+    safe, _, _ = await asyncio.to_thread(SSRFGuard.validate_url, url)
+    if not safe:
         return "", "unsafe_host"
 
-    client = httpx.AsyncClient(follow_redirects=True, timeout=httpx.Timeout(timeout, connect=8.0))
-    try:
-        resp = await client.get(
-            f"{_READER_PREFIX}{url}",
-            headers={"Accept": "text/markdown"},
+    owns_client = client is None
+    if owns_client:
+        client = httpx.AsyncClient(
+            transport=SSRFSafeTransport(), follow_redirects=True, max_redirects=5,
+            timeout=httpx.Timeout(timeout, connect=min(timeout, 8.0)),
         )
-        if resp.status_code != 200:
-            logger.warning(
-                "Reader fallback returned HTTP %s for %s", resp.status_code, url
-            )
-            return "", f"http_{resp.status_code}"
-        raw = resp.content[:_MAX_READER_BYTES].decode("utf-8", errors="replace")
-        _, body = _strip_reader_header(raw)
+    try:
+        async with asyncio.timeout(timeout):
+            async with client.stream("GET", f"{_READER_PREFIX}{url}", headers={"Accept": "text/markdown"}) as resp:
+                if resp.status_code != 200:
+                    return "", f"http_{resp.status_code}"
+                content_type = resp.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+                if content_type not in {"text/plain", "text/markdown", "text/x-markdown"}:
+                    return "", "unsupported_content_type"
+                raw = bytearray()
+                reason = ""
+                async for chunk in resp.aiter_bytes():
+                    if len(raw) + len(chunk) > _MAX_READER_BYTES:
+                        raw.extend(chunk[:max(0, _MAX_READER_BYTES - len(raw))])
+                        reason = "response_size_limit_exceeded"
+                        break
+                    raw.extend(chunk)
+        _, body = _strip_reader_header(bytes(raw).decode("utf-8", errors="replace"))
         if not body.strip():
-            return "", "empty_body"
-        return body, ""
-    except httpx.TimeoutException:
-        logger.warning("Reader fallback timed out for %s", url)
+            return "", reason or "empty_body"
+        return body, reason
+    except (httpx.TimeoutException, TimeoutError):
         return "", "timeout"
     except Exception as exc:  # noqa: BLE001 - fallback must never break the pipeline
-        logger.warning("Reader fallback failed for %s: %s", url, exc)
+        logger.warning("Reader fallback failed: %s", type(exc).__name__)
         return "", type(exc).__name__
     finally:
-        await client.aclose()
+        if owns_client:
+            await client.aclose()
 
 
 __all__ = [

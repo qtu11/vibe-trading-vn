@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "実行フェーズ",
+    "phaseCount": "フェーズ",
+    "toolCount": "ツール",
+    "failedPhases": "件失敗",
+    "filterLogs": "ツールを絞り込む",
+    "noMatchingTools": "条件に一致するツールはありません。",
+    "phases": {
+      "planning": "リサーチ計画",
+      "planningHint": "スキルの読み込み、サブエージェントの展開、問いの整理。",
+      "collection": "データ収集",
+      "collectionHint": "市場データ・開示・ニュース・Web 情報の取得。",
+      "modeling": "財務分析",
+      "modelingHint": "ファクター構築、バックテスト、シグナル生成。",
+      "verification": "クロス検証",
+      "verificationHint": "頑健性と一貫性による結果の検証。",
+      "reporting": "レポート生成",
+      "reportingHint": "要約、引用、ダウンロード可能な成果物の作成。"
+    }
+  },
   "navigation": {
     "menu": "機能を見る",
     "close": "機能メニューを閉じる",
@@ -73,7 +93,12 @@
     "sessionsLoadFailed": "会話を読み込めません。",
     "pixelOffice": "ピクセルオフィス",
     "paperTrading": "模擬取引",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "ワークスペースを検索",
+    "commandEmpty": "一致する画面がありません。",
+    "systemStatus": "ワークスペースサービス",
+    "systemOnline": "オンライン",
+    "workspace": "ワークスペース"
   },
   "runtime": {
     "monitorBadge": "取引モニター",
@@ -1952,7 +1977,7 @@
   },
   "charts": {
     "noCompleteBars": "チャートを表示できません。完全な OHLC ローソク足を取得できていません。足の推定は行っていません。",
-  "legacyUnavailable": "保存されたチャートはローソク足データの一部が削除されているため再構築できません。再質問して、観測済みの市場データから新しいチャートを生成してください。",
+    "legacyUnavailable": "保存されたチャートはローソク足データの一部が削除されているため再構築できません。再質問して、観測済みの市場データから新しいチャートを生成してください。",
     "historicalNote": "上記の調整基準による過去のローソク足です。リアルタイムの最終約定価格ではありません。",
     "sourceLink": "データソース ↗",
     "sourceUrlUnavailable": "データ提供元からソース URL が返されていません",

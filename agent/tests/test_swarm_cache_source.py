@@ -28,6 +28,7 @@ from unittest.mock import patch
 import pytest
 
 from src.agent.llm_usage import _normalize_llm_usage
+from src.agent.tools import BaseTool
 from src.providers.chat import LLMResponse, ToolCallRequest
 from src.swarm.models import SwarmAgentSpec, SwarmRun, SwarmTask, WorkerResult
 from src.swarm.runtime import SwarmRuntime
@@ -236,7 +237,7 @@ def test_runtime_style_worker_result_construction_defaults_new_fields() -> None:
 _TOOL_DEF = {
     "type": "function",
     "function": {
-        "name": "noop_tool", "description": "no-op",
+        "name": "noop_tool", "description": "Observed data probe",
         "parameters": {"type": "object", "properties": {}},
     },
 }
@@ -249,8 +250,15 @@ _PROVIDER_USAGE = {
 }
 
 
+class _ObservedProbe(BaseTool):
+    name = "noop_tool"
+
+    def execute(self, **kwargs):
+        return '{"ok": true, "data": {"observation": "source data"}}'
+
+
 class _Registry:
-    """Registry stand-in exposing one no-op tool."""
+    """Registry stand-in exposing one observed readonly data tool."""
 
     def get_definitions(self) -> list[dict]:
         """Return the single scripted tool definition."""
@@ -258,11 +266,11 @@ class _Registry:
 
     def get(self, name: str):
         """Local-only registry: no MCPRemoteTool metadata."""
-        return None
+        return _ObservedProbe() if name == "noop_tool" else None
 
     def execute(self, name: str, args: dict) -> str:
         """Return a benign JSON envelope for any dispatch."""
-        return '{"ok": true, "data": {}}'
+        return self.get(name).execute(**args)
 
 
 class _ScriptedLLM:

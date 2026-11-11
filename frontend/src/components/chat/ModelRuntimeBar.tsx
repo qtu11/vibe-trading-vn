@@ -49,24 +49,24 @@ export function ModelRuntimeBar({
   const effortLabel = effortKey ? t(effortKey) : t("settings.providerDefault");
 
   return (
-    <div className="shrink-0 border-b border-border/70 bg-background/95 px-6 py-2 backdrop-blur-sm">
-      <div className="mx-auto flex max-w-3xl items-center gap-2 overflow-hidden text-xs">
+    <div className="shrink-0 border-b border-hairline-subtle bg-surface-chrome/50 px-6 py-1.5">
+      <div className="mx-auto flex max-w-3xl items-center gap-2 overflow-hidden text-[11px]">
         {!identityMatches && <>
-          <span className="relative flex h-2 w-2 shrink-0" aria-hidden="true">
+          <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
             <span className="absolute inline-flex h-full w-full rounded-full bg-success/30" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-success" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
           </span>
-          <span className="shrink-0 font-medium text-foreground">{providerLabel}</span>
-          <span className="text-muted-foreground/60">·</span>
-          <span className="truncate font-mono text-[11px] text-muted-foreground" title={model}>{model}</span>
+          <span className="shrink-0 font-medium text-ink">{providerLabel}</span>
+          <span className="text-ink-faint/60" aria-hidden="true">·</span>
+          <span className="truncate font-mono text-[10.5px] text-ink-muted" title={model}>{model}</span>
         </>}
         <a
           href="/settings"
           title={t("settings.reasoningEffortDesc")}
-          className="ml-auto hidden shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 hover:bg-muted/80 px-2.5 py-0.5 text-[10px] text-muted-foreground hover:text-foreground transition-all cursor-pointer sm:inline-flex"
+          className="ms-auto hidden shrink-0 items-center gap-1.5 rounded-full border border-hairline bg-surface-sunken/70 px-2.5 py-0.5 text-[10px] text-ink-muted transition-colors hover:bg-muted hover:text-ink cursor-pointer sm:inline-flex"
         >
           <Cpu className="h-3 w-3" aria-hidden="true" />
-          <span>{t("agent.reasoningStrength")}: {effortLabel}</span>
+          <span>{t("agent.reasoningStrength")}: <span className="font-medium text-ink-secondary">{effortLabel}</span></span>
         </a>
       </div>
     </div>

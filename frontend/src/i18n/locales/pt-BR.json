@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Fases de execução",
+    "phaseCount": "fases",
+    "toolCount": "ferramentas",
+    "failedPhases": "com falha",
+    "filterLogs": "Filtrar ferramentas",
+    "noMatchingTools": "Nenhuma ferramenta corresponde a este filtro.",
+    "phases": {
+      "planning": "Planejamento da pesquisa",
+      "planningHint": "Carregando skills, abrindo subagentes e delimitando a pergunta de pesquisa.",
+      "collection": "Coleta de dados",
+      "collectionHint": "Obtendo dados de mercado, demonstrativos, notícias e fontes da web.",
+      "modeling": "Análise financeira",
+      "modelingHint": "Construindo fatores, rodando backtests e gerando sinais.",
+      "verification": "Verificação cruzada",
+      "verificationHint": "Validando resultados com testes de robustez e consistência.",
+      "reporting": "Geração do relatório",
+      "reportingHint": "Escrevendo a síntese, as citações e os artefatos baixáveis."
+    }
+  },
   "charts": {
     "noCompleteBars": "Gráfico indisponível: não foram obtidos candles OHLC completos. Nenhum candle foi estimado.",
     "legacyUnavailable": "Este gráfico salvo não pode ser reconstruído porque parte dos dados de candles foi editada. Pergunte novamente para gerar um gráfico novo a partir de dados de mercado observados.",
@@ -87,7 +107,12 @@
     "sessionsLoadFailed": "Não foi possível carregar as conversas.",
     "pixelOffice": "Escritório pixel",
     "paperTrading": "Negociação simulada",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "Buscar no espaço de trabalho",
+    "commandEmpty": "Nenhuma tela correspondente.",
+    "systemStatus": "Serviços do espaço de trabalho",
+    "systemOnline": "Online",
+    "workspace": "Espaço de trabalho"
   },
   "runtime": {
     "monitorBadge": "Monitor de Runtime",

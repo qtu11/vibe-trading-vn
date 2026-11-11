@@ -369,7 +369,7 @@ export function RunDetail() {
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="truncate text-xl font-semibold tracking-tight">{reportIdentity.title}</h1>
               {reportIdentity.strategyInferred && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-[#ff8a3d]/30 bg-[#ff8a3d]/10 px-2 py-0.5 text-[11px] text-[#c25a14]">
+                <span className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] text-warning">
                   {t("runDashboard.strategyInferred")}
                 </span>
               )}

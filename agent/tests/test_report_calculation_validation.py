@@ -6,6 +6,7 @@ from docx import Document
 import pytest
 
 from src.agent.tool_context import current_grounding
+from src.agent.grounding import GroundingLedger
 from src.reporting.service import ReportJobService
 from src.reporting.tool import ExportResearchReportTool
 from tests.test_report_evidence_pipeline import _collected_page, research
@@ -23,7 +24,7 @@ def export_receipt(tmp_path, monkeypatch, payload, context):
     monkeypatch.setattr("src.reporting.service.export_report", render)
     monkeypatch.setattr("src.reporting.tool.ReportJobService", lambda: ReportJobService(tmp_path / "jobs"))
     monkeypatch.setattr("src.reporting.evidence.from_grounding_ledger", lambda _: context)
-    token = current_grounding.set(object())
+    token = current_grounding.set(GroundingLedger(run_dir=tmp_path, user_message="Export the prepared report"))
     try:
         receipt = json.loads(ExportResearchReportTool().execute(payload, formats=["docx"]))
     finally:

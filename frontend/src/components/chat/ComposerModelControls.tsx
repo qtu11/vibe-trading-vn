@@ -1,10 +1,18 @@
 import { useEffect, useId, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, Loader2, RotateCcw, X } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, Loader2, RotateCcw, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { api, type LLMSettings } from "@/lib/api";
 import { effortLabelKey } from "@/lib/reasoningEffort";
+import { cn } from "@/lib/utils";
 import "./ComposerModelControls.css";
 
+/**
+ * Model + reasoning effort control.
+ *
+ * Visual model: the trigger is a *quiet* chip (secondary information), the
+ * popover is a floating surface on the elevation ladder, and the reasoning
+ * effort is expressed through a single heat scale that runs cool → hot.
+ */
 export function ComposerModelControls({
   settings,
   disabled,
@@ -142,26 +150,21 @@ export function ComposerModelControls({
   const activeEffort = configuredEffort ? label(configuredEffort) : "";
   const openEffortPrompt = vi ? "Chọn mức nỗ lực" : "Select effort";
   const effortRatio = maxStep <= 0 ? 0 : activeLevel / maxStep;
-  const effortRamp: Array<[number, number, number]> = [
-    [37, 99, 235],
-    [59, 130, 246],
-    [139, 92, 246],
-    [239, 68, 68],
-    [153, 27, 27],
+
+  /* Heat scale: five semantic stops, sampled by the current position. */
+  const heatStops = [
+    "var(--effort-1)",
+    "var(--effort-2)",
+    "var(--effort-3)",
+    "var(--effort-4)",
+    "var(--effort-5)",
   ];
-  const effortFill = (() => {
-    const clamped = Math.min(1, Math.max(0, effortRatio));
-    const scaled = clamped * (effortRamp.length - 1);
-    const lo = Math.min(effortRamp.length - 2, Math.floor(scaled));
-    const mix = scaled - lo;
-    const [r1, g1, b1] = effortRamp[lo];
-    const [r2, g2, b2] = effortRamp[lo + 1];
-    const r = Math.round(r1 + (r2 - r1) * mix);
-    const g = Math.round(g1 + (g2 - g1) * mix);
-    const b = Math.round(b1 + (b2 - b1) * mix);
-    return `rgb(${r}, ${g}, ${b})`;
-  })();
-  const effortGlow = effortFill.replace("rgb(", "rgba(").replace(")", ", 0.45)");
+  const heatIndex = Math.min(
+    heatStops.length - 1,
+    Math.round(effortRatio * (heatStops.length - 1)),
+  );
+  const effortFill = `hsl(${heatStops[heatIndex]})`;
+  const effortGlow = `hsl(${heatStops[heatIndex]} / 0.42)`;
   const effortParticles = [
     { left: "6%", delay: "0s", dur: "2.6s", size: 4, top: "30%" },
     { left: "18%", delay: "0.7s", dur: "3.1s", size: 3, top: "62%" },
@@ -190,23 +193,31 @@ export function ComposerModelControls({
           setError("");
           setOpen(!open);
         }}
-        className={`inline-flex h-[30px] max-w-full items-center gap-1.5 rounded-full px-3 text-[12.5px] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#3b82f6] disabled:opacity-50 ${
+        className={cn(
+          "vt-focus-visible group inline-flex h-[30px] max-w-full items-center gap-1.5 rounded-full border pl-2.5 pr-2 text-[12.5px] transition-colors duration-fast disabled:opacity-50",
           open
-            ? "border border-black/[0.1] dark:border-white/[0.12] bg-black/[0.08] dark:bg-[#27272a] text-muted-foreground shadow-inner"
-            : "border border-[#2563eb] dark:border-[#3b82f6] bg-[#2563eb]/10 dark:bg-[#3b82f6]/10 hover:bg-[#2563eb]/20 dark:hover:bg-[#3b82f6]/20 text-foreground shadow-2xs"
-        }`}
+            ? "border-hairline-strong bg-muted text-ink-secondary"
+            : "border-hairline bg-surface-panel text-ink-secondary hover:border-hairline-strong hover:bg-muted hover:text-ink",
+        )}
       >
+        <span
+          className={cn(
+            "h-1.5 w-1.5 shrink-0 rounded-full transition-colors duration-base",
+            open ? "bg-accent" : "bg-ink-faint group-hover:bg-accent",
+          )}
+          aria-hidden="true"
+        />
         {open ? (
-          <span className="truncate font-medium text-muted-foreground">
+          <span className="truncate font-medium text-ink-secondary">
             {openEffortPrompt}
           </span>
         ) : (
           <>
-            <span className="truncate max-w-[140px] sm:max-w-[200px] font-semibold text-foreground">
+            <span className="truncate max-w-[140px] font-semibold text-ink sm:max-w-[200px]">
               {shortModel}
             </span>
             {activeEffort && (
-              <span className="hidden text-zinc-400 shrink-0 font-normal sm:inline">
+              <span className="hidden shrink-0 font-normal text-ink-faint sm:inline">
                 {activeEffort}
               </span>
             )}
@@ -214,9 +225,10 @@ export function ComposerModelControls({
         )}
         <ChevronDown
           size={13}
-          className={`shrink-0 text-muted-foreground/80 transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
+          className={cn(
+            "shrink-0 text-ink-faint transition-transform duration-base",
+            open && "rotate-180",
+          )}
           aria-hidden="true"
         />
       </button>
@@ -227,17 +239,17 @@ export function ComposerModelControls({
           role="dialog"
           aria-modal="false"
           aria-label={vi ? "Model và mức suy nghĩ" : "Model and reasoning"}
-          className="absolute bottom-full -end-10 z-50 mb-3 max-h-[70vh] w-[272px] max-w-[calc(100vw-4rem)] overflow-y-auto rounded-2xl border border-black/[0.1] dark:border-white/[0.12] bg-popover dark:bg-[#1a1b1e] p-3.5 text-popover-foreground shadow-[0_12px_36px_rgba(0,0,0,0.4)] sm:end-0"
+          className="vt-pop-in absolute bottom-full end-0 z-50 mb-2.5 max-h-[70vh] w-[292px] max-w-[calc(100vw-4rem)] overflow-y-auto rounded-xl border border-hairline bg-surface-overlay p-3.5 text-ink shadow-lg sm:end-0"
         >
           {/* Header: effort + model, reset */}
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1 text-center">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
                 {vi ? "Mức suy nghĩ" : "Reasoning"}
               </p>
               <p
                 aria-live="polite"
-                className="mt-1 text-[17px] font-semibold leading-6 tracking-tight text-foreground"
+                className="vt-num mt-1 text-[17px] font-semibold leading-6 tracking-tight text-ink"
               >
                 {label(effort)}
               </p>
@@ -246,16 +258,18 @@ export function ComposerModelControls({
                 disabled={locked}
                 onClick={() => setPickingModel(!pickingModel)}
                 aria-expanded={pickingModel}
-                className="mx-auto mt-1.5 flex max-w-full items-center justify-center gap-1 rounded-full bg-black/[0.04] px-2.5 py-1 text-[11.5px] leading-4 text-muted-foreground transition-colors hover:bg-black/[0.08] hover:text-foreground dark:bg-white/[0.06] dark:hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                className="vt-focus-visible mx-auto mt-1.5 flex max-w-full items-center justify-center gap-1 rounded-full bg-muted px-2.5 py-1 text-[11.5px] leading-4 text-ink-secondary transition-colors duration-fast hover:bg-muted/70 hover:text-ink"
               >
-                <span className="max-w-[160px] truncate">
+                <Cpu size={11} className="shrink-0 text-ink-faint" aria-hidden="true" />
+                <span className="max-w-[150px] truncate">
                   {(model || "").split("/").pop() || model}
                 </span>
                 <ChevronRight
                   size={12}
-                  className={`shrink-0 transition-transform duration-150 ${
-                    pickingModel ? "rotate-90" : ""
-                  }`}
+                  className={cn(
+                    "shrink-0 text-ink-faint transition-transform duration-fast",
+                    pickingModel && "rotate-90",
+                  )}
                   aria-hidden="true"
                 />
               </button>
@@ -270,7 +284,7 @@ export function ComposerModelControls({
                   setEffort("");
                   void save("");
                 }}
-                className="rounded-full p-1.5 text-muted-foreground/70 transition-colors hover:bg-black/[0.05] hover:text-foreground dark:hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary disabled:opacity-35"
+                className="vt-focus-visible rounded-full p-1.5 text-ink-faint transition-colors duration-fast hover:bg-muted hover:text-ink disabled:opacity-35"
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -292,18 +306,22 @@ export function ComposerModelControls({
             </div>
           </div>
 
-          {/* Effort selector — flowing particles, deep red at max */}
+          {/* Effort selector — semantic heat scale */}
           <div
-            className={`effort-flow mt-4 rounded-2xl border border-black/[0.06] bg-black/[0.03] px-3 pb-2.5 pt-3 dark:border-white/[0.08] dark:bg-white/[0.04] transition-opacity ${
-              locked || !levels.length ? "opacity-45" : ""
-            }`}
-            style={{ ["--effort-fill" as string]: effortFill, ["--effort-glow" as string]: effortGlow }}
+            className={cn(
+              "effort-flow mt-4 rounded-lg border border-hairline-subtle bg-surface-sunken px-3 pb-2.5 pt-3 transition-opacity duration-base",
+              (locked || !levels.length) && "opacity-45",
+            )}
+            style={{
+              ["--effort-fill" as string]: effortFill,
+              ["--effort-glow" as string]: effortGlow,
+            }}
           >
             <div className="relative flex h-[26px] items-center">
               {/* base track */}
-              <div className="absolute inset-x-[9px] h-[6px] overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+              <div className="absolute inset-x-[9px] h-[6px] overflow-hidden rounded-full bg-border">
                 <div
-                  className="effort-flow-fill h-full rounded-full transition-all duration-500 ease-out"
+                  className="effort-flow-fill h-full rounded-full transition-all duration-slow ease-standard"
                   style={{
                     width:
                       !levels.length || maxStep <= 0
@@ -336,11 +354,10 @@ export function ComposerModelControls({
                 {steps.map((stepValue, idx) => (
                   <span
                     key={stepValue || `step-${idx}`}
-                    className={`h-[5px] w-[5px] rounded-full transition-all duration-300 ${
-                      idx <= activeLevel
-                        ? "bg-white"
-                        : "bg-black/30 dark:bg-white/30"
-                    }`}
+                    className={cn(
+                      "h-[5px] w-[5px] rounded-full transition-all duration-base",
+                      idx <= activeLevel ? "bg-ink" : "bg-ink-faint/50",
+                    )}
                     style={
                       idx <= activeLevel
                         ? { boxShadow: `0 0 0 3px ${effortGlow}` }
@@ -351,7 +368,7 @@ export function ComposerModelControls({
               </div>
               {/* thumb */}
               <div
-                className="pointer-events-none absolute top-1/2 z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white ring-1 ring-black/10 transition-all duration-500 ease-out"
+                className="pointer-events-none absolute top-1/2 z-10 flex h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-surface-overlay ring-1 ring-hairline-strong transition-all duration-slow ease-standard"
                 style={{
                   left:
                     !levels.length || maxStep <= 0
@@ -361,7 +378,7 @@ export function ComposerModelControls({
                 }}
               >
                 <span
-                  className="h-[6px] w-[6px] rounded-full transition-colors duration-500"
+                  className="h-[6px] w-[6px] rounded-full transition-colors duration-slow"
                   style={{ background: effortFill }}
                 />
               </div>
@@ -414,7 +431,7 @@ export function ComposerModelControls({
                 {steps.map((stepValue, idx) => (
                   <span
                     key={stepValue || `cap-${idx}`}
-                    className="max-w-[64px] truncate text-muted-foreground/55 transition-colors duration-500"
+                    className="max-w-[64px] truncate text-ink-faint transition-colors duration-slow"
                     style={
                       idx === activeLevel
                         ? { color: effortFill }
@@ -429,7 +446,7 @@ export function ComposerModelControls({
           </div>
 
           {!levels.length && (
-            <p className="mt-2.5 text-[11px] leading-relaxed text-muted-foreground">
+            <p className="mt-2.5 text-[11px] leading-relaxed text-ink-muted">
               {vi
                 ? "Endpoint dùng mức suy nghĩ mặc định của nhà cung cấp."
                 : "Provider default reasoning effort applies."}
@@ -441,12 +458,12 @@ export function ComposerModelControls({
             hidden={!pickingModel}
             className={
               pickingModel
-                ? "mt-3.5 space-y-2.5 border-t border-black/[0.08] dark:border-white/[0.08] pt-3"
+                ? "mt-3.5 space-y-2.5 border-t border-hairline-subtle pt-3"
                 : "sr-only"
             }
           >
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground">
+              <span className="text-[11px] font-medium text-ink-muted">
                 Model
               </span>
               <select
@@ -464,7 +481,7 @@ export function ComposerModelControls({
                     setEffort("");
                   }
                 }}
-                className="w-full rounded-xl border border-black/[0.1] dark:border-white/[0.1] bg-background dark:bg-[#1b1c20] px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-[#3b82f6]"
+                className="vt-focus-visible w-full rounded-lg border border-hairline bg-surface-panel px-2.5 py-1.5 text-xs text-ink"
               >
                 {[...new Set([settings.model_name, ...models])].map((name) => (
                   <option key={name} value={name}>
@@ -475,7 +492,7 @@ export function ComposerModelControls({
             </label>
 
             <label className="block space-y-1">
-              <span className="text-[11px] font-medium text-muted-foreground">
+              <span className="text-[11px] font-medium text-ink-muted">
                 {vi ? "Mức nỗ lực" : "Reasoning effort"}
               </span>
               <select
@@ -483,7 +500,7 @@ export function ComposerModelControls({
                 disabled={locked || !levels.length}
                 value={levels.includes(effort) ? effort : ""}
                 onChange={(event) => setEffort(event.target.value)}
-                className="w-full rounded-xl border border-black/[0.1] dark:border-white/[0.1] bg-background dark:bg-[#1b1c20] px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-[#3b82f6] disabled:opacity-50"
+                className="vt-focus-visible w-full rounded-lg border border-hairline bg-surface-panel px-2.5 py-1.5 text-xs text-ink disabled:opacity-50"
               >
                 <option value="">{t("settings.providerDefault")}</option>
                 {levels.map((lvl) => (
@@ -497,7 +514,7 @@ export function ComposerModelControls({
             {settings.provider === "custom" ? (
               <a
                 href="/settings"
-                className="block text-[11px] text-muted-foreground underline hover:text-foreground"
+                className="block text-[11px] text-ink-muted underline transition-colors hover:text-ink"
               >
                 {vi
                   ? "Đổi model trong cấu hình nhà cung cấp"
@@ -508,7 +525,7 @@ export function ComposerModelControls({
                 type="button"
                 onClick={() => void save(effort, true)}
                 disabled={locked}
-                className="w-full rounded-xl bg-[#2b7fff] hover:bg-[#3b8aff] px-3 py-2 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                className="vt-focus-visible w-full rounded-lg bg-accent px-3 py-2 text-xs font-semibold text-accent-foreground transition-colors duration-fast hover:bg-accent-strong disabled:opacity-50"
               >
                 {vi ? "Áp dụng cho lượt tiếp theo" : "Apply to next turn"}
               </button>
@@ -516,7 +533,7 @@ export function ComposerModelControls({
           </div>
 
           {error && (
-            <p role="alert" className="mt-2.5 text-[11px] text-destructive">
+            <p role="alert" className="mt-2.5 rounded-md bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">
               {error}
             </p>
           )}

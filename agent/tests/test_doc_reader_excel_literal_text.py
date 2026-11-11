@@ -59,8 +59,8 @@ def test_ordinary_text_and_all_sheets_keep_their_contract(tmp_path, monkeypatch)
     assert result["text"].index("Regions") < result["text"].index("Second")
 
 
-def test_existing_hundred_row_preview_is_unchanged(tmp_path, monkeypatch):
+def test_rows_beyond_old_hundred_row_preview_are_preserved(tmp_path, monkeypatch):
     rows = [[f"ROW-{i:03d}", "Ordinary", i] for i in range(101)]
     result = read_workbook(tmp_path, monkeypatch, rows)
     assert result["sheets"][0]["rows"] == 101
-    assert "ROW-099" in result["text"] and "ROW-100" not in result["text"]
+    assert "ROW-099" in result["text"] and "ROW-100" in result["text"]

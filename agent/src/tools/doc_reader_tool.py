@@ -3,7 +3,7 @@
 Supported formats:
   - PDF (.pdf) — pypdfium2 + OCR fallback for image pages
   - Word (.docx) — python-docx (paragraphs + table cells)
-  - Excel (.xlsx/.xls) — pandas preview, all sheets
+  - Excel (.xlsx/.xls) — all rows and sheets, paged delivery
   - PowerPoint (.pptx) — python-pptx (slide text)
   - Images (.png/.jpg/.jpeg/.gif/.bmp/.webp/.tiff) — OCR
   - Plain text (.txt/.md/.log/.json/.yaml/.yml/.toml/.ini/.cfg/.csv/.tsv/
@@ -21,9 +21,9 @@ from typing import Any, Callable
 
 from src.agent.progress import emit_progress
 from src.agent.tools import BaseTool
-from src.security.scanner import with_security_warnings
 from src.tools.ocr import get_ocr_engine, get_ocr_install_hint
 from src.tools.path_utils import safe_document_path
+from src.tools.source_documents import document_result, persist_document
 
 _MAX_CHARS = 15000
 _MIN_TEXT_PER_PAGE = 50
@@ -77,26 +77,17 @@ def _err(msg: str) -> str:
     return json.dumps({"status": "error", "error": msg}, ensure_ascii=False)
 
 
-def _truncate(text: str) -> tuple[str, bool]:
-    """Clip to _MAX_CHARS, return (text, was_truncated)."""
-    if len(text) <= _MAX_CHARS:
-        return text, False
-    return text[:_MAX_CHARS] + f"\n\n... (truncated, total {len(text)} chars)", True
-
-
 def _envelope(path: Path, fmt: str, text: str, **extra: Any) -> str:
-    """Build the standard JSON response."""
-    body, truncated = _truncate(text)
+    """Internal extraction envelope; delivery is bounded after snapshotting."""
     payload: dict[str, Any] = {
         "status": "ok",
         "file": path.name,
         "format": fmt,
         "char_count": len(text),
-        "truncated": truncated,
-        "text": body,
+        "truncated": False,
+        "text": text,
     }
     payload.update(extra)
-    payload = with_security_warnings(payload, fields=("text",))
     return json.dumps(payload, ensure_ascii=False)
 
 
@@ -141,6 +132,8 @@ def _read_pdf(path: Path, pages: str, min_text_per_page: int = _MIN_TEXT_PER_PAG
     try:
         total_pages = len(doc)
         targets = _parse_pages(pages, total_pages) if pages.strip() else list(range(total_pages))
+        if not targets or any(not 0 <= page < total_pages for page in targets):
+            return _err("Selected PDF page range is empty or outside the document")
         total_targets = len(targets)
         chunks: list[str] = []
         ocr_pages = 0
@@ -205,18 +198,15 @@ def _read_pdf(path: Path, pages: str, min_text_per_page: int = _MIN_TEXT_PER_PAG
         if not full and skipped_pages > 0:
             engine = _get_ocr()
             hint = get_ocr_install_hint(engine)
-            return _err(
-                f"All {total_pages} page(s) are scanned/image pages with no "
-                f"extractable text, and no OCR engine is available. {hint}"
-            )
+            return _envelope(path, "pdf", full, status="error", total_pages=total_pages,
+                             pages_read=0, skipped_pages=skipped_pages, extraction_complete=False,
+                             error=f"All {total_pages} page(s) are scanned/image pages with no extractable text, and no OCR engine is available. {hint}")
         engine = _get_ocr()
         if native_text_without_ocr and not qualified_native_pages and not ocr_pages:
             hint = get_ocr_install_hint(engine)
-            return _err(
-                "Selected PDF pages contain only native text below "
-                f"min_text_per_page ({min_text_per_page}), and no OCR engine "
-                f"is available. {hint}"
-            )
+            return _envelope(path, "pdf", full, status="error", total_pages=total_pages,
+                             pages_read=len(targets), skipped_pages=skipped_pages, extraction_complete=False,
+                             error=f"Selected PDF pages contain only native text below min_text_per_page ({min_text_per_page}), and no OCR engine is available. {hint}")
 
         # Compute OCR quality metrics
         pages_read = len(targets)
@@ -249,6 +239,9 @@ def _read_pdf(path: Path, pages: str, min_text_per_page: int = _MIN_TEXT_PER_PAG
             skipped_pages=skipped_pages,
             ocr_engine=engine.name if engine else None,
             ocr_quality=ocr_quality,
+            unread_pages=total_pages - len(targets),
+            extraction_complete=(len(targets) == total_pages and not skipped_pages
+                                 and not ocr_attempted_pages and not native_text_without_ocr and bool(full)),
         )
     finally:
         doc.close()
@@ -299,7 +292,7 @@ def _read_excel(path: Path) -> str:
             message=f"sheet {name}",
         )
         df = xls.parse(name, dtype=str, keep_default_na=False, na_values=[""])
-        preview = df.head(100).to_string(index=False)
+        preview = df.to_string(index=False)
         parts.append(f"--- Sheet: {name} ({len(df)} rows × {len(df.columns)} cols) ---\n{preview}")
         sheet_info.append({"name": name, "rows": len(df), "cols": len(df.columns)})
     return _envelope(path, "excel", "\n\n".join(parts), sheets=sheet_info)
@@ -424,7 +417,40 @@ _HANDLERS: dict[str, Callable[[Path], str]] = {
 }
 
 
-def read_document(file_path: str, pages: str = "", min_text_per_page: int = _MIN_TEXT_PER_PAGE) -> str:
+def _snapshot_result(path: Path, payload: dict[str, Any], *, source: str,
+                     content_bytes: bytes, run_dir: str | Path | None = None,
+                     offset: int = 0, max_chars: int = _MAX_CHARS, deliver: bool = True,
+                     requested_url: str = "") -> dict[str, Any]:
+    full_text = payload.pop("text", "")
+    coverage = {key: payload[key] for key in ("total_pages", "pages_read", "skipped_pages", "unread_pages") if key in payload}
+    coverage["extraction_complete"] = payload.get("extraction_complete", payload.get("status") == "ok" and bool(full_text.strip()))
+    coverage["scope"] = "extracted_document_text"
+    document = persist_document(source=source, content_type="application/pdf" if payload.get("format") == "pdf" else "application/octet-stream",
+                                content_bytes=content_bytes, full_text=full_text, coverage=coverage, run_dir=run_dir, requested_url=requested_url)
+    payload["source_document"] = document
+    payload["char_count"] = document["coverage"]["total_chars"]
+    return document_result(payload, offset=offset, max_chars=max_chars, deliver=deliver)
+
+
+def read_pdf_bytes(data: bytes, *, source: str, run_dir: str | Path | None = None,
+                   offset: int = 0, max_chars: int = _MAX_CHARS, deliver: bool = True,
+                   requested_url: str = "") -> dict[str, Any]:
+    """Read fetched PDF bytes natively without forwarding a PDF to a proxy."""
+    raw = persist_document(source=source, content_type="application/pdf", content_bytes=data,
+                           coverage={"extraction_complete": False}, run_dir=run_dir, requested_url=requested_url)
+    if not data.lstrip().startswith(b"%PDF-"):
+        payload = {"status": "error", "error": "PDF signature is missing", "format": "pdf"}
+    else:
+        try:
+            payload = json.loads(_read_pdf(Path(raw["artifact_path"]), ""))
+        except Exception as exc:
+            payload = {"status": "error", "error": f"PDF extraction failed ({type(exc).__name__})", "format": "pdf"}
+    return _snapshot_result(Path(raw["artifact_path"]), payload, source=source, content_bytes=data,
+                            run_dir=run_dir, offset=offset, max_chars=max_chars, deliver=deliver, requested_url=requested_url)
+
+
+def read_document(file_path: str, pages: str = "", min_text_per_page: int = _MIN_TEXT_PER_PAGE,
+                  offset: int = 0, max_chars: int = _MAX_CHARS, run_dir: str | Path | None = None) -> str:
     """Read any supported document; dispatch by extension.
 
     Args:
@@ -448,16 +474,25 @@ def read_document(file_path: str, pages: str = "", min_text_per_page: int = _MIN
 
     ext = path.suffix.lower()
     try:
-        if ext == ".pdf":
-            return _read_pdf(path, pages, min_text_per_page=min_text_per_page)
-        if ext in _HANDLERS:
-            return _HANDLERS[ext](path)
-        if ext in _IMAGE_EXTS:
-            return _read_image(path)
-        if ext in _TEXT_EXTS or ext == "":
-            return _read_text(path)
-        # Unknown extension: best-effort text read
-        return _read_text(path)
+        content_bytes = path.read_bytes()
+        try:
+            if ext == ".pdf":
+                extracted = _read_pdf(path, pages, min_text_per_page=min_text_per_page)
+            elif ext in _HANDLERS:
+                extracted = _HANDLERS[ext](path)
+            elif ext in _IMAGE_EXTS:
+                extracted = _read_image(path)
+            else:
+                extracted = _read_text(path)
+        except Exception as exc:
+            extracted = _err(f"Document extraction failed ({type(exc).__name__})")
+        payload = json.loads(extracted)
+        if path.read_bytes() != content_bytes:
+            payload.update(status="error", error="Source file changed during extraction", extraction_complete=False)
+        payload["source_url"] = "doc://" + path.as_posix()
+        result = _snapshot_result(path, payload, source=str(path), content_bytes=content_bytes,
+                                  run_dir=run_dir, offset=offset, max_chars=max_chars, requested_url=payload["source_url"])
+        return json.dumps(result, ensure_ascii=False)
     except Exception as exc:
         return _err(f"{type(exc).__name__}: {exc}")
 
@@ -486,6 +521,8 @@ class DocReaderTool(BaseTool):
                 "description": "PDF only: minimum text chars per page before OCR is triggered. Default 50.",
                 "default": 50,
             },
+            "offset": {"type": "integer", "minimum": 0, "default": 0, "description": "Character offset from next_offset; read all chunks to complete source coverage."},
+            "max_chars": {"type": "integer", "minimum": 1, "maximum": 50000, "default": 15000, "description": "Upper bound per text chunk; actual JSON delivery budget may return fewer characters."},
         },
         "required": ["file_path"],
     }
@@ -496,4 +533,6 @@ class DocReaderTool(BaseTool):
             kwargs["file_path"],
             kwargs.get("pages", ""),
             min_text_per_page=kwargs.get("min_text_per_page", _MIN_TEXT_PER_PAGE),
+            offset=kwargs.get("offset", 0), max_chars=kwargs.get("max_chars", _MAX_CHARS),
+            run_dir=kwargs.get("run_dir"),
         )

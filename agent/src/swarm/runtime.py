@@ -475,8 +475,17 @@ class SwarmRuntime:
         try:
             self._execute_run_bound(run, cancel_event, include_shell_tools, resume_from)
         finally:
-            current_observations.reset(observation_token)
-            current_grounding.reset(grounding_token)
+            try:
+                from src.swarm.serialization import serialize_task
+                saved = self._store.load_run(run.id)
+                if saved is not None:
+                    ledger.record_swarm_run(run.id, {
+                        "preset": saved.preset_name, "status": saved.status.value,
+                        "tasks": [serialize_task(task) for task in saved.tasks],
+                    })
+            finally:
+                current_observations.reset(observation_token)
+                current_grounding.reset(grounding_token)
 
     def _execute_run_bound(
         self,
@@ -605,6 +614,7 @@ class SwarmRuntime:
                             completed_at=now_iso,
                             artifacts=result.artifact_paths,
                             worker_iterations=result.iterations,
+                            data_tool_calls=result.data_tool_calls,
                         )
                         resolve_dependencies(run_dir / "tasks", tid)
                         self._emit_event(
@@ -640,6 +650,7 @@ class SwarmRuntime:
                             completed_at=datetime.now(timezone.utc).isoformat(),
                             artifacts=result.artifact_paths,
                             worker_iterations=result.iterations,
+                            data_tool_calls=result.data_tool_calls,
                         )
                         self._emit_event(
                             run_id,
@@ -666,6 +677,7 @@ class SwarmRuntime:
                             or f"worker did not complete (status={result.status})",
                             completed_at=datetime.now(timezone.utc).isoformat(),
                             worker_iterations=result.iterations,
+                            data_tool_calls=result.data_tool_calls,
                         )
                         self._emit_event(
                             run_id,
@@ -728,6 +740,12 @@ class SwarmRuntime:
                     run.final_report = task_summaries[tid]
                     break
 
+        from src.agent.tool_context import current_grounding
+        from src.swarm.serialization import serialize_task
+        ledger = current_grounding.get()
+        if ledger is not None:
+            ledger.record_swarm_run(run.id, {"preset": run.preset_name, "status": run.status.value,
+                                            "tasks": [serialize_task(task) for task in run.tasks]})
         self._store.update_run(run)
         self._emit_event(run_id, self._make_event("run_completed", data={"status": final_status.value}))
 

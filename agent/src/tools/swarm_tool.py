@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import threading
 import time
 from typing import Any
 
@@ -377,6 +378,8 @@ def _match_preset(prompt: str) -> str:
 
 _PRESET_NAMES = {preset_name for preset_name, _, _ in _PRESET_KEYWORDS}
 _CONTINUATION_PATTERNS = (
+    r"^\s*(?:tiếp\s+tục|tiep\s+tuc|làm\s+tiếp|lam\s+tiep)\b",
+    r"^\s*(?:hoàn\s+thành|hoan\s+thanh)\s+(?:báo\s+cáo|bao\s+cao)\b",
     r"^\s*continue\b",
     r"^\s*resume\b",
     r"^\s*finish\b",
@@ -446,7 +449,7 @@ def _resolve_preset(prompt: str, explicit_preset: str | None = None) -> tuple[st
         return (
             None,
             "Ambiguous continuation swarm prompt. Reuse the previous swarm result, "
-            "or call run_swarm with preset_name and the original full request. "
+            "or wait for its run_id. Start a new run only with an explicit preset and full request. "
             "Refusing to auto-route this continuation to equity_research_team.",
         )
 
@@ -466,6 +469,7 @@ class SwarmTool(BaseTool):
         "Provide a natural language prompt and, when known, an explicit preset_name from agent/src/swarm/presets "
         "(e.g. equity_research_team, quant_strategy_desk, global_allocation_committee, risk_committee) "
         "so follow-up/continuation prompts do not lose routing context. "
+        "To wait again for an existing run, pass only its run_id; this resumes waiting without starting a team. "
         "Example: run_swarm(prompt='Analyze A-share new energy opportunities for Q2 2026', preset_name='equity_research_team')"
     )
     parameters = {
@@ -492,8 +496,9 @@ class SwarmTool(BaseTool):
                 "type": "integer", "minimum": 1,
                 "description": "Optional cap on Swarm stream_chat invocations, including retries. Not a token or cost cap; SDK retries and invoke fallback may occur inside an invocation.",
             },
+            "run_id": {"type": "string", "description": "Wait again for a run started by this tool in this parent request; do not change its prompt or variables."},
         },
-        "required": ["prompt"],
+        "required": [],
     }
     is_readonly = False
     repeatable = True  # loop.py dedups by tool name; each prompt is a distinct run (#42)
@@ -513,6 +518,11 @@ class SwarmTool(BaseTool):
         """
         self.include_shell_tools = include_shell_tools
         self._event_callback = event_callback
+        self.cancel_event: threading.Event | None = None
+        self.usage_callback: Any | None = None
+        self.progress_callback: Any | None = None
+        self._runs: dict[str, tuple[Any, Any, Any, str, str, dict]] = {}
+        self._callback_lock = threading.RLock()
 
     def _emit_session_event(self, event_type: str, data: dict[str, Any]) -> None:
         """Forward swarm status to the hosting session SSE channel if present."""
@@ -522,6 +532,14 @@ class SwarmTool(BaseTool):
             self._event_callback(event_type, data)
         except Exception:
             logger.warning("Failed to forward %s to session event stream", event_type, exc_info=True)
+
+    def cancel_owned_run(self, run_id: str) -> bool:
+        """Stop only a run launched by this tool and the current parent request."""
+        from src.agent.tool_context import current_grounding
+
+        owned = self._runs.get(run_id) if isinstance(run_id, str) else None
+        return bool(owned is not None and owned[2] is current_grounding.get()
+                    and owned[0].cancel_run(run_id))
 
     def execute(self, **kwargs: Any) -> str:
         """Start a swarm run: auto-match preset, extract variables, wait for completion.
@@ -533,6 +551,27 @@ class SwarmTool(BaseTool):
         Returns:
             JSON string with status, preset, variables, final_report, tasks, token_usage.
         """
+        from src.agent.tool_context import current_grounding
+
+        owner = current_grounding.get()
+        if "run_id" in kwargs and (not isinstance(kwargs["run_id"], str) or not kwargs["run_id"].strip()):
+            return json.dumps({"status": "error", "error": "run_id must be a nonempty string"})
+        if (not isinstance(kwargs.get("prompt", ""), str)
+                or (kwargs.get("preset_name") is not None and not isinstance(kwargs["preset_name"], str))):
+            return json.dumps({"status": "error", "error": "prompt and preset_name must be strings"})
+        if kwargs.get("run_id"):
+            owned = self._runs.get(kwargs["run_id"])
+            if owned is None or owned[2] is not owner:
+                return json.dumps({"status": "error", "error": "run_id does not belong to this parent request and tool instance"})
+            runtime, store, _, prompt, preset, variables = owned
+            if ((kwargs.get("prompt") and kwargs["prompt"] != prompt)
+                    or (kwargs.get("preset_name") and kwargs["preset_name"] != preset)
+                    or (kwargs.get("variables") is not None and kwargs["variables"] != variables)
+                    or kwargs.get("max_llm_calls") is not None):
+                return json.dumps({"status": "error", "error": "Cannot change a running swarm's request; resume using run_id only"})
+            return self._wait_for_run(runtime, store, kwargs["run_id"], preset, variables, owner)
+        if self.cancel_event is not None and self.cancel_event.is_set():
+            return json.dumps({"status": "error", "error": "Parent request was cancelled before starting the swarm"})
         prompt = kwargs.get("prompt", "")
 
         if not prompt:
@@ -583,10 +622,19 @@ class SwarmTool(BaseTool):
 
         pending_live_events: list[dict[str, Any]] = []
         run_id_holder: dict[str, str | None] = {"run_id": None}
+        usage_callback = self.usage_callback
+        progress_callback = self.progress_callback
 
         try:
             def _live_callback(event: Any) -> None:
                 payload = event.model_dump()
+                with self._callback_lock:
+                    if usage_callback is not None and event.type == "worker_llm_usage":
+                        usage_callback(event.agent_id or "worker", payload["data"]["usage"])
+                    if progress_callback is not None and event.type in {
+                        "worker_text", "worker_llm_usage", "tool_result", "task_completed", "task_failed"
+                    }:
+                        progress_callback(event.type, payload)
                 current_run_id = run_id_holder["run_id"]
                 if current_run_id is None:
                     pending_live_events.append(payload)
@@ -599,7 +647,7 @@ class SwarmTool(BaseTool):
             run = runtime.start_run(
                 preset,
                 variables,
-                live_callback=_live_callback if self._event_callback is not None else None,
+                live_callback=_live_callback if any((self._event_callback, usage_callback, progress_callback)) else None,
                 include_shell_tools=self.include_shell_tools,
                 **({"max_llm_calls": kwargs["max_llm_calls"]} if kwargs.get("max_llm_calls") is not None else {}),
             )
@@ -620,6 +668,7 @@ class SwarmTool(BaseTool):
             )
 
         run_id = run.id
+        self._runs[run_id] = (runtime, store, owner, prompt, preset, variables)
         run_id_holder["run_id"] = run_id
         logger.info("SwarmTool: started run %s (preset=%s)", run_id, preset)
         self._emit_session_event(
@@ -640,10 +689,45 @@ class SwarmTool(BaseTool):
             )
         pending_live_events.clear()
 
+        return self._wait_for_run(runtime, store, run_id, preset, variables, owner)
+
+    def _wait_for_run(self, runtime, store, run_id: str, preset: str, variables: dict,
+                      owner: Any) -> str:
+        """Poll the owned run; a wait timeout never starts or cancels another run."""
+        def observed_result(loaded, *, timed_out=False):
+            result = _format_result(store.reconcile_run(loaded, write=True), preset, variables,
+                                    timed_out=timed_out)
+            if owner is not None:
+                from src.tools.source_documents import current_document_coverage
+
+                payload = json.loads(result)
+                owner.record_swarm_run(run_id, payload)
+                payload["_sources"] = []
+                for source in owner.source_citations():
+                    payload["_sources"].append({"id": source["source_id"], **{
+                        key: source[key] for key in ("url", "title", "publisher", "tier", "published_at", "data_effective_at")
+                    }})
+                shared = [row for row in owner.shared_observations() if row.get("swarm_run_id") == run_id]
+                documents = {}
+                for observation in shared:
+                    for document in observation.get("source_documents", []):
+                        key = document.get("coverage_id") or document.get("full_text_path")
+                        documents[key] = {**document, "coverage": current_document_coverage(document)}
+                # These copies live in the parent sandbox; child workspace paths are not readable there.
+                payload["source_documents"] = list(documents.values())
+                payload["evidence_parts"] = list(dict.fromkeys(
+                    part for observation in shared for part in observation.get("parts", [])
+                ))
+                return json.dumps(payload, ensure_ascii=False)
+            return result
+
         t0 = time.monotonic()
         max_wait = _max_wait_seconds()
         while time.monotonic() - t0 < max_wait:
-            time.sleep(_POLL_INTERVAL_SECONDS)
+            if self.cancel_event is not None and self.cancel_event.is_set():
+                runtime.cancel_run(run_id)
+                loaded = store.load_run(run_id)
+                return observed_result(loaded, timed_out=True) if loaded else json.dumps({"status": "error", "error": "Cancelled run disappeared"})
 
             loaded = store.load_run(run_id)
             if loaded is None:
@@ -653,8 +737,14 @@ class SwarmTool(BaseTool):
                 )
 
             reconciled = store.reconcile_run(loaded, write=True)
+            if owner is not None:
+                owner.record_swarm_run(run_id, json.loads(_format_result(reconciled, preset, variables)))
             if reconciled.status.value in ("completed", "failed", "cancelled"):
-                return _format_result(reconciled, preset, variables)
+                return observed_result(reconciled)
+            if self.cancel_event is not None:
+                self.cancel_event.wait(_POLL_INTERVAL_SECONDS)
+            else:
+                time.sleep(_POLL_INTERVAL_SECONDS)
 
         # Wait budget elapsed but the run is still in flight. Do NOT cancel —
         # the daemon thread keeps working and the agent can decide to wait
@@ -663,9 +753,10 @@ class SwarmTool(BaseTool):
         # whenever a preset legitimately ran past the budget.
         loaded = store.load_run(run_id)
         if loaded is not None:
-            return _format_result(
-                store.reconcile_run(loaded, write=True), preset, variables, timed_out=True
-            )
+            if self.cancel_event is not None and self.cancel_event.is_set():
+                runtime.cancel_run(run_id)
+                loaded = store.load_run(run_id) or loaded
+            return observed_result(loaded, timed_out=True)
 
         return json.dumps(
             {"status": "timeout", "error": f"Swarm run {run_id} timed out after {max_wait}s"},

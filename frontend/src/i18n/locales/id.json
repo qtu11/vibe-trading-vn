@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Fase eksekusi",
+    "phaseCount": "fase",
+    "toolCount": "alat",
+    "failedPhases": "gagal",
+    "filterLogs": "Filter alat",
+    "noMatchingTools": "Tidak ada alat yang cocok dengan filter ini.",
+    "phases": {
+      "planning": "Perencanaan riset",
+      "planningHint": "Memuat skill, menjalankan subagen, dan merumuskan pertanyaan riset.",
+      "collection": "Pengumpulan data",
+      "collectionHint": "Mengambil data pasar, laporan, berita, dan sumber web.",
+      "modeling": "Analisis keuangan",
+      "modelingHint": "Membangun faktor, menjalankan backtest, dan menghasilkan sinyal.",
+      "verification": "Verifikasi silang",
+      "verificationHint": "Memvalidasi hasil dengan uji ketahanan dan konsistensi.",
+      "reporting": "Penyusunan laporan",
+      "reportingHint": "Menulis sintesis, sitasi, dan artefak yang dapat diunduh."
+    }
+  },
   "charts": {
     "noCompleteBars": "Grafik tidak tersedia: candle OHLC lengkap belum diperoleh. Tidak ada candle yang diperkirakan.",
     "legacyUnavailable": "Grafik tersimpan ini tidak dapat direkonstruksi karena sebagian data candle telah disunting. Tanyakan lagi untuk membuat grafik baru dari data pasar yang diamati.",
@@ -87,7 +107,12 @@
     "sessionsLoadFailed": "Percakapan tidak dapat dimuat.",
     "pixelOffice": "Kantor piksel",
     "paperTrading": "Trading simulasi",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "Cari di ruang kerja",
+    "commandEmpty": "Tidak ada panel yang cocok.",
+    "systemStatus": "Layanan ruang kerja",
+    "systemOnline": "Online",
+    "workspace": "Ruang kerja"
   },
   "runtime": {
     "monitorBadge": "Monitor Runtime",

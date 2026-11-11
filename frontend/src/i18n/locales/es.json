@@ -2,9 +2,29 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Fases de ejecución",
+    "phaseCount": "fases",
+    "toolCount": "herramientas",
+    "failedPhases": "fallidas",
+    "filterLogs": "Filtrar herramientas",
+    "noMatchingTools": "Ninguna herramienta coincide con este filtro.",
+    "phases": {
+      "planning": "Planificación de la investigación",
+      "planningHint": "Carga de habilidades, creación de subagentes y delimitación de la pregunta.",
+      "collection": "Recolección de datos",
+      "collectionHint": "Obtención de datos de mercado, filings, noticias y fuentes web.",
+      "modeling": "Análisis financiero",
+      "modelingHint": "Construcción de factores, backtests y generación de señales.",
+      "verification": "Verificación cruzada",
+      "verificationHint": "Validación de resultados con pruebas de robustez y consistencia.",
+      "reporting": "Generación del informe",
+      "reportingHint": "Redacción de la síntesis, las citas y los artefactos descargables."
+    }
+  },
   "charts": {
     "noCompleteBars": "Gráfico no disponible: no se obtuvieron velas OHLC completas. No se ha estimado ninguna vela.",
-  "legacyUnavailable": "No se pudo reconstruir este gráfico guardado porque parte de los datos de velas fue redactada. Vuelve a preguntar para generar un gráfico nuevo con datos de mercado observados.",
+    "legacyUnavailable": "No se pudo reconstruir este gráfico guardado porque parte de los datos de velas fue redactada. Vuelve a preguntar para generar un gráfico nuevo con datos de mercado observados.",
     "historicalNote": "Velas históricas con la base de ajuste indicada arriba; no son una cotización en tiempo real de la última operación.",
     "sourceLink": "Fuente de datos ↗",
     "sourceUrlUnavailable": "El proveedor de datos no facilitó la URL de origen",
@@ -87,7 +107,12 @@
     "sessionsLoadFailed": "No se pueden cargar las conversaciones.",
     "pixelOffice": "Oficina de píxeles",
     "paperTrading": "Trading simulado",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "Buscar en el espacio de trabajo",
+    "commandEmpty": "No hay paneles coincidentes.",
+    "systemStatus": "Servicios del espacio de trabajo",
+    "systemOnline": "En línea",
+    "workspace": "Espacio de trabajo"
   },
   "runtime": {
     "monitorBadge": "Monitor de Runtime",

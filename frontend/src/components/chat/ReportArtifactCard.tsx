@@ -62,8 +62,8 @@ export default function ReportArtifactCard({ code }: { code: string }) {
 
   if (error || !job) {
     return (
-      <div className="my-2 flex items-center gap-2 rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground">
-        <AlertCircle className="h-4 w-4 text-amber-500" />
+      <div className="my-2 flex items-center gap-2 rounded-lg border border-hairline bg-surface-panel p-3 text-xs text-ink-muted">
+        <AlertCircle className="h-4 w-4 text-warning" />
         <span>Mã báo cáo: {jobId.slice(0, 8)}... (Chưa sẵn sàng tải tự động)</span>
       </div>
     );
@@ -83,22 +83,22 @@ export default function ReportArtifactCard({ code }: { code: string }) {
   }
 
   if (job.status === "queued" || job.status === "running") {
-    return <div role="status" className="my-2 rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-900">Báo cáo đang được tạo. Tải lại khi hoàn tất.</div>;
+    return <div role="status" className="my-2 rounded-xl border border-report-brand/25 bg-report-soft p-4 text-xs text-report-brand-ink-strong">Báo cáo đang được tạo. Tải lại khi hoàn tất.</div>;
   }
 
   const isPartial = job.status === "partial";
   const isDemo = job.publication_status === "simulated_demo";
 
   return (
-    <div className="not-prose my-3 overflow-hidden rounded-2xl border border-red-400/30 bg-gradient-to-br from-[#391111] via-[#5C1717] to-[#251010] text-white shadow-lg">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-4 py-2.5">
+    <div className="not-prose my-3 overflow-hidden rounded-2xl border border-report-brand/40 bg-gradient-to-br from-report-card-from via-report-card-via to-report-card-to text-report-ink shadow-lg">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-report-ink/15 px-4 py-2.5">
         <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
           <img src="/shrimp-vest-logo.png" alt="Logo tôm đỏ Vibe-Trading" className="h-9 w-9 shrink-0 object-contain" />
-          <span className="min-w-0 text-[10px] font-semibold tracking-wider text-red-100 sm:text-xs">
+          <span className="min-w-0 text-[10px] font-semibold tracking-wider text-report-ink/85 sm:text-xs">
             VIBE RESEARCH<span className="hidden sm:inline"> • BÁO CÁO PHÂN TÍCH</span>
           </span>
         </div>
-        <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-red-100">
+        <span className="shrink-0 rounded-full bg-report-ink/12 px-2 py-0.5 text-[10px] font-medium text-report-ink/85">
           {isDemo ? "Dữ liệu giả lập" : "Dự thảo nghiên cứu"}
         </span>
       </div>
@@ -106,20 +106,20 @@ export default function ReportArtifactCard({ code }: { code: string }) {
       <div className="p-4">
         <div className="mb-3 flex items-start justify-between">
           <div>
-            <button type="button" onClick={() => openPreview(job)} className="text-left text-sm font-bold text-white underline-offset-4 hover:underline focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-white">
+            <button type="button" onClick={() => openPreview(job)} className="vt-focus-visible text-left text-sm font-bold text-report-ink underline-offset-4 hover:underline">
               Tài liệu Báo cáo Tài chính & Định giá
             </button>
-            <p className="mt-0.5 text-xs text-red-100/80">
+            <p className="mt-0.5 text-xs text-report-ink/70">
               Bấm vào tài liệu để xem trước ở sidebar bên phải.
             </p>
           </div>
-          {isPartial ? <AlertCircle className="h-4 w-4 text-amber-300" /> : <CheckCircle2 className="h-4 w-4 text-red-200" />}
+          {isPartial ? <AlertCircle className="h-4 w-4 text-warning" /> : <CheckCircle2 className="h-4 w-4 text-report-ink/80" />}
         </div>
 
-        {isPartial && <p role="alert" className="mb-3 rounded-lg bg-amber-300/10 p-2 text-xs text-amber-100">{job.error?.message || "Một định dạng chưa xuất được. Bạn có thể tải tài liệu đã sẵn sàng."}</p>}
+        {isPartial && <p role="alert" className="mb-3 rounded-lg bg-warning/15 p-2 text-xs text-warning">{job.error?.message || "Một định dạng chưa xuất được. Bạn có thể tải tài liệu đã sẵn sàng."}</p>}
 
         <div className="mt-3 flex flex-wrap gap-2.5">
-          <button type="button" onClick={() => openPreview(job)} className="flex items-center gap-2 rounded-lg bg-red-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500"><PanelRightOpen className="h-3.5 w-3.5" aria-hidden="true" />Xem trước tài liệu</button>
+          <button type="button" onClick={() => openPreview(job)} className="vt-focus-visible flex items-center gap-2 rounded-lg bg-report-brand px-3.5 py-2 text-xs font-semibold text-report-ink transition-colors duration-fast hover:bg-report-brand/85"><PanelRightOpen className="h-3.5 w-3.5" aria-hidden="true" />Xem trước tài liệu</button>
           {job.artifacts.map((art) => {
             const isDocx = art.filename.toLowerCase().endsWith(".docx");
             const isPdf = art.filename.toLowerCase().endsWith(".pdf");
@@ -131,22 +131,22 @@ export default function ReportArtifactCard({ code }: { code: string }) {
                 key={art.report_id}
                 type="button"
                 onClick={() => openPreview(job)}
-                className={`group flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all ${
+                className={`vt-focus-visible group flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-all duration-fast ${
                   isPdf
-                    ? "bg-red-600 text-white hover:bg-red-500 hover:shadow-md hover:shadow-red-600/20"
-                    : "border border-white/20 bg-white/5 text-white hover:bg-white/10"
+                    ? "bg-report-brand text-report-ink hover:bg-report-brand/85 hover:shadow-md hover:shadow-report-brand/25"
+                    : "border border-report-ink/20 bg-report-ink/[0.06] text-report-ink hover:bg-report-ink/[0.12]"
                 }`}
               >
                 <FileText className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>{formatLabel}</span>
-                <span className="text-[10px] opacity-70">({sizeLabel})</span>
+                <span className="vt-num text-[10px] opacity-70">({sizeLabel})</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      <div className="border-t border-white/10 bg-black/20 px-4 py-1.5 text-[10px] text-red-100/70">
+      <div className="border-t border-report-ink/15 bg-black/25 px-4 py-1.5 text-[10px] text-report-ink/70">
         Kiểm tra ngày dữ liệu, giả định và điều kiện khuyến nghị trước khi sử dụng.
       </div>
     </div>

@@ -4,6 +4,7 @@ import { ReportPreviewPanel } from "./ReportPreviewPanel";
 import { SourceBrowserPanel } from "./SourceBrowserPanel";
 import { ResearchPreviewPanel } from "./ResearchPreviewPanel";
 import { safeGet, safeSet } from "@/lib/storage";
+import { cn } from "@/lib/utils";
 import { useReportPreviewStore, type PreviewTab } from "@/stores/reportPreview";
 
 const WIDTH_KEY = "qa-preview-width";
@@ -17,7 +18,13 @@ function storedWidth(): number {
   return Number.isFinite(value) && value >= MIN_WIDTH && value <= MAX_WIDTH ? value : DEFAULT_WIDTH;
 }
 
-/** Keep documents and web iframes mounted so tab switches retain their state. */
+/**
+ * The research browser column.
+ *
+ * Layout: a sticky tab strip on top of a single active viewport. The strip is
+ * a proper tablist with roving focus; the viewport hosts one mounted panel per
+ * tab so a loaded document or in-flight web view survives a tab switch.
+ */
 export function PreviewPane() {
   const tabs = useReportPreviewStore((state) => state.tabs);
   const activeId = useReportPreviewStore((state) => state.activeId);
@@ -75,7 +82,11 @@ export function PreviewPane() {
   if (tabs.length === 0) return null;
 
   return (
-    <div ref={paneRef} style={{ width: `${width}%` }} className="relative z-20 flex h-full min-h-0 min-w-[20rem] shrink-0 flex-col border-l border-border bg-background lg:max-w-[calc(100%_-_20rem)] max-lg:absolute max-lg:inset-0 max-lg:!w-full max-lg:min-w-0 max-lg:max-w-none">
+    <div
+      ref={paneRef}
+      style={{ width: `${width}%` }}
+      className="relative z-20 flex h-full min-h-0 min-w-[20rem] shrink-0 flex-col border-l border-hairline bg-surface-base lg:max-w-[calc(100%_-_20rem)] max-lg:absolute max-lg:inset-0 max-lg:!w-full max-lg:min-w-0 max-lg:max-w-none"
+    >
       <div
         role="separator"
         tabIndex={0}
@@ -87,7 +98,7 @@ export function PreviewPane() {
         aria-valuemax={MAX_WIDTH}
         aria-valuenow={Math.round(width)}
         aria-valuetext={`Khung xem trước ${Math.round(width)}%`}
-        className="group absolute inset-y-0 -left-1.5 z-30 flex w-3 touch-none cursor-col-resize items-center justify-center transition-colors hover:bg-primary/10 focus-visible:bg-primary/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary max-lg:hidden"
+        className="group absolute inset-y-0 -left-1.5 z-30 flex w-3 touch-none cursor-col-resize items-center justify-center transition-colors duration-fast hover:bg-accent/10 focus-visible:bg-accent/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent max-lg:hidden"
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           event.preventDefault();
@@ -109,36 +120,46 @@ export function PreviewPane() {
           persistWidth();
         }}
       >
-        <span aria-hidden="true" className="pointer-events-none h-10 w-1.5 rounded-full bg-muted-foreground/40 shadow-sm transition-colors group-hover:bg-primary group-focus-visible:bg-primary" />
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none h-10 w-[3px] rounded-full bg-hairline-strong transition-colors duration-fast",
+            "group-hover:bg-accent group-focus-visible:bg-accent",
+            dragging && "bg-accent",
+          )}
+        />
       </div>
-        <div
-          ref={stripRef}
-          role="tablist"
-          aria-label="Bản xem trước đang mở"
-          className="flex w-full shrink-0 items-end gap-1 overflow-x-auto border-b border-border bg-muted/30 px-2 pt-1.5"
-          onKeyDown={(event) => {
-            if (!(event.target instanceof HTMLElement) || event.target.getAttribute("role") !== "tab") return;
-            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-            event.preventDefault();
-            const index = tabs.findIndex((tab) => tab.id === activeId);
-            const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
-            setActive(tabs[next].id);
-            stripRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
-          }}
+
+      {/* Tab strip */}
+      <div
+        ref={stripRef}
+        role="tablist"
+        aria-label="Bản xem trước đang mở"
+        className="flex w-full shrink-0 items-end gap-1 overflow-x-auto border-b border-hairline bg-surface-sidebar px-2 pt-1.5"
+        onKeyDown={(event) => {
+          if (!(event.target instanceof HTMLElement) || event.target.getAttribute("role") !== "tab") return;
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const index = tabs.findIndex((tab) => tab.id === activeId);
+          const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+          setActive(tabs[next].id);
+          stripRef.current?.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
+        }}
+      >
+        {tabs.map((tab) => (
+          <TabButton key={tab.id} id={`${id}-${encodeURIComponent(tab.id)}`} tab={tab} active={tab.id === activeId} onSelect={() => setActive(tab.id)} onClose={() => closeTab(tab.id)} />
+        ))}
+        <button
+          type="button"
+          aria-label="Đóng tất cả bản xem trước"
+          onClick={close}
+          className="vt-focus-visible mb-1 ml-auto shrink-0 rounded-md p-1.5 text-ink-faint transition-colors duration-fast hover:bg-muted hover:text-ink"
         >
-          {tabs.map((tab) => (
-            <TabButton key={tab.id} id={`${id}-${encodeURIComponent(tab.id)}`} tab={tab} active={tab.id === activeId} onSelect={() => setActive(tab.id)} onClose={() => closeTab(tab.id)} />
-          ))}
-          <button
-            type="button"
-            aria-label="Đóng tất cả bản xem trước"
-            onClick={close}
-            className="mb-1 ml-auto shrink-0 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
-          >
-            <X aria-hidden="true" className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      <div id={`${id}-content`} className={`flex min-h-0 w-full flex-1 flex-col ${dragging ? "pointer-events-none select-none" : ""}`}>
+          <X aria-hidden="true" className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      <div id={`${id}-content`} className={cn("flex min-h-0 w-full flex-1 flex-col", dragging && "pointer-events-none select-none")}>
         {tabs.map((tab) => (
           <TabContent key={tab.id} id={`${id}-${encodeURIComponent(tab.id)}`} tab={tab} active={tab.id === activeId} resizing={dragging} />
         ))}
@@ -154,14 +175,27 @@ function TabButton({ id, tab, active, onSelect, onClose }: { id: string; tab: Pr
   return (
     <div
       title={tab.title}
-      className={`group flex max-w-[14rem] shrink-0 items-center gap-1.5 rounded-t-lg border border-b-0 px-2.5 py-1.5 text-xs transition-colors ${
+      className={cn(
+        "group relative flex max-w-[14rem] shrink-0 items-center gap-1.5 rounded-t-md border border-b-0 px-2.5 py-1.5 text-xs transition-colors duration-fast",
         active
-          ? "border-border bg-background font-medium text-foreground"
-          : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-      }`}
+          ? "border-hairline bg-surface-base font-medium text-ink"
+          : "border-transparent text-ink-muted hover:bg-muted/60 hover:text-ink-secondary",
+      )}
     >
-      <button id={`${id}-tab`} role="tab" aria-selected={active} aria-controls={`${id}-panel`} tabIndex={active ? 0 : -1} type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-1.5 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-        <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 opacity-70" />
+      {active && (
+        <span aria-hidden="true" className="absolute inset-x-0 -bottom-px h-[2px] rounded-full bg-accent" />
+      )}
+      <button
+        id={`${id}-tab`}
+        role="tab"
+        aria-selected={active}
+        aria-controls={`${id}-panel`}
+        tabIndex={active ? 0 : -1}
+        type="button"
+        onClick={onSelect}
+        className="vt-focus-visible flex min-w-0 flex-1 items-center gap-1.5 text-left"
+      >
+        <Icon aria-hidden="true" className={cn("h-3.5 w-3.5 shrink-0", active ? "text-accent-ink" : "text-ink-faint")} />
         <span className="truncate">{tab.title}</span>
       </button>
       <button
@@ -173,7 +207,10 @@ function TabButton({ id, tab, active, onSelect, onClose }: { id: string; tab: Pr
           event.stopPropagation();
           onClose();
         }}
-        className={`shrink-0 rounded p-0.5 text-muted-foreground transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary group-hover:opacity-100 group-focus-within:opacity-100 ${active ? "opacity-100" : "opacity-0"}`}
+        className={cn(
+          "vt-focus-visible shrink-0 rounded p-0.5 text-ink-faint transition-opacity duration-fast hover:bg-muted hover:text-ink",
+          active ? "opacity-100" : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100",
+        )}
       >
         <X aria-hidden="true" className="h-3 w-3" />
       </button>

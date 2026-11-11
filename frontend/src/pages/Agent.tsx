@@ -1934,12 +1934,12 @@ export function Agent() {
       <div
         ref={listRef}
         data-streaming={status === "streaming" ? "true" : undefined}
-        className="chat-scroll-container flex-1 overflow-auto p-6 relative"
+        className="chat-scroll-container relative flex-1 overflow-auto p-6"
       >
         <div
           className={[
-            reportPreviewOpen ? "w-full space-y-8" : "max-w-3xl mx-auto space-y-8",
-            !sessionLoading && messages.length === 0 ? "min-h-full flex flex-col" : "",
+            reportPreviewOpen ? "w-full space-y-8" : "mx-auto max-w-3xl space-y-8",
+            !sessionLoading && messages.length === 0 ? "flex min-h-full flex-col" : "",
           ].join(" ")}
         >
           {sessionLoading && (
@@ -2089,7 +2089,7 @@ export function Agent() {
 
       <div
         data-agent-composer
-        className="border-t border-white/[0.06] dark:border-white/[0.04] px-4 pt-2 pb-3.5 bg-gradient-to-t from-background/95 via-background/90 to-background/50 backdrop-blur-xl"
+        className="border-t border-hairline-subtle vt-edge-bottom px-4 pb-3.5 pt-2 vt-chrome"
       >
         <div className={reportPreviewOpen ? "w-full" : "max-w-2xl mx-auto"}>
           <LiveRuntimePanel

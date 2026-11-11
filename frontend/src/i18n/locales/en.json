@@ -2,6 +2,26 @@
   "app": {
     "version": "v0.3.4"
   },
+  "execution": {
+    "phaseRail": "Execution phases",
+    "phaseCount": "phases",
+    "toolCount": "tools",
+    "failedPhases": "failed",
+    "filterLogs": "Filter tools",
+    "noMatchingTools": "No tools match this filter.",
+    "phases": {
+      "planning": "Research planning",
+      "planningHint": "Loading skills, spawning subagents and framing the research question.",
+      "collection": "Data collection",
+      "collectionHint": "Pulling market data, filings, news and web sources.",
+      "modeling": "Financial analysis",
+      "modelingHint": "Building factors, running backtests and generating signals.",
+      "verification": "Cross verification",
+      "verificationHint": "Validating results with robustness and consistency checks.",
+      "reporting": "Report generation",
+      "reportingHint": "Writing the synthesis, citations and downloadable artifacts."
+    }
+  },
   "charts": {
     "noCompleteBars": "Chart unavailable: no complete OHLC candles were retrieved. No candles have been estimated.",
     "legacyUnavailable": "This saved chart cannot be reconstructed because its candle data was partially redacted. Ask again to generate a fresh chart from observed market data.",
@@ -87,7 +107,12 @@
     "sessionsLoadFailed": "Cannot load conversations.",
     "pixelOffice": "Pixel Office",
     "paperTrading": "Paper trading",
-    "marketResearch": "Market research"
+    "marketResearch": "Market research",
+    "commandSearch": "Search workspace",
+    "commandEmpty": "No matching surfaces.",
+    "systemStatus": "Workspace services",
+    "systemOnline": "Online",
+    "workspace": "Workspace"
   },
   "runtime": {
     "monitorBadge": "Runtime Monitor",

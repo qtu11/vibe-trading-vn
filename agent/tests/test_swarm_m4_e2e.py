@@ -248,6 +248,11 @@ def test_run_worker_uses_remote_mcp_tool_and_report_cites_canned_data(
         _make_server_config(),
         client_factory=_make_factory(state),
     )
+    # Remote tools remain serial-only and cannot self-certify a readonly observation.
+    from src.tools.web_reader_tool import WebReaderTool
+    monkeypatch.setattr(WebReaderTool, "execute", lambda self, **kwargs: json.dumps({
+        "status": "ok", "url": "https://issuer.example/filing", "content": canned_payload["answer"],
+    }))
 
     # Simulate two LLM turns: first one calls the remote tool, second writes
     # report.md using the (real) write_file tool, third returns final text.
@@ -267,6 +272,9 @@ def test_run_worker_uses_remote_mcp_tool_and_report_cites_canned_data(
         ),
         _final_response("Wrote report.md with KB-cited findings."),
     ]
+    responses[0].tool_calls.append(ToolCallRequest(
+        id="tc-source", name="read_url", arguments={"url": "https://issuer.example/filing"},
+    ))
     llm_factory = _stub_llm_factory(responses)
 
     events: list[SwarmEvent] = []
@@ -285,7 +293,7 @@ def test_run_worker_uses_remote_mcp_tool_and_report_cites_canned_data(
         result = run_worker(
             agent_spec=_agent_spec(
                 agent_id="kb_analyst",
-                tools=["mcp_kb_search", "write_file"],
+                tools=["mcp_kb_search", "write_file", "read_url"],
                 max_iterations=5,
             ),
             task=_task(task_id="t1", agent_id="kb_analyst"),
