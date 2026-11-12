@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from typing import Any
@@ -55,6 +56,50 @@ def requested_export_formats(request: str) -> set[str]:
     if not re.search(r"\b(export|save|download|xuat|tao|create|generate|write|viet|ra file)\b", text):
         return set()
     return set(re.findall(r"\b(docx|pdf|pptx)\b", text))
+
+
+def review_wait_windows() -> int:
+    """Return how many ``run_swarm`` wait windows cover the whole review run.
+
+    ``run_swarm`` blocks for at most ``SWARM_TIMEOUT`` seconds per call. The
+    review preset runs four evidence-reading roles serially and each role has
+    its own timeout plus retry budget, so a fixed resume count can abandon a
+    run the runtime still considers healthy. Derive the window count from the
+    preset that will actually execute (including a user override) and from the
+    same layer deadline the runtime applies — ``timeout * (retries + 1)``,
+    capped retry backoff, and the 60s layer buffer.
+
+    The returned number includes the initial ``run_swarm`` call. Three
+    windows (the previous fixed budget) are returned when the preset cannot be
+    loaded; the run itself then fails with a clear preset error.
+    """
+    try:
+        from src.config.accessor import get_env_config
+        from src.swarm.presets import load_preset
+
+        swarm = get_env_config().swarm
+        preset = load_preset(REVIEW_PRESET)
+        agents = {
+            str(agent.get("id")): agent
+            for agent in preset.get("agents", [])
+            if isinstance(agent, dict)
+        }
+        total_seconds = 0.0
+        for task in preset.get("tasks", []):
+            if not isinstance(task, dict):
+                continue
+            agent = agents.get(str(task.get("agent_id")), {})
+            timeout = max(1.0, float(agent.get("timeout_seconds") or 300))
+            retries = max(0, int(agent.get("max_retries") or 0))
+            total_seconds += (
+                timeout * (retries + 1)
+                + retries * float(swarm.swarm_worker_retry_max_delay_s)
+                + 60.0
+            )
+        window = max(1, int(swarm.swarm_timeout))
+        return max(2, math.ceil(total_seconds / window))
+    except Exception:
+        return 3
 
 
 def completed_review(ledger: Any) -> dict[str, Any] | None:

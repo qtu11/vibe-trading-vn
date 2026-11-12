@@ -27,12 +27,15 @@ def test_real_research_team_reads_shared_sources_and_resumes_one_run(tmp_path, m
 
     def wait_budget():
         waits.append(True)
-        if len(waits) == 1:
+        if len(waits) < 4:
             return 0
         release.set()
         return 5
 
     monkeypatch.setattr(tool_module, "_max_wait_seconds", wait_budget)
+    # Four windows: the initial call plus three resumes, beyond the old fixed
+    # two-resume budget. The computed window count is covered separately.
+    monkeypatch.setattr("src.agent.loop.review_wait_windows", lambda: 4)
     original_start = runtime_module.SwarmRuntime.start_run
 
     def start(runtime, *args, **kwargs):
@@ -121,7 +124,7 @@ def test_real_research_team_reads_shared_sources_and_resumes_one_run(tmp_path, m
     result = loop.run("Deep research climate transition risks using primary web sources")
     assert result["status"] == "success", result.get("reason")
     assert order == ["Source analyst", "Domain analyst", "Critical reviewer", "Research editor", "parent"]
-    assert len(started) == 1 and len(waits) == 2
+    assert len(started) == 1 and len(waits) == 4
     assert result["research_workflow"]["review_run_id"] == started[0]
     assert source_ids == [["S1"]] * 4
     assert [row.url for row in loop._grounding.sources] == ["https://issuer.example/filing"]

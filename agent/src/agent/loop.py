@@ -84,7 +84,7 @@ from src.agent.tool_progress import ToolProgress
 from src.agent.write_targets import append_report_artifacts, missing_report_formats
 from src.agent.research_workflow import (
     REVIEW_PRESET, completed_review, requested_export_formats,
-    requires_research_review, research_release_error,
+    requires_research_review, research_release_error, review_wait_windows,
 )
 from src.agent.tools import ToolRegistry
 from src.agent.trace import TraceWriter
@@ -609,9 +609,12 @@ class AgentLoop(ToolCallLifecycle):
                 messages.append(context.format_assistant_tool_calls([call]))
                 self._process_tool_calls([call], context, messages, trace, react_trace, self._run_iteration)
                 receipt = completed_review(self._grounding)
-                # The preset has four bounded tasks; resume the same run across
-                # up to three tool wait windows instead of starting another team.
-                for wait_index in range(2):
+                # The preset's roles are serial and each has its own timeout, so
+                # the review can legitimately outlive a single wait window.
+                # Resume the same run until the preset budget is covered; never
+                # start a second team just because one window elapsed.
+                wait_windows = review_wait_windows()
+                for wait_index in range(max(0, wait_windows - 1)):
                     if receipt is not None or self._cancel_event.is_set():
                         break
                     observed_runs = [row for row in self._grounding.swarm_run_receipts()

@@ -61,7 +61,7 @@ agents:
     tools: *research_tools
     skills: *research_skills
     max_iterations: 25
-    timeout_seconds: 900
+    timeout_seconds: 1800
     max_retries: 0
 
   - id: research_editor
@@ -80,7 +80,7 @@ agents:
     tools: *research_tools
     skills: *research_skills
     max_iterations: 20
-    timeout_seconds: 900
+    timeout_seconds: 1800
     max_retries: 0
 
 tasks:

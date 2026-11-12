@@ -210,3 +210,57 @@ def test_review_preset_has_serial_roles_and_no_recursive_export():
     assert inspect_preset(REVIEW_PRESET)["valid"] is True
     assert len(inspect_preset(REVIEW_PRESET)["layers"]) == 4
     assert all(not ({"run_swarm", "export_research_report", "bash"} & set(row["tools"])) for row in data["agents"])
+
+
+def test_review_roles_have_enough_wall_clock_for_evidence_review():
+    """Review/editing roles must not be tighter than the analyst stages.
+
+    A 900s reviewer timed out mid-analysis while the analysts had 1200s, so
+    the review preset now gives every evidence-reading role the same full
+    budget; the worker's wall-clock wrap-up protects the tail of that budget.
+    """
+    from src.swarm.presets import load_preset
+    from src.agent.research_workflow import REVIEW_PRESET
+
+    data = load_preset(REVIEW_PRESET)
+    timeouts = {row["id"]: row["timeout_seconds"] for row in data["agents"]}
+    assert timeouts["source_analyst"] >= 1200
+    assert timeouts["domain_analyst"] >= 1200
+    assert timeouts["critical_reviewer"] >= timeouts["domain_analyst"]
+    assert timeouts["research_editor"] >= 1200
+
+
+def test_review_wait_windows_cover_all_role_budgets():
+    """The parent must not abandon a review the runtime still considers live.
+
+    Each task may consume ``timeout * (retries + 1)`` plus capped retry
+    backoff and the runtime's 60s layer buffer. ``SWARM_TIMEOUT`` is only the
+    per-call wait window, so the resume count has to cover their sum.
+    """
+    from src.agent.research_workflow import REVIEW_PRESET, review_wait_windows
+    from src.config.accessor import get_env_config
+    from src.swarm.presets import load_preset
+
+    data = load_preset(REVIEW_PRESET)
+    agents = {row["id"]: row for row in data["agents"]}
+    swarm = get_env_config().swarm
+    total = sum(
+        agents[task["agent_id"]]["timeout_seconds"]
+        * (agents[task["agent_id"]]["max_retries"] + 1)
+        + agents[task["agent_id"]]["max_retries"] * swarm.swarm_worker_retry_max_delay_s
+        + 60
+        for task in data["tasks"]
+    )
+    windows = review_wait_windows()
+    assert windows >= 2
+    assert windows * swarm.swarm_timeout >= total
+
+
+def test_review_wait_windows_fall_back_when_preset_is_missing(monkeypatch):
+    import src.agent.research_workflow as research_workflow
+
+    def missing(_name):
+        raise FileNotFoundError("preset disappeared")
+
+    monkeypatch.setattr("src.swarm.presets.load_preset", missing)
+    assert research_workflow.review_wait_windows() == 3

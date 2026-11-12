@@ -761,6 +761,18 @@ def _run_worker_impl(
 
     # Threshold for injecting a "wrap up" nudge (80% of budget)
     wrap_up_at = max(1, int(max_iterations * 0.8))
+
+    # Wall-clock budget. The iteration cap alone is not enough: a slow role
+    # can spend its whole timeout inside tool calls and reach neither the
+    # 80%-of-iterations nudge nor the last-iteration forced-answer path.
+    # Reserve a final tool-less call and stop tool use before the deadline.
+    time_budget = float(timeout)
+    final_call_reserve = min(180.0, max(5.0, time_budget * 0.20))
+    final_phase_at = max(0.0, time_budget - final_call_reserve)
+    time_wrap_up_at = time_budget * 0.70
+    time_wrap_up_sent = False
+    final_wrap_up_sent = False
+
     last_assistant_content = ""
     pending_data_review = False
 
@@ -815,8 +827,49 @@ def _run_worker_impl(
                 ),
             )
 
+        # Wall-clock wrap-up. The iteration nudge below only fires once 80% of
+        # the *iteration* budget is gone; a slow reviewer can still exhaust
+        # its timeout mid-research. Nudge at 70% of wall-clock time, then stop
+        # offering tools at the hard final-answer threshold so the reserved
+        # tail of the budget produces a critique instead of an empty timeout.
+        in_final_phase = elapsed >= final_phase_at
+        if not final_wrap_up_sent and in_final_phase:
+            remaining_s = max(0, int(time_budget - elapsed))
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"[SYSTEM] Time budget: about {remaining_s}s remain. "
+                    "Stop calling tools now and return your final analysis as plain text, "
+                    "using only evidence you have already observed. State unresolved gaps "
+                    "explicitly and do not start new research."
+                ),
+            })
+            final_wrap_up_sent = True
+            time_wrap_up_sent = True
+            _emit(event_callback, "worker_time_wrap_up", agent_id, task_id,
+                  {"iteration": iteration, "elapsed": round(elapsed, 1),
+                   "remaining_s": remaining_s, "final": True})
+        elif not time_wrap_up_sent and elapsed >= time_wrap_up_at:
+            remaining_s = max(0, int(time_budget - elapsed))
+            messages.append({
+                "role": "user",
+                "content": (
+                    f"[SYSTEM] About {remaining_s}s remain. Finish the current check, "
+                    "stop starting new research and consolidate your evidence for a "
+                    "final plain-text answer."
+                ),
+            })
+            time_wrap_up_sent = True
+            _emit(event_callback, "worker_time_wrap_up", agent_id, task_id,
+                  {"iteration": iteration, "elapsed": round(elapsed, 1),
+                   "remaining_s": remaining_s, "final": False})
+
+        # On the last iteration the model is called without tool definitions,
+        # so the iteration nudge below must not tell it to write a file.
+        is_last_iteration = iteration == max_iterations - 1
+
         # Inject wrap-up nudge when approaching iteration limit
-        if iteration == wrap_up_at:
+        if iteration == wrap_up_at and not in_final_phase and not is_last_iteration:
             remaining = max_iterations - iteration
             if "write_file" in (agent_spec.tools or []):
                 wrap_up_content = (
@@ -838,9 +891,13 @@ def _run_worker_impl(
                 "content": wrap_up_content,
             })
 
-        # On last iteration, call LLM without tool definitions to force text output
-        is_last_iteration = iteration == max_iterations - 1
-        tool_defs = None if is_last_iteration else registry.get_definitions()
+        # On the last iteration or once the wall-clock final phase starts,
+        # call the LLM without tool definitions to force text output.
+        tool_defs = (
+            None
+            if is_last_iteration or in_final_phase
+            else registry.get_definitions()
+        )
         compacted = worker_context.compact(messages, tool_defs)
         if compacted:
             _emit(event_callback, "worker_context_offloaded", agent_id, task_id,
@@ -1043,6 +1100,15 @@ def _run_worker_impl(
         if response.content and len(response.content.strip()) > 20:
             last_assistant_content = response.content
 
+        # In the wall-clock final phase the model was offered no tools. If a
+        # provider still returns tool calls, do not dispatch another research
+        # round with the time already reserved for the final answer: keep the
+        # turn's text (or the best substantive text seen so far) as terminal.
+        if in_final_phase and response.has_tool_calls:
+            response.tool_calls = []
+            if not (response.content or "").strip():
+                response.content = _best_summary(messages, "")
+
         # Content-filter skip: provider blocked the response — continue to
         # the next iteration instead of finalising on empty/garbage content.
         if response.content_filter_triggered:
@@ -1097,7 +1163,13 @@ def _run_worker_impl(
 
         # If no tool calls, this is the final response
         if not response.has_tool_calls:
-            summary = response.content or last_assistant_content or "(no summary)"
+            if in_final_phase:
+                # Never manufacture a deliverable from a weak preamble when
+                # the forced final call returned nothing: an empty summary
+                # fails _classify_deliverable instead of silently completing.
+                summary = (response.content or "").strip() or _best_summary(messages, "")
+            else:
+                summary = response.content or last_assistant_content or "(no summary)"
             summary = _resolve_summary(artifact_dir, summary)
             _finalize_run(artifact_dir, summary, messages)
             reason = _classify_deliverable(
